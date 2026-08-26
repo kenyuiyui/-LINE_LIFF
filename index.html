@@ -264,7 +264,9 @@
       <div class="dev-panel" style="margin-top:14px;">
         <b>這裡是真的：</b>點擊上方按鈕會跳出瀏覽器的麥克風權限請求，同意後即為真實的 Web Speech API 語音辨識，請對著裝置說話測試。若卡在「無法開始錄音」，畫面會顯示實際錯誤原因（權限被拒 / 網路問題 / 瀏覽器不支援），不是我用文字猜的。
         <br><br>
-        <b>這次修正：</b>引擎每講一兩句就自動重啟是系統本身的行為，改不了；但現在重啟不會再打斷你正在講的長句——內容會持續累積，直到真的停頓夠久（約 2.5 秒）或講出標點符號才切成卡片，長句應該不會再被切得支離破碎。
+        <b>這次修正：</b>引擎每講一兩句就自動重啟是系統本身的行為，改不了；但現在重啟不會再打斷你正在講的長句——內容會持續累積，直到真的停頓夠久（約 2.5 秒）或講出標點符號才切成卡片。
+        <br><br>
+        <b>修的 bug（感謝真機截圖回報）：</b>上一版有嚴重疊加問題，導致同一句話被重複好幾遍塞進同一張卡片，原因是 Web Speech API 每次重啟都會重新給一整批「至今為止的結果」，但程式碼誤把它當成新增內容持續往上加。這次改成正確追蹤「這個 session 內真正新增的部分」，已用模擬資料重現你截圖裡的重複現象並確認修好，但實際效果仍需你真機重新測試確認。
         <div>
           <button onclick="simWakeLockLost()">模擬螢幕意外熄屏（僅 UI 提示，非真實偵測）</button>
         </div>
@@ -421,40 +423,56 @@ const DictationEngine = {
     this.recognition.interimResults = true;
     this.recognition.lang = 'zh-TW';
 
-    // 修正說明：原本每次 onend 自動重啟後，殘餘的無標點文字會在短暫停頓計時器
-    // 一到就被強制切成卡片，但 Android/Chrome 對 continuous 模式的自動重啟頻率
-    // 本身就偏高（見前次查證：系統會在講完一句就判定結束、觸發重啟），這導致
-    // 使用者感受到的是「幾乎一句一句斷」。
-    // 修正邏輯：buffer 提升為跨越多次引擎重啟都持續累積的緩衝區，重啟本身
-    // 不觸發任何切分動作；只有「真的偵測到標點」或「累積內容夠長時間沒有
-    // 任何新字進來」（用更寬鬆的靜默判定，而非每次重啟就重算）才切成卡片。
-    this.longBuffer = ''; // 跨越多次 onend 重啟持續累積的長句緩衝區
+    // 修正說明（第二次修正，修的是第一次修正引入的新 bug）：
+    // 上一版用 `this.longBuffer += text` 在每次 onresult 觸發時累加文字，
+    // 但真機實測發現同一句話會被重複疊加好幾遍。根本原因：W3C 規格明定
+    // event.results 是「這個 session 至今所有結果」的完整陣列，resultIndex
+    // 只保證「比它小的索引內容不變」，但每次 recognition.start()（也就是
+    // onend 自動重啟後）都會開啟一個全新 session，其內部的 results 陣列與
+    // resultIndex 計算基準會重新歸零——若外部的 longBuffer 繼續無條件累加，
+    // 同一段話就會在每次重啟後被重新讀取一次、疊加一次，重啟越多次疊加越多次。
+    // 正確做法：用一個「這個 session 內已確認的最終文字」獨立追蹤，
+    // 每次 onresult 都是整段覆寫（不是累加），只有在真正要跨 session 保留
+    // 內容時（例如切換到 longBuffer 準備斷句判斷）才手動搬移一次。
+    this.longBuffer = ''; // 跨越多次 onend 重啟持續累積、等待斷句的緩衝區
     this._silenceTimer = null;
     const SILENCE_TO_CUT_MS = 2500; // 真正判定「這段話講完了」所需的靜默時間，
                                      // 刻意設得比引擎重啟間隔更長，避免重啟誤觸發斷句
 
+    let sessionFinalTranscript = ''; // 僅屬於「目前這次 recognition session」的最終文字，
+                                      // 每次 onstart（新 session 開始）時會被重置為空
+
+    this.recognition.onstart = () => {
+      sessionFinalTranscript = ''; // 新 session 開始，該 session 自己的追蹤歸零
+    };
+
     this.recognition.onresult = (event) => {
       let interim = '';
-      let gotFinal = false;
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const text = event.results[i][0].transcript;
+      let sessionFinalThisEvent = '';
+      // 每次事件觸發都從頭掃過 results（不是從 resultIndex 開始），
+      // 但只用來「重新組出這個 session 目前為止的完整最終文字」，
+      // 這是整段覆寫，不是疊加，所以同一個 session 內重複觸發不會重複計入
+      for (let i = 0; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          // 合併時補上一個空格，避免跨越引擎重啟拼接的片段黏在一起難以閱讀
-          // （中文本身不靠空格分詞，這裡用空格只是給卡片文字一點呼吸感，
-          //  不影響 M2 的標點斷句判斷）
-          this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + text;
-          gotFinal = true;
-        } else {
-          interim = text;
+          sessionFinalThisEvent += event.results[i][0].transcript;
+        } else if (i === event.results.length - 1) {
+          interim = event.results[i][0].transcript;
         }
       }
       this.updateInterim(interim);
 
-      if (gotFinal) {
-        // 每次拿到最終結果，先檢查有沒有明確標點可以立刻切（標點是最可靠的訊號）
+      // 只有當「這個 session 的最終文字」比上次記錄的更長，才代表有新內容，
+      // 取出差異部分（新增的那一小段）搬進跨 session 的 longBuffer
+      if (sessionFinalThisEvent.length > sessionFinalTranscript.length) {
+        const newPart = sessionFinalThisEvent.slice(sessionFinalTranscript.length);
+        sessionFinalTranscript = sessionFinalThisEvent;
+
+        this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + newPart;
+
+        // 有新內容進來，先檢查有沒有明確標點可以立刻切（標點是最可靠的訊號）
         this.flushByPunctuation();
-        // 不管有沒有標點，都重置靜默計時器：只要還在持續講話（即使引擎中途重啟），
-        // 就不斷句；真正停下來一段夠長時間才強制把剩餘內容收成一張卡片
+        // 重置靜默計時器：只要還在持續講話（即使引擎中途重啟），就不斷句；
+        // 真正停下來一段夠長時間才強制把剩餘內容收成一張卡片
         clearTimeout(this._silenceTimer);
         this._silenceTimer = setTimeout(() => this.flushRemainingAsCard(), SILENCE_TO_CUT_MS);
       }
