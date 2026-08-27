@@ -278,7 +278,9 @@
         <br><br>
         <b>這次修正：</b>引擎每講一兩句就自動重啟是系統本身的行為，改不了；但現在重啟不會再打斷你正在講的長句——內容會持續累積，直到真的停頓夠久（約 2.5 秒）或講出標點符號才切成卡片。新增：會議中畫面現在會即時顯示「剛新增的那張卡片內容」，不用切到編輯頁才看得到。
         <br><br>
-        <b>連續修了三次的 bug（老實記錄，方便你判斷這輪穩不穩）：</b>第一版疊加 bug 導致同一句話重複六遍；第二版修疊加時改用長度比對，結果把「引擎修正字詞但長度不變」的情況整段漏掉，導致長句消失；第三版改用共同前綴比對，又在「句子中間單字被修正」時產生混亂拼接。這一版改回 Chrome 官方示範的標準寫法：session 內用 resultIndex 累加（不用自己比對差異），只在 session 真正結束（onend）時才把內容搬進跨 session 緩衝區，並補上「使用者中途按停止、最後一段話不會消失」的處理。已用模擬資料驗證四種情境，但沒有真機音訊資料，仍可能有這裡沒設想到的邊界情況。
+        <b>連續修了三次的 bug（老實記錄，方便你判斷這輪穩不穩）：</b>第一版疊加 bug 導致同一句話重複六遍；第二版修疊加時改用長度比對，結果把「引擎修正字詞但長度不變」的情況整段漏掉，導致長句消失；第三版改用共同前綴比對，又在「句子中間單字被修正」時產生混亂拼接。第四版改回 Chrome 官方示範的標準寫法：session 內用 resultIndex 累加（不用自己比對差異），只在 session 真正結束（onend）時才把內容搬進跨 session 緩衝區，並補上「使用者中途按停止、最後一段話不會消失」的處理。
+        <br><br>
+        <b>第五版新修：</b>真機測試發現唸連續數字（1、2、3…10）時，引擎會把每次逐步累加的中間判斷都當成正式 final 結果送出，導致卡片內容變成「111 21 21 2 31 2 31 2 3…」這種混亂疊加。這不代表引擎在其他內容上也會這樣，但既然它會發生，就加了防禦：若新收到的內容整段包含上一段內容當開頭（代表引擎在重講同一段話），就用新的取代舊的而非相加。已用模擬資料重建這個真機現象並確認修正，同時跑過前四版的所有回歸測試確認沒有弄壞既有功能，但實際效果仍需真機測試確認。
         <div>
           <button onclick="simWakeLockLost()">模擬螢幕意外熄屏（僅 UI 提示，非真實偵測）</button>
         </div>
@@ -459,15 +461,32 @@ const DictationEngine = {
 
     this.recognition.onstart = () => {
       sessionFinalTranscript = ''; // 新 session 開始，歸零
+      this._lastFinalPiece = ''; // 同步歸零，避免跨 session 誤判前綴延伸
     };
 
     this.recognition.onresult = (event) => {
       let interim = '';
       // Chrome 官方標準寫法：從 event.resultIndex 開始，只處理這次新增/變更的部分，
-      // 規格保證 resultIndex 之前的內容不會再變，這是最簡單也最不容易出錯的方式
+      // 規格保證 resultIndex 之前的內容不會再變，這是最簡單也最不容易出錯的方式。
+      //
+      // 防禦性修正（真機發現：連續數字如「1、2、3...10」時，引擎會把每一次
+      // 逐步累加的中間判斷都標成 isFinal=true 送出，而不是只送一次最終結果，
+      // 導致「1」「1 2」「1 2 3」…全部被當成獨立內容疊加，卡片變成
+      // 「111 21 21 2 31 2 31 2 3 41…」這種混亂形狀）：
+      // 不去猜測或依賴引擎為什麼這樣送資料，而是根據系統實際回傳的內容本身
+      // 做判斷——如果這次收到的 final 文字，是「上一次已收到內容」的前綴延伸
+      // （代表引擎又把舊內容整段重講了一次、只是後面多接了一點新東西），
+      // 就用新的整段取代舊的，而不是兩者相加，避免重複部分被疊加進去。
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          sessionFinalTranscript += event.results[i][0].transcript;
+          const piece = event.results[i][0].transcript;
+          if (this._lastFinalPiece && piece.startsWith(this._lastFinalPiece)) {
+            // 新內容整段包含舊內容當開頭 → 這是同一段話的重講/延伸，取代不疊加
+            sessionFinalTranscript = sessionFinalTranscript.slice(0, sessionFinalTranscript.length - this._lastFinalPiece.length) + piece;
+          } else {
+            sessionFinalTranscript += piece;
+          }
+          this._lastFinalPiece = piece;
         } else {
           interim = event.results[i][0].transcript;
         }
