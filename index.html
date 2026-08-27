@@ -101,6 +101,16 @@
     font-size: 13px; color: #6be89a; min-height: 18px;
     margin-bottom: 14px; font-style: italic;
   }
+  .latest-card-preview {
+    font-size: 13px; color: #fff; min-height: 20px;
+    margin-bottom: 14px; padding: 8px 10px;
+    border-radius: 8px; background: rgba(255,255,255,0.06);
+    line-height: 1.5; word-break: break-word;
+    transition: background 0.3s ease;
+  }
+  .latest-card-preview.flash {
+    background: rgba(6,199,85,0.35);
+  }
   .rec-stats {
     display: flex; justify-content: center; gap: 28px;
     margin-bottom: 22px;
@@ -153,6 +163,7 @@
   }
   @keyframes cardIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
   .card.dragging { opacity: 0.4; }
+  .card.just-added { border-color: var(--line-green); background: #f0fbf4; }
   .card-handle { color: #c7cbd1; font-size: 16px; line-height: 1; padding-top: 4px; cursor: grab; user-select: none; }
   .card-body { flex: 1; min-width: 0; }
   .card-text { font-size: 14.5px; line-height: 1.5; color: var(--ink); outline: none; word-break: break-word; }
@@ -240,6 +251,7 @@
         <div class="rec-status-text" id="recStatusText">尚未開始</div>
         <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始，這會真的呼叫麥克風權限</div>
         <div class="interim-preview" id="interimPreview"></div>
+        <div class="latest-card-preview" id="latestCardPreview"></div>
 
         <div id="engineTagWrap" style="display:none;">
           <span class="engine-tag" id="engineTag"></span>
@@ -264,9 +276,9 @@
       <div class="dev-panel" style="margin-top:14px;">
         <b>這裡是真的：</b>點擊上方按鈕會跳出瀏覽器的麥克風權限請求，同意後即為真實的 Web Speech API 語音辨識，請對著裝置說話測試。若卡在「無法開始錄音」，畫面會顯示實際錯誤原因（權限被拒 / 網路問題 / 瀏覽器不支援），不是我用文字猜的。
         <br><br>
-        <b>這次修正：</b>引擎每講一兩句就自動重啟是系統本身的行為，改不了；但現在重啟不會再打斷你正在講的長句——內容會持續累積，直到真的停頓夠久（約 2.5 秒）或講出標點符號才切成卡片。
+        <b>這次修正：</b>引擎每講一兩句就自動重啟是系統本身的行為，改不了；但現在重啟不會再打斷你正在講的長句——內容會持續累積，直到真的停頓夠久（約 2.5 秒）或講出標點符號才切成卡片。新增：會議中畫面現在會即時顯示「剛新增的那張卡片內容」，不用切到編輯頁才看得到。
         <br><br>
-        <b>修的 bug（感謝真機截圖回報）：</b>上一版有嚴重疊加問題，導致同一句話被重複好幾遍塞進同一張卡片，原因是 Web Speech API 每次重啟都會重新給一整批「至今為止的結果」，但程式碼誤把它當成新增內容持續往上加。這次改成正確追蹤「這個 session 內真正新增的部分」，已用模擬資料重現你截圖裡的重複現象並確認修好，但實際效果仍需你真機重新測試確認。
+        <b>連續修了三次的 bug（老實記錄，方便你判斷這輪穩不穩）：</b>第一版疊加 bug 導致同一句話重複六遍；第二版修疊加時改用長度比對，結果把「引擎修正字詞但長度不變」的情況整段漏掉，導致長句消失；第三版改用共同前綴比對，又在「句子中間單字被修正」時產生混亂拼接。這一版改回 Chrome 官方示範的標準寫法：session 內用 resultIndex 累加（不用自己比對差異），只在 session 真正結束（onend）時才把內容搬進跨 session 緩衝區，並補上「使用者中途按停止、最後一段話不會消失」的處理。已用模擬資料驗證四種情境，但沒有真機音訊資料，仍可能有這裡沒設想到的邊界情況。
         <div>
           <button onclick="simWakeLockLost()">模擬螢幕意外熄屏（僅 UI 提示，非真實偵測）</button>
         </div>
@@ -423,59 +435,44 @@ const DictationEngine = {
     this.recognition.interimResults = true;
     this.recognition.lang = 'zh-TW';
 
-    // 修正說明（第二次修正，修的是第一次修正引入的新 bug）：
-    // 上一版用 `this.longBuffer += text` 在每次 onresult 觸發時累加文字，
-    // 但真機實測發現同一句話會被重複疊加好幾遍。根本原因：W3C 規格明定
-    // event.results 是「這個 session 至今所有結果」的完整陣列，resultIndex
-    // 只保證「比它小的索引內容不變」，但每次 recognition.start()（也就是
-    // onend 自動重啟後）都會開啟一個全新 session，其內部的 results 陣列與
-    // resultIndex 計算基準會重新歸零——若外部的 longBuffer 繼續無條件累加，
-    // 同一段話就會在每次重啟後被重新讀取一次、疊加一次，重啟越多次疊加越多次。
-    // 正確做法：用一個「這個 session 內已確認的最終文字」獨立追蹤，
-    // 每次 onresult 都是整段覆寫（不是累加），只有在真正要跨 session 保留
-    // 內容時（例如切換到 longBuffer 準備斷句判斷）才手動搬移一次。
+    // 修正說明（第四次修正 —— 回到 Chrome 官方示範的標準寫法，拆成兩層職責）：
+    // 前三次修正的問題在於，我試圖用一個變數同時處理「session 內不重複」
+    // 跟「跨 session（重啟後）不遺失、不重複」這兩件事，導致邏輯越改越複雜、
+    // 越改越壞（累加法會疊加重複；長度比對法會漏掉修正內容；共同前綴法在
+    // 「中間插入/替換」的修正情境下仍會產生混亂拼接）。
+    // 正確架構：兩層分開處理，各自用最簡單可靠的機制——
+    //   第一層（session 內）：Chrome 官方標準寫法，用 event.resultIndex 累加，
+    //     這是 W3C 規格本來就設計好用來避免重複的機制，不需要額外比對。
+    //   第二層（跨 session）：只在 onend（session 真正結束、確定不會再修正）
+    //     時，才把該 session 的完整最終文字一次性搬進 longBuffer。
+    //     這樣「引擎中途修正文字」只會發生在 session 內部（用官方寫法正確處理），
+    //     絕不會跨越 session 邊界去汙染已經確定的 longBuffer 內容。
     this.longBuffer = ''; // 跨越多次 onend 重啟持續累積、等待斷句的緩衝區
     this._silenceTimer = null;
     const SILENCE_TO_CUT_MS = 2500; // 真正判定「這段話講完了」所需的靜默時間，
                                      // 刻意設得比引擎重啟間隔更長，避免重啟誤觸發斷句
 
-    let sessionFinalTranscript = ''; // 僅屬於「目前這次 recognition session」的最終文字，
-                                      // 每次 onstart（新 session 開始）時會被重置為空
+    let sessionFinalTranscript = ''; // 僅屬於「目前這次 session」，用官方標準寫法累加
+    // 存成 this 的屬性，讓 stop() 在使用者中途結束時也能拿到還沒被 onend
+    // 搬移過去的最後一段內容，避免「最後一句話消失」
+    this._getSessionFinalTranscript = () => sessionFinalTranscript;
 
     this.recognition.onstart = () => {
-      sessionFinalTranscript = ''; // 新 session 開始，該 session 自己的追蹤歸零
+      sessionFinalTranscript = ''; // 新 session 開始，歸零
     };
 
     this.recognition.onresult = (event) => {
       let interim = '';
-      let sessionFinalThisEvent = '';
-      // 每次事件觸發都從頭掃過 results（不是從 resultIndex 開始），
-      // 但只用來「重新組出這個 session 目前為止的完整最終文字」，
-      // 這是整段覆寫，不是疊加，所以同一個 session 內重複觸發不會重複計入
-      for (let i = 0; i < event.results.length; ++i) {
+      // Chrome 官方標準寫法：從 event.resultIndex 開始，只處理這次新增/變更的部分，
+      // 規格保證 resultIndex 之前的內容不會再變，這是最簡單也最不容易出錯的方式
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          sessionFinalThisEvent += event.results[i][0].transcript;
-        } else if (i === event.results.length - 1) {
+          sessionFinalTranscript += event.results[i][0].transcript;
+        } else {
           interim = event.results[i][0].transcript;
         }
       }
       this.updateInterim(interim);
-
-      // 只有當「這個 session 的最終文字」比上次記錄的更長，才代表有新內容，
-      // 取出差異部分（新增的那一小段）搬進跨 session 的 longBuffer
-      if (sessionFinalThisEvent.length > sessionFinalTranscript.length) {
-        const newPart = sessionFinalThisEvent.slice(sessionFinalTranscript.length);
-        sessionFinalTranscript = sessionFinalThisEvent;
-
-        this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + newPart;
-
-        // 有新內容進來，先檢查有沒有明確標點可以立刻切（標點是最可靠的訊號）
-        this.flushByPunctuation();
-        // 重置靜默計時器：只要還在持續講話（即使引擎中途重啟），就不斷句；
-        // 真正停下來一段夠長時間才強制把剩餘內容收成一張卡片
-        clearTimeout(this._silenceTimer);
-        this._silenceTimer = setTimeout(() => this.flushRemainingAsCard(), SILENCE_TO_CUT_MS);
-      }
     };
 
     this.recognition.onerror = (event) => {
@@ -498,9 +495,16 @@ const DictationEngine = {
     };
 
     this.recognition.onend = () => {
-      // 依規劃書設計：非使用者主動停止時，自動重啟以補償系統靜音掛斷。
-      // 關鍵：重啟時絕不清空 this.longBuffer —— 這正是修正「一句一句斷」的核心，
-      // 讓引擎的重啟頻率跟卡片的斷句時機徹底脫鉤。
+      // 這裡是第二層的核心：session 真正結束了（不會再有修正），
+      // 把這個 session 累積的最終文字一次性搬進跨 session 的 longBuffer
+      if (sessionFinalTranscript.trim()) {
+        this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + sessionFinalTranscript;
+        this.flushByPunctuation();
+        clearTimeout(this._silenceTimer);
+        this._silenceTimer = setTimeout(() => this.flushRemainingAsCard(), SILENCE_TO_CUT_MS);
+      }
+
+      // 依規劃書設計：非使用者主動停止時，自動重啟以補償系統靜音掛斷
       if (this.state === 'listening') {
         try { this.recognition.start(); }
         catch (e) { /* 已在啟動中，忽略重複呼叫錯誤 */ }
@@ -546,10 +550,31 @@ const DictationEngine = {
     if (el) el.textContent = text ? `聽到：「${text}」…` : '';
   },
 
+  // 每次 CardSandbox 新增一張卡片時呼叫，讓使用者不用切到「會議後編輯」
+  // 就能在會議中畫面看到剛剛被切出來的那張卡片內容
+  showLatestCard(text) {
+    const el = document.getElementById('latestCardPreview');
+    if (!el) return;
+    el.textContent = `📝 剛新增：「${text}」`;
+    el.classList.add('flash');
+    clearTimeout(this._latestCardFlashTimer);
+    this._latestCardFlashTimer = setTimeout(() => {
+      el.classList.remove('flash');
+    }, 1200);
+  },
+
   stop() {
-    // 使用者主動結束時，把 longBuffer 裡還沒切完的殘餘內容強制收成最後一張卡片，
-    // 不能因為錄音結束就把這段話直接丟掉
+    // 使用者主動結束時，可能正好卡在某個 session 中途（onend 還沒觸發、
+    // 該 session 累積的最終文字還沒被搬進 longBuffer）。
+    // 先把這段「還沒收尾的最後內容」補進 longBuffer，再一起收成最後一張卡片，
+    // 否則會出現「最後一句話憑空消失」的問題。
     clearTimeout(this._silenceTimer);
+    if (this._getSessionFinalTranscript) {
+      const lastSessionText = this._getSessionFinalTranscript();
+      if (lastSessionText && lastSessionText.trim()) {
+        this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + lastSessionText;
+      }
+    }
     this.flushRemainingAsCard();
     this.stopInternal();
     this.state = 'idle';
@@ -664,10 +689,17 @@ const CardSandbox = {
   add(rawSentence) {
     const { cleaned } = RuleBasedCleaner.clean(rawSentence);
     if (!cleaned) return;
-    this.cards.push({ id: this.nextId++, text: cleaned, ts: new Date() });
+    const newCard = { id: this.nextId++, text: cleaned, ts: new Date(), justAdded: true };
+    this.cards.push(newCard);
     this.render();
     DictationEngine.render();
+    DictationEngine.showLatestCard(cleaned); // 會議中畫面即時顯示剛新增的內容
     M5_OfflineStore.saveDraft(this.cards);
+    // 短暫標記後移除 highlight 狀態，避免所有卡片永遠停留在「新增」樣式
+    setTimeout(() => {
+      newCard.justAdded = false;
+      this.render();
+    }, 2000);
   },
 
   delete(id) {
@@ -716,7 +748,7 @@ const CardSandbox = {
 
     this.cards.forEach((card) => {
       const div = document.createElement('div');
-      div.className = 'card';
+      div.className = 'card' + (card.justAdded ? ' just-added' : '');
       div.draggable = true;
       div.dataset.id = card.id;
       div.innerHTML = `
