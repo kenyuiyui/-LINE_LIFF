@@ -403,35 +403,60 @@ const DictationEngine = {
   // 判斷 not-allowed 錯誤的真正成因：iframe 政策擋下 vs 使用者真的手動拒絕。
   // 無法 100% 確定（瀏覽器不會告訴我們是哪一種），但可以用「是否處於跨網域 iframe」
   // 這個強烈的情境信號，給出比一律說「請去設定允許」更準確的訊息。
-  diagnosePermissionDenial() {
-    let inCrossOriginFrame = false;
+  async requestMicPermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
     try {
-      inCrossOriginFrame = window.self !== window.top;
-    } catch (e) {
-      // 存取 window.top 拋出例外本身就代表跨網域
-      inCrossOriginFrame = true;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err) {      return false;
     }
-
-    if (inCrossOriginFrame) {
-      return '⚠️ 此頁面目前運行在跨網域預覽窗中，瀏覽器依規格直接擋下麥克風請求，連權限詢問視窗都不會跳出來 — 這不是你按了拒絕，是這個測試環境的限制。請將此檔案部署到獨立網域（例如 GitHub Pages）後在該網址下重新測試。';
-    }
-    return '麥克風權限被拒絕。若剛才有看到瀏覽器詢問視窗且點了拒絕，請至瀏覽器網址列左側的鎖頭圖示或系統設定中，重新允許此網站使用麥克風。';
   },
+ diagnosePermissionDenial() {
+  let inCrossOriginFrame = false;
+  try {
+    inCrossOriginFrame = window.self !== window.top;
+  } catch (e) {
+    inCrossOriginFrame = true;
+  }
+  if (inCrossOriginFrame) {
+    return '⚠️ 目前處於跨網域預覽視窗 (iframe) 中，瀏覽器依安全規範阻擋了麥克風。請將此頁面部署至獨立 HTTPS 網域後測試。';
+  }
+  
+  // 針對 LINE App 內置瀏覽器的提示
+  return '麥克風權限被拒絕。請點選 LINE 右上角「...」選單選擇「在預設瀏覽器開啟」，或至手機「設定」➔「LINE」中開啟「麥克風」權限後重新整理頁面。';
+}
 
-  async start() {
-    if (!this.isSupported()) {
-      this.state = 'error';
-      this.errorMsg = '此瀏覽器不支援 Web Speech API（SpeechRecognition），無法進行語音辨識';
-      this.render();
-      return;
-    }
-    if (!navigator.onLine) {
-      // 誠實行為：目前沒有本地離線引擎，離線時不假裝能辨識
-      this.state = 'error';
-      this.errorMsg = '目前離線。Web Speech API 依賴雲端運算，離線時無法辨識（本地離線引擎尚未實作，見規劃書 M1 進階項目）';
-      this.render();
-      return;
-    }
+ async start() {
+  if (!this.isSupported()) {
+    this.state = 'error';
+    this.errorMsg = '此瀏覽器不支援 Web Speech API';
+    this.render();
+    return;
+  }
+  if (!navigator.onLine) {
+    this.state = 'error';
+    this.errorMsg = '目前離線，雲端語音辨識不可用';
+    this.render();
+    return;
+  }
+
+  // 【新增關鍵步驟】先透過 getUserMedia 取得權限
+  const hasPermission = await this.requestMicPermission();
+  if (!hasPermission) {
+    this.state = 'error';
+    this.errorMsg = this.diagnosePermissionDenial();
+    this.render();
+    return;
+  }
+
+  // 取得權限後，再繼續執行原本的 Web Speech API 初始化
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  this.recognition = new SpeechRecognition();
+  // ... (下方保持原有的 recognition 設定與事件監聽不變) ...
+  
+  this.recognition.start();
+}
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
