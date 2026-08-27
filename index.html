@@ -382,12 +382,6 @@ const WakeLockManager = {
 };
 
 // ---------- M1: Dictation Engine — 真實 Web Speech API 整合 ----------
-// 這裡改為真正呼叫瀏覽器的 SpeechRecognition，不再是模擬信號。
-// 來源: W3C Web Speech API (community draft)
-// 已知限制（前面查證過，這裡會真實體現）：
-//   - 預設為雲端運算，離線時會直接失敗（Safari 拋 service-not-available 錯誤）
-//   - 本地離線引擎（WASM）尚未實作，無網路時目前只能顯示「無法辨識」而非真的離線轉寫
-//   - iOS/Android 對 continuous 模式的靜音自動掛斷行為不一致，用 onend 自動重啟補償
 const DictationEngine = {
   state: 'idle', // idle | listening | error
   mode: null,    // 'cloud' | 'unavailable'
@@ -400,115 +394,77 @@ const DictationEngine = {
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   },
 
-  // 判斷 not-allowed 錯誤的真正成因：iframe 政策擋下 vs 使用者真的手動拒絕。
-  // 無法 100% 確定（瀏覽器不會告訴我們是哪一種），但可以用「是否處於跨網域 iframe」
-  // 這個強烈的情境信號，給出比一律說「請去設定允許」更準確的訊息。
   async requestMicPermission() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       return true;
-    } catch (err) {      return false;
+    } catch (err) {
+      return false;
     }
   },
- diagnosePermissionDenial() {
-  let inCrossOriginFrame = false;
-  try {
-    inCrossOriginFrame = window.self !== window.top;
-  } catch (e) {
-    inCrossOriginFrame = true;
-  }
-  if (inCrossOriginFrame) {
-    return '⚠️ 目前處於跨網域預覽視窗 (iframe) 中，瀏覽器依安全規範阻擋了麥克風。請將此頁面部署至獨立 HTTPS 網域後測試。';
-  }
-  
-  // 針對 LINE App 內置瀏覽器的提示
-  return '麥克風權限被拒絕。請點選 LINE 右上角「...」選單選擇「在預設瀏覽器開啟」，或至手機「設定」➔「LINE」中開啟「麥克風」權限後重新整理頁面。';
-}
 
- async start() {
-  if (!this.isSupported()) {
-    this.state = 'error';
-    this.errorMsg = '此瀏覽器不支援 Web Speech API';
-    this.render();
-    return;
-  }
-  if (!navigator.onLine) {
-    this.state = 'error';
-    this.errorMsg = '目前離線，雲端語音辨識不可用';
-    this.render();
-    return;
-  }
+  diagnosePermissionDenial() {
+    let inCrossOriginFrame = false;
+    try {
+      inCrossOriginFrame = window.self !== window.top;
+    } catch (e) {
+      inCrossOriginFrame = true;
+    }
+    if (inCrossOriginFrame) {
+      return '⚠️ 目前處於跨網域預覽視窗 (iframe) 中，瀏覽器依安全規範阻擋了麥克風。請將此頁面部署至獨立 HTTPS 網域後測試。';
+    }
+    return '麥克風權限被拒絕。請點選 LINE 右上角「...」選單選擇「在預設瀏覽器開啟」，或至手機「設定」➔「LINE」中開啟「麥克風」權限後重新整理頁面。';
+  },
 
-  // 【新增關鍵步驟】先透過 getUserMedia 取得權限
-  const hasPermission = await this.requestMicPermission();
-  if (!hasPermission) {
-    this.state = 'error';
-    this.errorMsg = this.diagnosePermissionDenial();
-    this.render();
-    return;
-  }
+  async start() {
+    if (!this.isSupported()) {
+      this.state = 'error';
+      this.errorMsg = '此瀏覽器不支援 Web Speech API';
+      this.render();
+      return;
+    }
+    if (!navigator.onLine) {
+      this.state = 'error';
+      this.errorMsg = '目前離線，雲端語音辨識不可用';
+      this.render();
+      return;
+    }
 
-  // 取得權限後，再繼續執行原本的 Web Speech API 初始化
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  this.recognition = new SpeechRecognition();
-  // ... (下方保持原有的 recognition 設定與事件監聽不變) ...
-  
-  this.recognition.start();
-}
+    // 1. 先主動要求麥克風權限
+    const hasPermission = await this.requestMicPermission();
+    if (!hasPermission) {
+      this.state = 'error';
+      this.errorMsg = this.diagnosePermissionDenial();
+      this.render();
+      return;
+    }
 
+    // 2. 成功取得權限後啟動語音辨識
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.recognition.lang = 'zh-TW';
 
-    // 修正說明（第四次修正 —— 回到 Chrome 官方示範的標準寫法，拆成兩層職責）：
-    // 前三次修正的問題在於，我試圖用一個變數同時處理「session 內不重複」
-    // 跟「跨 session（重啟後）不遺失、不重複」這兩件事，導致邏輯越改越複雜、
-    // 越改越壞（累加法會疊加重複；長度比對法會漏掉修正內容；共同前綴法在
-    // 「中間插入/替換」的修正情境下仍會產生混亂拼接）。
-    // 正確架構：兩層分開處理，各自用最簡單可靠的機制——
-    //   第一層（session 內）：Chrome 官方標準寫法，用 event.resultIndex 累加，
-    //     這是 W3C 規格本來就設計好用來避免重複的機制，不需要額外比對。
-    //   第二層（跨 session）：只在 onend（session 真正結束、確定不會再修正）
-    //     時，才把該 session 的完整最終文字一次性搬進 longBuffer。
-    //     這樣「引擎中途修正文字」只會發生在 session 內部（用官方寫法正確處理），
-    //     絕不會跨越 session 邊界去汙染已經確定的 longBuffer 內容。
-    this.longBuffer = ''; // 跨越多次 onend 重啟持續累積、等待斷句的緩衝區
+    this.longBuffer = '';
     this._silenceTimer = null;
-    const SILENCE_TO_CUT_MS = 2500; // 真正判定「這段話講完了」所需的靜默時間，
-                                     // 刻意設得比引擎重啟間隔更長，避免重啟誤觸發斷句
-
-    let sessionFinalTranscript = ''; // 僅屬於「目前這次 session」，用官方標準寫法累加
-    // 存成 this 的屬性，讓 stop() 在使用者中途結束時也能拿到還沒被 onend
-    // 搬移過去的最後一段內容，避免「最後一句話消失」
+    const SILENCE_TO_CUT_MS = 2500;
+    let sessionFinalTranscript = '';
     this._getSessionFinalTranscript = () => sessionFinalTranscript;
 
     this.recognition.onstart = () => {
-      sessionFinalTranscript = ''; // 新 session 開始，歸零
-      this._lastFinalPiece = ''; // 同步歸零，避免跨 session 誤判前綴延伸
+      sessionFinalTranscript = '';
+      this._lastFinalPiece = '';
     };
 
     this.recognition.onresult = (event) => {
       let interim = '';
-      // Chrome 官方標準寫法：從 event.resultIndex 開始，只處理這次新增/變更的部分，
-      // 規格保證 resultIndex 之前的內容不會再變，這是最簡單也最不容易出錯的方式。
-      //
-      // 防禦性修正（真機發現：連續數字如「1、2、3...10」時，引擎會把每一次
-      // 逐步累加的中間判斷都標成 isFinal=true 送出，而不是只送一次最終結果，
-      // 導致「1」「1 2」「1 2 3」…全部被當成獨立內容疊加，卡片變成
-      // 「111 21 21 2 31 2 31 2 3 41…」這種混亂形狀）：
-      // 不去猜測或依賴引擎為什麼這樣送資料，而是根據系統實際回傳的內容本身
-      // 做判斷——如果這次收到的 final 文字，是「上一次已收到內容」的前綴延伸
-      // （代表引擎又把舊內容整段重講了一次、只是後面多接了一點新東西），
-      // 就用新的整段取代舊的，而不是兩者相加，避免重複部分被疊加進去。
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           const piece = event.results[i][0].transcript;
           if (this._lastFinalPiece && piece.startsWith(this._lastFinalPiece)) {
-            // 新內容整段包含舊內容當開頭 → 這是同一段話的重講/延伸，取代不疊加
             sessionFinalTranscript = sessionFinalTranscript.slice(0, sessionFinalTranscript.length - this._lastFinalPiece.length) + piece;
           } else {
             sessionFinalTranscript += piece;
