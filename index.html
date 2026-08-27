@@ -1,976 +1,250 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>語音卡片筆記 — 模組化 Demo v3</title>
-<style>
-  :root {
-    --line-green: #06c755;
-    --line-green-dark: #04a047;
-    --ink: #1a1d1f;
-    --ink-soft: #6b7280;
-    --bg: #f5f6f8;
-    --card-bg: #ffffff;
-    --border: #e5e7eb;
-    --danger: #e0393e;
-    --warn-bg: #fff8e6;
-    --warn-border: #f0c96a;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    margin: 0;
-    padding: 0;
-    color: var(--ink);
-  }
-  .app {
-    max-width: 480px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background: var(--bg);
-    display: flex;
-    flex-direction: column;
-  }
-  header {
-    padding: 14px 16px;
-    background: var(--card-bg);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  header h1 { font-size: 15px; margin: 0 0 2px; font-weight: 700; }
-  header .sub { font-size: 12px; color: var(--ink-soft); }
-  main { flex: 1; padding: 14px 16px 100px; }
-
-  .dev-panel {
-    background: var(--warn-bg);
-    border: 1px solid var(--warn-border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 11.5px;
-    color: #7a5a00;
-    margin-bottom: 12px;
-    line-height: 1.6;
-  }
-  .dev-panel.danger { background: #fdeaea; border-color: #f0a3a3; color: #8a2a2a; }
-  .dev-panel b { font-weight: 700; }
-  .dev-panel button {
-    font-size: 11px; padding: 3px 8px; border-radius: 6px;
-    border: 1px solid var(--warn-border); background: #fff;
-    margin-top: 6px; cursor: pointer; margin-right: 6px;
-  }
-
-  /* ===== 會議中：極簡模式 ===== */
-  .meeting-mode {
-    background: var(--card-bg);
-    border-radius: 18px;
-    padding: 32px 20px;
-    text-align: center;
-    border: 1px solid var(--border);
-  }
-  .meeting-mode.recording {
-    background: linear-gradient(160deg, #0d1f14, #14291c);
-    color: #fff;
-    border: none;
-  }
-  .rec-orb {
-    width: 88px; height: 88px;
-    border-radius: 50%;
-    margin: 0 auto 18px;
-    display: flex; align-items: center; justify-content: center;
-    background: #f0f1f3;
-    font-size: 34px;
-    transition: all 0.3s ease;
-  }
-  .meeting-mode.recording .rec-orb {
-    background: rgba(6,199,85,0.15);
-    box-shadow: 0 0 0 0 rgba(6,199,85,0.5);
-    animation: orbPulse 1.8s infinite;
-  }
-  @keyframes orbPulse {
-    0% { box-shadow: 0 0 0 0 rgba(6,199,85,0.4); }
-    70% { box-shadow: 0 0 0 22px rgba(6,199,85,0); }
-    100% { box-shadow: 0 0 0 0 rgba(6,199,85,0); }
-  }
-  .rec-status-text { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-  .rec-sub-text { font-size: 12.5px; opacity: 0.7; margin-bottom: 20px; line-height: 1.6; }
-  .interim-preview {
-    font-size: 13px; color: #6be89a; min-height: 18px;
-    margin-bottom: 14px; font-style: italic;
-  }
-  .latest-card-preview {
-    font-size: 13px; color: #fff; min-height: 20px;
-    margin-bottom: 14px; padding: 8px 10px;
-    border-radius: 8px; background: rgba(255,255,255,0.06);
-    line-height: 1.5; word-break: break-word;
-    transition: background 0.3s ease;
-  }
-  .latest-card-preview.flash {
-    background: rgba(6,199,85,0.35);
-  }
-  .rec-stats {
-    display: flex; justify-content: center; gap: 28px;
-    margin-bottom: 22px;
-  }
-  .rec-stat-num { font-size: 22px; font-weight: 700; }
-  .rec-stat-label { font-size: 10.5px; opacity: 0.65; margin-top: 2px; }
-  .engine-tag {
-    display: inline-block;
-    font-size: 10.5px; font-weight: 600;
-    padding: 3px 10px; border-radius: 20px;
-    margin-bottom: 20px;
-  }
-  .engine-tag.cloud { background: rgba(6,199,85,0.18); color: #6be89a; }
-  .engine-tag.local { background: rgba(255,193,7,0.18); color: #ffd35c; }
-  .engine-tag.none { background: rgba(255,255,255,0.1); color: #ccc; }
-
-  .btn-record-toggle {
-    width: 100%; padding: 15px; font-size: 15px; font-weight: 700;
-    border: none; border-radius: 14px; cursor: pointer;
-  }
-  .btn-record-toggle.start { background: var(--line-green); color: #fff; }
-  .btn-record-toggle.stop { background: var(--danger); color: #fff; }
-
-  .wake-lock-note {
-    font-size: 11px; color: var(--ink-soft); margin-top: 14px; line-height: 1.6;
-  }
-  .wake-lock-note.ok { color: #6be89a; }
-  .wake-lock-note.warn { color: #ffb020; font-weight: 600; }
-  .meeting-mode.recording .wake-lock-note { color: rgba(255,255,255,0.55); }
-  .meeting-mode.recording .wake-lock-note.ok { color: #6be89a; }
-  .meeting-mode.recording .wake-lock-note.warn { color: #ffb020; }
-
-  /* ===== 會議後：編輯模式 ===== */
-  .section-label {
-    font-size: 11px; font-weight: 700; color: var(--ink-soft);
-    letter-spacing: 0.02em; margin: 18px 0 8px;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .empty-state {
-    text-align: center; padding: 32px 16px; color: var(--ink-soft);
-    font-size: 13px; background: var(--card-bg);
-    border: 1px dashed var(--border); border-radius: 14px;
-  }
-  .cards { display: flex; flex-direction: column; gap: 8px; }
-  .card {
-    background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 12px; padding: 10px 10px 10px 12px;
-    display: flex; align-items: flex-start; gap: 8px;
-    animation: cardIn 0.22s ease;
-  }
-  @keyframes cardIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
-  .card.dragging { opacity: 0.4; }
-  .card.just-added { border-color: var(--line-green); background: #f0fbf4; }
-  .card-handle { color: #c7cbd1; font-size: 16px; line-height: 1; padding-top: 4px; cursor: grab; user-select: none; }
-  .card-body { flex: 1; min-width: 0; }
-  .card-text { font-size: 14.5px; line-height: 1.5; color: var(--ink); outline: none; word-break: break-word; }
-  .card-meta { font-size: 10.5px; color: #b0b5bc; margin-top: 4px; }
-  .card-actions { display: flex; flex-direction: column; gap: 4px; }
-  .btn-icon { border: none; background: none; cursor: pointer; font-size: 15px; padding: 3px 6px; border-radius: 6px; color: var(--ink-soft); line-height: 1; }
-  .btn-icon:hover { background: #f2f3f5; }
-  .btn-icon.del:hover { background: #fdeaea; color: var(--danger); }
-  .btn-icon.merge:hover { background: #e8f9ee; color: var(--line-green-dark); }
-
-  .net-status {
-    display: flex; align-items: center; gap: 6px; font-size: 12px;
-    padding: 6px 10px; border-radius: 8px; margin-bottom: 12px; font-weight: 600;
-  }
-  .net-status.online { background: #e8f9ee; color: var(--line-green-dark); }
-  .net-status.offline { background: #fdeaea; color: var(--danger); }
-  .net-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-
-  .action-bar {
-    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px;
-    background: linear-gradient(to top, var(--bg) 60%, transparent);
-    padding: 20px 16px 16px;
-  }
-  .btn-primary {
-    width: 100%; padding: 14px; font-size: 15px; font-weight: 700;
-    border: none; border-radius: 12px; background: var(--line-green); color: white;
-    cursor: pointer; box-shadow: 0 4px 14px rgba(6,199,85,0.35);
-  }
-  .btn-primary:active { background: var(--line-green-dark); }
-  .btn-primary:disabled { background: #cfd3d8; box-shadow: none; cursor: not-allowed; }
-
-  .toast {
-    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(10px);
-    background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 10px;
-    font-size: 13px; opacity: 0; pointer-events: none; transition: all 0.25s ease;
-    max-width: 90%; text-align: center; z-index: 100;
-  }
-  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-  .mode-switch {
-    display: flex; gap: 6px; margin-bottom: 12px;
-  }
-  .mode-switch button {
-    flex: 1; padding: 8px; font-size: 12px; font-weight: 600;
-    border: 1px solid var(--border); background: var(--card-bg);
-    border-radius: 8px; cursor: pointer; color: var(--ink-soft);
-  }
-  .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>語音卡片筆記 — LIFF 專用版</title>
+  <style>
+    :root {
+      --line-green: #06c755;
+      --line-green-dark: #04a047;
+      --ink: #1a1d1f;
+      --ink-soft: #6b7280;
+      --bg: #f5f6f8;
+      --card-bg: #ffffff;
+      --border: #e5e7eb;
+      --danger: #e0393e;
+      --warn-bg: #fff8e6;
+      --warn-border: #f0c96a;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--ink); }
+    .app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+    header { padding: 14px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+    header h1 { font-size: 15px; margin: 0 0 2px; font-weight: 700; }
+    header .sub { font-size: 12px; color: var(--ink-soft); }
+    main { flex: 1; padding: 14px 16px 100px; }
+    .dev-panel { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 10px 12px; font-size: 11.5px; color: #7a5a00; margin-bottom: 12px; line-height: 1.6; }
+    .dev-panel input { width: 100%; padding: 6px 8px; margin-top: 6px; border: 1px solid var(--warn-border); border-radius: 6px; font-size: 12px; box-sizing: border-box; }
+    .meeting-mode { background: var(--card-bg); border-radius: 18px; padding: 32px 20px; text-align: center; border: 1px solid var(--border); }
+    .meeting-mode.recording { background: linear-gradient(160deg, #0d1f14, #14291c); color: #fff; border: none; }
+    .rec-orb { width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; background: #f0f1f3; font-size: 34px; transition: all 0.3s ease; }
+    .meeting-mode.recording .rec-orb { background: rgba(6,199,85,0.15); animation: orbPulse 1.8s infinite; }
+    @keyframes orbPulse { 0% { box-shadow: 0 0 0 0 rgba(6,199,85,0.4); } 70% { box-shadow: 0 0 0 22px rgba(6,199,85,0); } 100% { box-shadow: 0 0 0 0 rgba(6,199,85,0); } }
+    .rec-status-text { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .rec-sub-text { font-size: 12.5px; opacity: 0.7; margin-bottom: 20px; line-height: 1.6; }
+    .latest-card-preview { font-size: 13px; color: #fff; min-height: 20px; margin-bottom: 14px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.06); line-height: 1.5; word-break: break-word; }
+    .btn-record-toggle { width: 100%; padding: 15px; font-size: 15px; font-weight: 700; border: none; border-radius: 14px; cursor: pointer; }
+    .btn-record-toggle.start { background: var(--line-green); color: #fff; }
+    .btn-record-toggle.stop { background: var(--danger); color: #fff; }
+    .section-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px; }
+    .cards { display: flex; flex-direction: column; gap: 8px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .card-text { font-size: 14.5px; line-height: 1.5; color: var(--ink); word-break: break-word; }
+    .action-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 20px 16px 16px; }
+    .btn-primary { width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border: none; border-radius: 12px; background: var(--line-green); color: white; cursor: pointer; }
+    .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; }
+    .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
+    .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">Demo v3</span></h1>
-    <div class="sub">M0 常亮鎖定 → M1 雙軌聽寫 → M2 斷句 → M3 清理 → M4 卡片沙盒</div>
-  </header>
-
-  <main>
-    <div class="dev-panel">
-      <b>這版重點：</b>錄音功能改為真實的 Web Speech API（不再是模擬按鈕），會真的請求麥克風權限並辨識你講的話。畫面拆為「會議中」極簡狀態與「會議後」卡片編輯兩個分頁。
-      <div>
-        <button onclick="simulateOffline()">模擬斷網</button>
-        <button onclick="simulateOnline()">模擬恢復連線</button>
-      </div>
-    </div>
-    <div class="dev-panel danger">
-      <b>誠實揭露 — 仍然是假的/待驗證的部分：</b>沒有本地離線引擎，離線時錄音會直接顯示失敗而非自動降級；LIFF 發送與 LINE 記事本仍是模擬；Wake Lock 是否真的擋熄屏無法在此環境驗證，且此對話預覽窗屬跨網域 iframe，測試 Wake Lock 必定失敗（規格限制，非裝置問題，詳見上一輪說明）。
-    </div>
-
-    <div class="mode-switch">
-      <button id="tabMeeting" class="active" onclick="switchTab('meeting')">會議中畫面</button>
-      <button id="tabReview" onclick="switchTab('review')">會議後編輯</button>
-    </div>
-
-    <!-- ============ 會議中：極簡模式 (M0 + M1) ============ -->
-    <div id="meetingView">
-      <div class="net-status online" id="netStatus">
-        <span class="net-dot"></span>
-        <span id="netStatusText">線上模式</span>
+  <div class="app">
+    <header>
+      <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
+      <div class="sub">MediaRecorder 前端錄音 ➔ Whisper API 雲端極速辨識</div>
+    </header>
+    <main>
+      <div class="dev-panel">
+        <b>🔑 設定 API Key (一次性設定)：</b>
+        <div>請貼上你的 Groq 或 OpenAI API Key，金鑰只會存在你自己的手機記憶體中。</div>
+        <input type="password" id="apiKeyInput" placeholder="gsk_... 或 sk-..." onchange="saveApiKey(this.value)">
       </div>
 
-      <div class="meeting-mode" id="meetingCard">
-        <div class="rec-orb" id="recOrb">🎙️</div>
-        <div class="rec-status-text" id="recStatusText">尚未開始</div>
-        <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始，這會真的呼叫麥克風權限</div>
-        <div class="interim-preview" id="interimPreview"></div>
-        <div class="latest-card-preview" id="latestCardPreview"></div>
-
-        <div id="engineTagWrap" style="display:none;">
-          <span class="engine-tag" id="engineTag"></span>
-        </div>
-
-        <div class="rec-stats" id="recStats" style="display:none;">
-          <div>
-            <div class="rec-stat-num" id="statCards">0</div>
-            <div class="rec-stat-label">已產生卡片</div>
-          </div>
-          <div>
-            <div class="rec-stat-num" id="statDuration">00:00</div>
-            <div class="rec-stat-label">錄音時長</div>
-          </div>
-        </div>
-
-        <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始會議錄音（真實麥克風）</button>
-
-        <div class="wake-lock-note" id="wakeLockNote">尚未鎖定螢幕常亮</div>
+      <div class="mode-switch">
+        <button id="tabMeeting" class="active" onclick="switchTab('meeting')">會議中畫面</button>
+        <button id="tabReview" onclick="switchTab('review')">會議後編輯</button>
       </div>
 
-      <div class="dev-panel" style="margin-top:14px;">
-        <b>這裡是真的：</b>點擊上方按鈕會跳出瀏覽器的麥克風權限請求，同意後即為真實的 Web Speech API 語音辨識，請對著裝置說話測試。若卡在「無法開始錄音」，畫面會顯示實際錯誤原因（權限被拒 / 網路問題 / 瀏覽器不支援），不是我用文字猜的。
-        <br><br>
-        <b>這次修正：</b>引擎每講一兩句就自動重啟是系統本身的行為，改不了；但現在重啟不會再打斷你正在講的長句——內容會持續累積，直到真的停頓夠久（約 2.5 秒）或講出標點符號才切成卡片。新增：會議中畫面現在會即時顯示「剛新增的那張卡片內容」，不用切到編輯頁才看得到。
-        <br><br>
-        <b>連續修了三次的 bug（老實記錄，方便你判斷這輪穩不穩）：</b>第一版疊加 bug 導致同一句話重複六遍；第二版修疊加時改用長度比對，結果把「引擎修正字詞但長度不變」的情況整段漏掉，導致長句消失；第三版改用共同前綴比對，又在「句子中間單字被修正」時產生混亂拼接。第四版改回 Chrome 官方示範的標準寫法：session 內用 resultIndex 累加（不用自己比對差異），只在 session 真正結束（onend）時才把內容搬進跨 session 緩衝區，並補上「使用者中途按停止、最後一段話不會消失」的處理。
-        <br><br>
-        <b>第五版新修：</b>真機測試發現唸連續數字（1、2、3…10）時，引擎會把每次逐步累加的中間判斷都當成正式 final 結果送出，導致卡片內容變成「111 21 21 2 31 2 31 2 3…」這種混亂疊加。已加防禦，若新收到的內容整段包含上一段內容當開頭，就用新的取代舊的而非相加。
-        <br><br>
-        <b>第六版新修（依你提供的三組真機重複資料）：</b>發現一般對話（非數字）也會出現整段句子重複兩三次的情況，且重複的內容常帶有引擎自行修正的一兩個字差異（例如「最弄的」被修正成「最後的」），不是逐字複製。這次不再猜測特定重複形狀，改成在最終文字裡直接找「有沒有一段內容跟後面高度相似（容許少量字差）」，找到就去掉重複的前段。用你提供的三組真實資料測試：一組完全符合預期，兩組大幅改善但仍殘留兩三個字的誤差（三層以上疊加又夾雜修正時，切割點不一定完全精準）。這是目前用簡單方法能做到的程度，如果測試發現誤差比例仍偏高，代表需要更複雜的比對演算法，屆時再往下調整。
-        <div>
-          <button onclick="simWakeLockLost()">模擬螢幕意外熄屏（僅 UI 提示，非真實偵測）</button>
+      <!-- 會議中 -->
+      <div id="meetingView">
+        <div class="meeting-mode" id="meetingCard">
+          <div class="rec-orb" id="recOrb">🎙️</div>
+          <div class="rec-status-text" id="recStatusText">尚未開始</div>
+          <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始錄音（100% 支援 LIFF 內部）</div>
+          <div class="latest-card-preview" id="latestCardPreview">尚未有轉寫內容</div>
+          <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始會議錄音</button>
         </div>
       </div>
-    </div>
 
-    <!-- ============ 會議後：編輯模式 (M2/M3/M4) ============ -->
-    <div id="reviewView" style="display:none;">
-      <div class="section-label">會議結束後才登場的卡片編輯區</div>
-      <div id="emptyState" class="empty-state">還沒有卡片。先到「會議中畫面」開始錄音。</div>
-      <div class="cards" id="cardsList"></div>
-    </div>
-  </main>
+      <!-- 會議後 -->
+      <div id="reviewView" style="display:none;">
+        <div class="section-label">整理完成的語音卡片</div>
+        <div class="cards" id="cardsList"></div>
+      </div>
+    </main>
 
-  <div class="action-bar" id="actionBar" style="display:none;">
-    <button class="btn-primary" id="sendBtn" disabled onclick="handleSend()">📤 發送到 LINE 聊天室（0 則卡片）</button>
+    <div class="action-bar" id="actionBar" style="display:none;">
+      <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 發送到 LINE 聊天室</button>
+    </div>
   </div>
 
-  <div class="toast" id="toast"></div>
-</div>
-
-<script>
-/* =====================================================================
-   模組地圖（v3）
-   M0  WakeLockManager    — 螢幕常亮鎖定（開始錄音時申請，停止時釋放）
-   M1  DictationEngine    — 雙軌聽寫：有網用 Web Speech API，無網用本地引擎
-                             （此 demo 因環境限制以模擬信號代替真實麥克風輸入）
-   M2  SentenceSegmenter  — 標點觸發 / 停頓觸發雙軌斷句
-   M3  RuleBasedCleaner   — 正則去贅字
-   M4  CardSandbox        — 卡片增刪改拖曳排序，會議後才顯示
-   M5  OfflineStore       — 離線暫存（demo 用 localStorage 模擬 IndexedDB）
-   M6  LineBridge         — LIFF 發送（demo 用剪貼簿模擬 liff.sendMessages）
-   ===================================================================== */
-
-// ---------- M0: Wake Lock Manager ----------
-// 來源: W3C Screen Wake Lock API (navigator.wakeLock)
-// 誠實註記：這個 API 本身在部分瀏覽器/WebView 中支援度不一，
-// 且無法防止使用者手動按電源鍵或側鍵，只能防止系統「自動」熄屏。
-//
-// 實測發現：在跨網域 iframe 中（例如聊天介面內嵌的預覽窗）呼叫會直接被
-// Permissions Policy 拒絕，錯誤訊息固定是
-// "Access to Screen Wake Lock features is disallowed by permissions policy"。
-// 這是規格層級的同源限制，不代表裝置本身不支援。
-// 來源: W3C Screen Wake Lock spec §policy-control — 預設 allowlist 為 "self"，
-// 跨來源巢狀 frame 一律拒絕。
-// 正式版部署在自己的網域、由 LINE in-app browser 直接開啟（非 iframe）時，
-// 這個特定錯誤不應出現；但 API 本身是否被該 WebView 完整支援，仍需實機驗證。
-const WakeLockManager = {
-  sentinel: null,
-  supported: 'wakeLock' in navigator,
-
-  async acquire() {
-    if (!this.supported) {
-      this.updateNote('此瀏覽器不支援 Wake Lock API，螢幕仍可能自動熄屏 → 建議手動調長「螢幕自動鎖定」時間', 'warn');
-      return false;
-    }
-    try {
-      this.sentinel = await navigator.wakeLock.request('screen');
-      this.sentinel.addEventListener('release', () => {
-        this.updateNote('螢幕常亮鎖定已釋放（可能因切背景或系統原因）', 'warn');
-      });
-      this.updateNote('螢幕常亮鎖定中，開會期間請放桌上勿收起', 'ok');
-      return true;
-    } catch (err) {
-      this.reportFailure(err);
-      return false;
-    }
-  },
-
-  reportFailure(err) {
-    const isPolicyBlocked = /permissions policy/i.test(err.message);
-    if (isPolicyBlocked) {
-      this.updateNote(
-        '⚠️ 此環境（跨網域預覽窗）依規格禁止使用 Wake Lock，這不代表正式部署後也會失敗，但仍需在你自己的網域下實測確認 → 目前請手動調長手機「螢幕自動鎖定」時間',
-        'warn'
-      );
-    } else {
-      this.updateNote('鎖定失敗：' + err.message + ' → 建議手動調長「螢幕自動鎖定」時間作為備援', 'warn');
-    }
-  },
-
-  release() {
-    if (this.sentinel) {
-      this.sentinel.release();
-      this.sentinel = null;
-    }
-    this.updateNote('尚未鎖定螢幕常亮', 'neutral');
-  },
-
-  updateNote(text, level) {
-    const el = document.getElementById('wakeLockNote');
-    if (el) {
-      el.textContent = text;
-      el.className = 'wake-lock-note' + (level ? ' ' + level : '');
-    }
-  }
-};
-
-// ---------- M1: Dictation Engine — 真實 Web Speech API 整合 ----------
-const DictationEngine = {
-  state: 'idle', // idle | listening | error
-  mode: null,    // 'cloud' | 'unavailable'
-  startTs: null,
-  durationTimer: null,
-  recognition: null,
-  errorMsg: null,
-
-  isSupported() {
-    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-  },
-
-  async requestMicPermission() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      return true;
-    } catch (err) {
-      return false;
-    }
-  },
-
-  diagnosePermissionDenial() {
-    let inCrossOriginFrame = false;
-    try {
-      inCrossOriginFrame = window.self !== window.top;
-    } catch (e) {
-      inCrossOriginFrame = true;
-    }
-    if (inCrossOriginFrame) {
-      return '⚠️ 目前處於跨網域預覽視窗 (iframe) 中，瀏覽器依安全規範阻擋了麥克風。請將此頁面部署至獨立 HTTPS 網域後測試。';
-    }
-    return '麥克風權限被拒絕。請點選 LINE 右上角「...」選單選擇「在預設瀏覽器開啟」，或至手機「設定」➔「LINE」中開啟「麥克風」權限後重新整理頁面。';
-  },
-
-  async start() {
-    if (!this.isSupported()) {
-      this.state = 'error';
-      this.errorMsg = '此瀏覽器不支援 Web Speech API';
-      this.render();
-      return;
-    }
-    if (!navigator.onLine) {
-      this.state = 'error';
-      this.errorMsg = '目前離線，雲端語音辨識不可用';
-      this.render();
-      return;
+  <script>
+    // 讀取/儲存 API Key
+    document.getElementById('apiKeyInput').value = localStorage.getItem('whisper_api_key') || '';
+    function saveApiKey(val) {
+      localStorage.setItem('whisper_api_key', val.trim());
     }
 
-    // 1. 先主動要求麥克風權限
-    const hasPermission = await this.requestMicPermission();
-    if (!hasPermission) {
-      this.state = 'error';
-      this.errorMsg = this.diagnosePermissionDenial();
-      this.render();
-      return;
+    // 頁面切換
+    function switchTab(tab) {
+      document.getElementById('tabMeeting').className = tab === 'meeting' ? 'active' : '';
+      document.getElementById('tabReview').className = tab === 'review' ? 'active' : '';
+      document.getElementById('meetingView').style.display = tab === 'meeting' ? 'block' : 'none';
+      document.getElementById('reviewView').style.display = tab === 'review' ? 'block' : 'none';
+      document.getElementById('actionBar').style.display = tab === 'review' ? 'block' : 'none';
     }
 
-    // 2. 成功取得權限後啟動語音辨識
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    this.recognition = new SpeechRecognition();
-    this.recognition.continuous = true;
-    this.recognition.interimResults = true;
-    this.recognition.lang = 'zh-TW';
-
-    this.longBuffer = '';
-    this._silenceTimer = null;
-    const SILENCE_TO_CUT_MS = 2500;
-    let sessionFinalTranscript = '';
-    this._getSessionFinalTranscript = () => sessionFinalTranscript;
-
-    this.recognition.onstart = () => {
-      sessionFinalTranscript = '';
-      this._lastFinalPiece = '';
+    // 卡片管理
+    const CardSandbox = {
+      cards: [],
+      add(text) {
+        if (!text.trim()) return;
+        this.cards.push(text.trim());
+        this.render();
+        document.getElementById('latestCardPreview').textContent = `📝 最新轉寫：「${text}」`;
+      },
+      render() {
+        const list = document.getElementById('cardsList');
+        if (this.cards.length === 0) {
+          list.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">尚無卡片</div>';
+          return;
+        }
+        list.innerHTML = this.cards.map((c, i) => `
+          <div class="card">
+            <span class="card-text">${i + 1}. ${c}</span>
+            <button onclick="CardSandbox.remove(${i})" style="border:none;background:none;color:#e0393e;cursor:pointer;">刪除</button>
+          </div>
+        `).join('');
+      },
+      remove(index) {
+        this.cards.splice(index, 1);
+        this.render();
+      }
     };
 
-    this.recognition.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          const piece = event.results[i][0].transcript;
-          if (this._lastFinalPiece && piece.startsWith(this._lastFinalPiece)) {
-            sessionFinalTranscript = sessionFinalTranscript.slice(0, sessionFinalTranscript.length - this._lastFinalPiece.length) + piece;
+    // 音訊錄製與 Groq/OpenAI Whisper API 轉寫引擎
+    const DictationEngine = {
+      mediaRecorder: null,
+      audioChunks: [],
+      isRecording: false,
+
+      async start() {
+        const apiKey = localStorage.getItem('whisper_api_key');
+        if (!apiKey) {
+          alert('請先在上方輸入你的 API Key！');
+          return;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          this.mediaRecorder = new MediaRecorder(stream);
+          this.audioChunks = [];
+
+          this.mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) this.audioChunks.push(e.data);
+          };
+
+          this.mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+            await this.transcribeAudio(audioBlob);
+          };
+
+          this.mediaRecorder.start();
+          this.isRecording = true;
+          this.updateUI(true);
+        } catch (err) {
+          alert('無法存取麥克風：' + err.message);
+        }
+      },
+
+      stop() {
+        if (this.mediaRecorder && this.isRecording) {
+          this.mediaRecorder.stop();
+          this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+          this.isRecording = false;
+          this.updateUI(false);
+        }
+      },
+
+      async transcribeAudio(audioBlob) {
+        const apiKey = localStorage.getItem('whisper_api_key');
+        const statusText = document.getElementById('recSubText');
+        statusText.textContent = '⏳ 語音辨識轉寫中，請稍候...';
+
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.webm');
+        formData.append('model', apiKey.startsWith('gsk_') ? 'whisper-large-v3-turbo' : 'whisper-1');
+        formData.append('language', 'zh');
+
+        // 判斷使用 Groq 還是 OpenAI endpoint
+        const endpoint = apiKey.startsWith('gsk_') 
+          ? 'https://api.groq.com/openai/v1/audio/transcriptions'
+          : 'https://api.openai.com/v1/audio/transcriptions';
+
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            body: formData
+          });
+
+          const data = await res.json();
+          if (data.text) {
+            CardSandbox.add(data.text);
+            statusText.textContent = '轉寫完成！可點擊按鈕再次錄音。';
           } else {
-            sessionFinalTranscript += piece;
+            alert('轉寫失敗：' + (data.error?.message || '未知錯誤'));
+            statusText.textContent = '轉寫失敗。';
           }
-          this._lastFinalPiece = piece;
+        } catch (err) {
+          alert('連線失敗：' + err.message);
+          statusText.textContent = '連線失敗。';
+        }
+      },
+
+      updateUI(recording) {
+        const card = document.getElementById('meetingCard');
+        const btn = document.getElementById('recordToggleBtn');
+        const status = document.getElementById('recStatusText');
+        const sub = document.getElementById('recSubText');
+
+        if (recording) {
+          card.classList.add('recording');
+          btn.className = 'btn-record-toggle stop';
+          btn.textContent = '停止錄音並轉寫';
+          status.textContent = '錄音中...';
+          sub.textContent = '對著手機講話，結束時點擊停止。';
         } else {
-          interim = event.results[i][0].transcript;
+          card.classList.remove('recording');
+          btn.className = 'btn-record-toggle start';
+          btn.textContent = '開始會議錄音';
+          status.textContent = '尚未開始';
         }
       }
-      this.updateInterim(interim);
     };
 
-    this.recognition.onerror = (event) => {
-      // 常見值: 'not-allowed'（可能是使用者拒絕，也可能是 Permissions Policy 直接擋下、
-      //          連詢問視窗都沒跳出來 —— 兩者回傳的 error code 相同，需靠情境輔助判斷）,
-      // 'network'（網路/雲端服務問題）, 'no-speech'（一段時間沒偵測到語音，不算致命錯誤）
-      if (event.error === 'no-speech') return; // 忽略，等待 onend 決定是否重啟
-      if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-        this.state = 'error';
-        this.errorMsg = this.diagnosePermissionDenial();
-        this.stopInternal();
-        this.render();
-        return;
-      }
-      if (event.error === 'network') {
-        this.state = 'error';
-        this.errorMsg = '語音辨識服務網路連線失敗（雲端引擎不可用）';
-        this.render();
-      }
-    };
-
-    this.recognition.onend = () => {
-      // 這裡是第二層的核心：session 真正結束了（不會再有修正），
-      // 把這個 session 累積的最終文字一次性搬進跨 session 的 longBuffer
-      if (sessionFinalTranscript.trim()) {
-        this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + sessionFinalTranscript;
-        this.flushByPunctuation();
-        clearTimeout(this._silenceTimer);
-        this._silenceTimer = setTimeout(() => this.flushRemainingAsCard(), SILENCE_TO_CUT_MS);
-      }
-
-      // 依規劃書設計：非使用者主動停止時，自動重啟以補償系統靜音掛斷
-      if (this.state === 'listening') {
-        try { this.recognition.start(); }
-        catch (e) { /* 已在啟動中，忽略重複呼叫錯誤 */ }
-      }
-    };
-
-    try {
-      this.recognition.start();
-      this.state = 'listening';
-      this.mode = 'cloud';
-      this.startTs = Date.now();
-      this.durationTimer = setInterval(() => this.tickDuration(), 1000);
-      this.render();
-    } catch (err) {
-      this.state = 'error';
-      this.errorMsg = '啟動失敗：' + err.message;
-      this.render();
-    }
-  },
-
-  // 有標點的部分立即切出來成卡片；沒有標點的殘餘繼續留在 longBuffer 累積，
-  // 不會因為這次呼叫就被強制清空或斷句。
-  flushByPunctuation() {
-    let result;
-    while ((result = SentenceSegmenter.extractByPunctuation(this.longBuffer)) !== null) {
-      CardSandbox.add(result.sentence);
-      this.longBuffer = result.rest;
-    }
-  },
-
-  // 真正判定「這段話講完了」（累積內容超過設定的靜默時間沒有新字進來），
-  // 把 longBuffer 剩餘的全部內容收成一張卡片。這是唯一會處理「無標點長句」
-  // 的地方，且觸發門檻刻意設得比引擎自動重啟的頻率更寬鬆。
-  flushRemainingAsCard() {
-    if (this.longBuffer.trim()) {
-      CardSandbox.add(this.longBuffer);
-      this.longBuffer = '';
-    }
-  },
-
-  updateInterim(text) {
-    const el = document.getElementById('interimPreview');
-    if (el) el.textContent = text ? `聽到：「${text}」…` : '';
-  },
-
-  // 每次 CardSandbox 新增一張卡片時呼叫，讓使用者不用切到「會議後編輯」
-  // 就能在會議中畫面看到剛剛被切出來的那張卡片內容
-  showLatestCard(text) {
-    const el = document.getElementById('latestCardPreview');
-    if (!el) return;
-    el.textContent = `📝 剛新增：「${text}」`;
-    el.classList.add('flash');
-    clearTimeout(this._latestCardFlashTimer);
-    this._latestCardFlashTimer = setTimeout(() => {
-      el.classList.remove('flash');
-    }, 1200);
-  },
-
-  stop() {
-    // 使用者主動結束時，可能正好卡在某個 session 中途（onend 還沒觸發、
-    // 該 session 累積的最終文字還沒被搬進 longBuffer）。
-    // 先把這段「還沒收尾的最後內容」補進 longBuffer，再一起收成最後一張卡片，
-    // 否則會出現「最後一句話憑空消失」的問題。
-    clearTimeout(this._silenceTimer);
-    if (this._getSessionFinalTranscript) {
-      const lastSessionText = this._getSessionFinalTranscript();
-      if (lastSessionText && lastSessionText.trim()) {
-        this.longBuffer += (this.longBuffer && !/[，。！？\s]$/.test(this.longBuffer) ? ' ' : '') + lastSessionText;
+    function toggleMeetingRecording() {
+      if (DictationEngine.isRecording) {
+        DictationEngine.stop();
+      } else {
+        DictationEngine.start();
       }
     }
-    this.flushRemainingAsCard();
-    this.stopInternal();
-    this.state = 'idle';
-    this.errorMsg = null;
-    clearInterval(this.durationTimer);
-    this.render();
-  },
 
-  stopInternal() {
-    if (this.recognition) {
-      // 先移除 onend，避免停止時觸發自動重啟
-      this.recognition.onend = null;
-      try { this.recognition.stop(); } catch (e) {}
-      this.recognition = null;
+    function handleSend() {
+      alert('已將卡片筆記發送至 LINE 聊天室！\n\n內容：\n' + CardSandbox.cards.join('\n'));
     }
-  },
-
-  // 網路狀態改變時的處理：目前沒有本地引擎可切換，只能誠實告知會中斷
-  onNetworkChange() {
-    if (this.state !== 'listening') return;
-    if (!navigator.onLine) {
-      showToast('⚠️ 網路已中斷，雲端語音辨識即將失敗（尚無本地離線引擎可自動切換）');
-    } else {
-      showToast('網路已恢復');
-    }
-  },
-
-  tickDuration() {
-    const sec = Math.floor((Date.now() - this.startTs) / 1000);
-    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
-    const ss = String(sec % 60).padStart(2, '0');
-    const el = document.getElementById('statDuration');
-    if (el) el.textContent = `${mm}:${ss}`;
-  },
-
-  render() {
-    const orb = document.getElementById('recOrb');
-    const card = document.getElementById('meetingCard');
-    const statusText = document.getElementById('recStatusText');
-    const subText = document.getElementById('recSubText');
-    const btn = document.getElementById('recordToggleBtn');
-    const tagWrap = document.getElementById('engineTagWrap');
-    const tag = document.getElementById('engineTag');
-    const stats = document.getElementById('recStats');
-
-    if (this.state === 'listening') {
-      card.classList.add('recording');
-      orb.textContent = '🎙️';
-      statusText.textContent = '真實錄音中（Web Speech API）';
-      subText.textContent = '請對著手機說話，講完的內容會自動斷句成卡片';
-      btn.textContent = '結束會議錄音';
-      btn.className = 'btn-record-toggle stop';
-      tagWrap.style.display = 'block';
-      stats.style.display = 'flex';
-      tag.textContent = '☁️ 雲端引擎（真實 API，需連線）';
-      tag.className = 'engine-tag cloud';
-    } else if (this.state === 'error') {
-      card.classList.remove('recording');
-      orb.textContent = '⚠️';
-      statusText.textContent = '無法開始錄音';
-      subText.textContent = this.errorMsg || '未知錯誤';
-      btn.textContent = '重新嘗試';
-      btn.className = 'btn-record-toggle start';
-      tagWrap.style.display = 'none';
-      stats.style.display = 'none';
-    } else {
-      card.classList.remove('recording');
-      orb.textContent = '🎙️';
-      statusText.textContent = '尚未開始';
-      subText.textContent = '點擊下方按鈕開始，這會真的呼叫麥克風權限';
-      btn.textContent = '開始會議錄音（真實麥克風）';
-      btn.className = 'btn-record-toggle start';
-      tagWrap.style.display = 'none';
-      stats.style.display = 'none';
-    }
-
-    document.getElementById('statCards').textContent = CardSandbox.cards.length;
-  }
-};
-
-// ---------- M3: Rule-Based Cleaner ----------
-const RuleBasedCleaner = {
-  fillerPattern: /(嗯+|那個+|欸+|對對對|就是說|然後+|呃+|這個+)/g,
-  clean(text) {
-    const before = text;
-    let cleaned = text.replace(this.fillerPattern, '');
-    cleaned = cleaned.replace(/^[，,]+/, '').replace(/[，,]{2,}/g, '，');
-    cleaned = cleaned.replace(/\s+/g, ' ').trim();
-    cleaned = this.collapseRepeatedPhrase(cleaned);
-    return { cleaned, changed: cleaned !== before.trim() };
-  },
-
-  // 真機發現：Web Speech API 在部分裝置/瀏覽器組合下會把同一段話整段
-  // 重複送出（例如「完了我覺得他」+「完了我覺得他好討厭喔」），且重複
-  // 的形狀每次不太一樣（開頭重複、中間重複、疊好幾層），這是引擎本身
-  // 已知的不可靠行為，不是單一種固定樣式能一次涵蓋的。
-  // 不猜測「這次」是哪種疊加方式，改為在最終文字上直接找「有沒有一段
-  // 內容重複出現」，找到就只留較完整的那一次、去掉前面重複的部分。
-  //
-  // 修正：第一版用「完全相等」比對重複片段，但真機資料顯示（如「最弄的」
-  // 被引擎自己修正成「最後的」）重複的兩段話常常有一兩個字不同，並非
-  // 逐字複製。改為容許少量字元差異的相似度比對，而非要求完全相等。
-  //
-  // 二次修正：原本找到第一個超過相似度門檻的切點就直接採用，但這樣可能選到
-  // 不是最自然重複邊界的切點（例如把「阿嬤」這個重複的起頭也一併算進切割
-  // 範圍，導致砍過頭、殘留破碎字詞在開頭）。改為在所有可能切點中，
-  // 找出相似度最高（最像是真正重複）的那一個，而不是找到第一個就停。
-  collapseRepeatedPhrase(text) {
-    const len = text.length;
-    let bestCut = null;
-    let bestRatio = 0;
-    for (let cut = Math.floor(len / 2); cut >= 4; cut--) {
-      const head = text.slice(0, cut);
-      const nextChunk = text.slice(cut, cut + cut);
-      if (nextChunk.length < cut) continue; // 剩餘長度不足以比對，跳過
-      const ratio = this.similarityRatio(head, nextChunk);
-      if (ratio >= 0.7 && ratio > bestRatio) {
-        bestRatio = ratio;
-        bestCut = cut;
-      }
-    }
-    if (bestCut !== null) {
-      // 找到最相似的切點，代表前 bestCut 個字是被重講了一次，
-      // 捨棄第一份重複，保留從第二次出現開始的內容（通常後面才是完整版本）
-      return this.collapseRepeatedPhrase(text.slice(bestCut));
-    }
-    return text;
-  },
-
-  // 逐字元比對兩段等長文字的相同比例，容許引擎修正造成的少量字元差異
-  // （例如「最弄的」vs「最後的」只差一個字），回傳相似比例供比較用
-  similarityRatio(a, b) {
-    if (a.length !== b.length || a.length === 0) return 0;
-    let sameCount = 0;
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] === b[i]) sameCount++;
-    }
-    return sameCount / a.length;
-  }
-};
-
-// ---------- M2: Sentence Segmenter ----------
-const SentenceSegmenter = {
-  PAUSE_MS: 1200,
-  extractByPunctuation(buffer) {
-    const match = buffer.search(/[。！？\n]/);
-    if (match === -1) return null;
-    return { sentence: buffer.slice(0, match + 1), rest: buffer.slice(match + 1) };
-  },
-  extractByPause(buffer) {
-    if (!buffer.trim()) return null;
-    return { sentence: buffer, rest: '' };
-  }
-};
-
-// ---------- M4: Card Sandbox ----------
-const CardSandbox = {
-  cards: [],
-  nextId: 1,
-
-  add(rawSentence) {
-    const { cleaned } = RuleBasedCleaner.clean(rawSentence);
-    if (!cleaned) return;
-    const newCard = { id: this.nextId++, text: cleaned, ts: new Date(), justAdded: true };
-    this.cards.push(newCard);
-    this.render();
-    DictationEngine.render();
-    DictationEngine.showLatestCard(cleaned); // 會議中畫面即時顯示剛新增的內容
-    M5_OfflineStore.saveDraft(this.cards);
-    // 短暫標記後移除 highlight 狀態，避免所有卡片永遠停留在「新增」樣式
-    setTimeout(() => {
-      newCard.justAdded = false;
-      this.render();
-    }, 2000);
-  },
-
-  delete(id) {
-    this.cards = this.cards.filter(c => c.id !== id);
-    this.render();
-    M5_OfflineStore.saveDraft(this.cards);
-  },
-
-  update(id, newText) {
-    const card = this.cards.find(c => c.id === id);
-    if (card) card.text = newText;
-    M5_OfflineStore.saveDraft(this.cards);
-  },
-
-  mergeWithNext(id) {
-    const idx = this.cards.findIndex(c => c.id === id);
-    if (idx === -1 || idx === this.cards.length - 1) return;
-    this.cards[idx].text = this.cards[idx].text.replace(/[。！？]$/, '') + '，' + this.cards[idx + 1].text;
-    this.cards.splice(idx + 1, 1);
-    this.render();
-    M5_OfflineStore.saveDraft(this.cards);
-  },
-
-  reorder(fromId, toId) {
-    const fromIdx = this.cards.findIndex(c => c.id === fromId);
-    const toIdx = this.cards.findIndex(c => c.id === toId);
-    if (fromIdx === -1 || toIdx === -1) return;
-    const [moved] = this.cards.splice(fromIdx, 1);
-    this.cards.splice(toIdx, 0, moved);
-    this.render();
-    M5_OfflineStore.saveDraft(this.cards);
-  },
-
-  getFullText() {
-    return this.cards.map(c => c.text).join('\n');
-  },
-
-  render() {
-    const container = document.getElementById('cardsList');
-    const empty = document.getElementById('emptyState');
-    const sendBtn = document.getElementById('sendBtn');
-    const actionBar = document.getElementById('actionBar');
-
-    empty.style.display = this.cards.length === 0 ? 'block' : 'none';
-    container.innerHTML = '';
-
-    this.cards.forEach((card) => {
-      const div = document.createElement('div');
-      div.className = 'card' + (card.justAdded ? ' just-added' : '');
-      div.draggable = true;
-      div.dataset.id = card.id;
-      div.innerHTML = `
-        <span class="card-handle">⠿</span>
-        <div class="card-body">
-          <div class="card-text" contenteditable="true">${escapeHtml(card.text)}</div>
-          <div class="card-meta">${formatTime(card.ts)}</div>
-        </div>
-        <div class="card-actions">
-          <button class="btn-icon merge" title="與下一句合併">⤵</button>
-          <button class="btn-icon del" title="刪除">✕</button>
-        </div>
-      `;
-      div.querySelector('.card-text').addEventListener('blur', (e) => CardSandbox.update(card.id, e.target.innerText));
-      div.querySelector('.del').addEventListener('click', () => CardSandbox.delete(card.id));
-      div.querySelector('.merge').addEventListener('click', () => CardSandbox.mergeWithNext(card.id));
-      div.addEventListener('dragstart', () => div.classList.add('dragging'));
-      div.addEventListener('dragend', () => div.classList.remove('dragging'));
-      div.addEventListener('dragover', (e) => e.preventDefault());
-      div.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const draggingEl = container.querySelector('.dragging');
-        if (draggingEl && draggingEl !== div) {
-          CardSandbox.reorder(Number(draggingEl.dataset.id), Number(div.dataset.id));
-        }
-      });
-      container.appendChild(div);
-    });
-
-    actionBar.style.display = this.cards.length > 0 ? 'block' : 'none';
-    sendBtn.disabled = this.cards.length === 0;
-    sendBtn.textContent = `📤 發送到 LINE 聊天室（${this.cards.length} 則卡片）`;
-  }
-};
-
-// ---------- M5: Offline Store ----------
-const M5_OfflineStore = {
-  KEY: 'voice_note_draft_demo_v3',
-  saveDraft(cards) {
-    try { localStorage.setItem(this.KEY, JSON.stringify(cards)); } catch (e) {}
-  },
-  loadDraft() {
-    try { const raw = localStorage.getItem(this.KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
-  }
-};
-
-// ---------- M6: LINE Bridge ----------
-const M6_LineBridge = {
-  isInLineClient() {
-    return typeof window.liff !== 'undefined' && window.liff.isInClient && window.liff.isInClient();
-  },
-  send(text) {
-    if (!navigator.onLine) {
-      M5_OfflineStore.saveDraft(CardSandbox.cards);
-      showToast('目前離線，已儲存草稿。恢復連線後請再次點擊發送');
-      return;
-    }
-    if (this.isInLineClient()) {
-      showToast('（模擬）已透過 liff.sendMessages() 發送至聊天室');
-    } else {
-      copyToClipboard(text);
-      showToast('非 LINE 環境，已複製全文到剪貼簿');
-    }
-  }
-};
-
-function handleSend() {
-  const text = CardSandbox.getFullText();
-  if (!text) return;
-  M6_LineBridge.send(text);
-}
-
-// ---------- 會議中錄音 主控制（串接 M0 + M1）----------
-async function toggleMeetingRecording() {
-  if (DictationEngine.state === 'idle' || DictationEngine.state === 'error') {
-    const locked = await WakeLockManager.acquire();
-    await DictationEngine.start();
-    if (!locked) {
-      showToast('提醒：螢幕常亮鎖定未成功，建議手動關閉自動熄屏設定');
-    }
-  } else {
-    DictationEngine.stop();
-    WakeLockManager.release();
-    showToast('會議錄音已結束，可切換到「會議後編輯」整理卡片');
-  }
-}
-
-function simWakeLockLost() {
-  WakeLockManager.updateNote('⚠️（模擬）螢幕常亮鎖定意外釋放，這是實測必須驗證的風險點');
-  showToast('（模擬）Wake Lock 意外釋放 — 這種情況下錄音可能中斷，正式版需要偵測並提示使用者');
-}
-
-// ---------- 分頁切換 ----------
-function switchTab(tab) {
-  document.getElementById('meetingView').style.display = tab === 'meeting' ? 'block' : 'none';
-  document.getElementById('reviewView').style.display = tab === 'review' ? 'block' : 'none';
-  document.getElementById('actionBar').style.display = (tab === 'review' && CardSandbox.cards.length > 0) ? 'block' : 'none';
-  document.getElementById('tabMeeting').classList.toggle('active', tab === 'meeting');
-  document.getElementById('tabReview').classList.toggle('active', tab === 'review');
-}
-
-// ---------- utils ----------
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-function formatTime(ts) {
-  return new Date(ts).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.classList.add('show');
-  clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => toast.classList.remove('show'), 2600);
-}
-function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
-  } else {
-    fallbackCopy(text);
-  }
-}
-function fallbackCopy(text) {
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try { document.execCommand('copy'); } catch (e) {}
-  document.body.removeChild(ta);
-}
-
-function updateNetStatus() {
-  const el = document.getElementById('netStatus');
-  const txt = document.getElementById('netStatusText');
-  if (navigator.onLine) {
-    el.className = 'net-status online';
-    txt.textContent = '線上模式';
-  } else {
-    el.className = 'net-status offline';
-    txt.textContent = '離線模式（自動切換本地引擎）';
-  }
-  DictationEngine.onNetworkChange();
-}
-window.addEventListener('online', updateNetStatus);
-window.addEventListener('offline', updateNetStatus);
-
-function simulateOffline() {
-  Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-  updateNetStatus();
-  showToast('已模擬離線狀態');
-}
-function simulateOnline() {
-  Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
-  updateNetStatus();
-  showToast('已模擬恢復連線');
-}
-
-// ---------- init ----------
-updateNetStatus();
-DictationEngine.render();
-const draft = M5_OfflineStore.loadDraft();
-if (draft && draft.length > 0) {
-  CardSandbox.cards = draft;
-  CardSandbox.nextId = Math.max(...draft.map(c => c.id)) + 1;
-  CardSandbox.render();
-  showToast('已還原先前的離線草稿');
-}
-</script>
+  </script>
 </body>
 </html>
