@@ -280,7 +280,9 @@
         <br><br>
         <b>連續修了三次的 bug（老實記錄，方便你判斷這輪穩不穩）：</b>第一版疊加 bug 導致同一句話重複六遍；第二版修疊加時改用長度比對，結果把「引擎修正字詞但長度不變」的情況整段漏掉，導致長句消失；第三版改用共同前綴比對，又在「句子中間單字被修正」時產生混亂拼接。第四版改回 Chrome 官方示範的標準寫法：session 內用 resultIndex 累加（不用自己比對差異），只在 session 真正結束（onend）時才把內容搬進跨 session 緩衝區，並補上「使用者中途按停止、最後一段話不會消失」的處理。
         <br><br>
-        <b>第五版新修：</b>真機測試發現唸連續數字（1、2、3…10）時，引擎會把每次逐步累加的中間判斷都當成正式 final 結果送出，導致卡片內容變成「111 21 21 2 31 2 31 2 3…」這種混亂疊加。這不代表引擎在其他內容上也會這樣，但既然它會發生，就加了防禦：若新收到的內容整段包含上一段內容當開頭（代表引擎在重講同一段話），就用新的取代舊的而非相加。已用模擬資料重建這個真機現象並確認修正，同時跑過前四版的所有回歸測試確認沒有弄壞既有功能，但實際效果仍需真機測試確認。
+        <b>第五版新修：</b>真機測試發現唸連續數字（1、2、3…10）時，引擎會把每次逐步累加的中間判斷都當成正式 final 結果送出，導致卡片內容變成「111 21 21 2 31 2 31 2 3…」這種混亂疊加。已加防禦，若新收到的內容整段包含上一段內容當開頭，就用新的取代舊的而非相加。
+        <br><br>
+        <b>第六版新修（依你提供的三組真機重複資料）：</b>發現一般對話（非數字）也會出現整段句子重複兩三次的情況，且重複的內容常帶有引擎自行修正的一兩個字差異（例如「最弄的」被修正成「最後的」），不是逐字複製。這次不再猜測特定重複形狀，改成在最終文字裡直接找「有沒有一段內容跟後面高度相似（容許少量字差）」，找到就去掉重複的前段。用你提供的三組真實資料測試：一組完全符合預期，兩組大幅改善但仍殘留兩三個字的誤差（三層以上疊加又夾雜修正時，切割點不一定完全精準）。這是目前用簡單方法能做到的程度，如果測試發現誤差比例仍偏高，代表需要更複雜的比對演算法，屆時再往下調整。
         <div>
           <button onclick="simWakeLockLost()">模擬螢幕意外熄屏（僅 UI 提示，非真實偵測）</button>
         </div>
@@ -682,7 +684,56 @@ const RuleBasedCleaner = {
     let cleaned = text.replace(this.fillerPattern, '');
     cleaned = cleaned.replace(/^[，,]+/, '').replace(/[，,]{2,}/g, '，');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    cleaned = this.collapseRepeatedPhrase(cleaned);
     return { cleaned, changed: cleaned !== before.trim() };
+  },
+
+  // 真機發現：Web Speech API 在部分裝置/瀏覽器組合下會把同一段話整段
+  // 重複送出（例如「完了我覺得他」+「完了我覺得他好討厭喔」），且重複
+  // 的形狀每次不太一樣（開頭重複、中間重複、疊好幾層），這是引擎本身
+  // 已知的不可靠行為，不是單一種固定樣式能一次涵蓋的。
+  // 不猜測「這次」是哪種疊加方式，改為在最終文字上直接找「有沒有一段
+  // 內容重複出現」，找到就只留較完整的那一次、去掉前面重複的部分。
+  //
+  // 修正：第一版用「完全相等」比對重複片段，但真機資料顯示（如「最弄的」
+  // 被引擎自己修正成「最後的」）重複的兩段話常常有一兩個字不同，並非
+  // 逐字複製。改為容許少量字元差異的相似度比對，而非要求完全相等。
+  //
+  // 二次修正：原本找到第一個超過相似度門檻的切點就直接採用，但這樣可能選到
+  // 不是最自然重複邊界的切點（例如把「阿嬤」這個重複的起頭也一併算進切割
+  // 範圍，導致砍過頭、殘留破碎字詞在開頭）。改為在所有可能切點中，
+  // 找出相似度最高（最像是真正重複）的那一個，而不是找到第一個就停。
+  collapseRepeatedPhrase(text) {
+    const len = text.length;
+    let bestCut = null;
+    let bestRatio = 0;
+    for (let cut = Math.floor(len / 2); cut >= 4; cut--) {
+      const head = text.slice(0, cut);
+      const nextChunk = text.slice(cut, cut + cut);
+      if (nextChunk.length < cut) continue; // 剩餘長度不足以比對，跳過
+      const ratio = this.similarityRatio(head, nextChunk);
+      if (ratio >= 0.7 && ratio > bestRatio) {
+        bestRatio = ratio;
+        bestCut = cut;
+      }
+    }
+    if (bestCut !== null) {
+      // 找到最相似的切點，代表前 bestCut 個字是被重講了一次，
+      // 捨棄第一份重複，保留從第二次出現開始的內容（通常後面才是完整版本）
+      return this.collapseRepeatedPhrase(text.slice(bestCut));
+    }
+    return text;
+  },
+
+  // 逐字元比對兩段等長文字的相同比例，容許引擎修正造成的少量字元差異
+  // （例如「最弄的」vs「最後的」只差一個字），回傳相似比例供比較用
+  similarityRatio(a, b) {
+    if (a.length !== b.length || a.length === 0) return 0;
+    let sameCount = 0;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] === b[i]) sameCount++;
+    }
+    return sameCount / a.length;
   }
 };
 
