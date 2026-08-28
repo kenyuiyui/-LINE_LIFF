@@ -350,6 +350,13 @@
     // 在一般瀏覽器（非 LINE App 內嵌視窗）也能呼叫，不需要使用者困在
     // 拿不到麥克風的 LIFF 內嵌視窗裡；代價是訊息以使用者自己的名義送出，
     // 不是以你的機器人名義（這是產品決定過的取捨，見程式碼外的討論）。
+    //
+    // 實測發現：shareTargetPicker 除了要在後台開通同意條款外，官方文件
+    // 明確要求「使用者已登入」這個前提也要成立，在一般瀏覽器（非 LINE App
+    // 內嵌視窗）開啟時，liff.init() 本身不會自動幫你登入。
+    // 這裡刻意不在 init 時用 withLoginOnExternalBrowser 自動跳轉登入，
+    // 因為那樣會讓使用者一打開頁面、都還沒開始錄音就被導去登入頁——
+    // 改為只在真正要發送、且確認尚未登入時，才主動引導登入。
     const LIFF_ID = '2011273067-abYzT84Y';
 
     let liffReady = false;
@@ -372,8 +379,27 @@
         return;
       }
 
-      // 情境一：LIFF 已就緒且 shareTargetPicker 在目前環境可用
-      if (liffReady && typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker')) {
+      if (!liffReady) {
+        // LIFF 初始化本身失敗（可能是網址跟後台登記的 Endpoint URL 對不上、
+        // 或 liffId 有誤），這種情況無法救，直接降級
+        copyToClipboardFallback(fullText);
+        return;
+      }
+
+      // 尚未登入時，shareTargetPicker 一定無法使用（官方文件明確要求登入
+      // 為前提條件）。這裡用使用者主動點擊「發送」觸發的登入，把整理好的
+      // 卡片內容暫存起來，登入完成、頁面導回來後可以繼續發送流程。
+      if (typeof liff.isLoggedIn === 'function' && !liff.isLoggedIn()) {
+        try {
+          sessionStorage.setItem('pending_send_text', fullText);
+        } catch (e) { /* sessionStorage 不可用時，登入完成後需使用者重新按一次發送 */ }
+        alert('需要先登入 LINE 才能選擇發送對象，即將導向登入頁面。');
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+
+      // 情境一：已登入，且 shareTargetPicker 在目前環境可用
+      if (typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker')) {
         try {
           const res = await liff.shareTargetPicker(
             [{ type: 'text', text: fullText }],
@@ -393,9 +419,22 @@
         return;
       }
 
-      // 情境二：LIFF 尚未就緒（例如 liffId 還沒設定、或不在支援環境），降級為複製
+      // 情境二：已登入，但 shareTargetPicker 仍不可用（例如後台同意條款未開通）
       copyToClipboardFallback(fullText);
     }
+
+    // 頁面載入時，若偵測到剛完成登入導回、且先前有暫存待發送的文字，
+    // 提示使用者可以直接再按一次發送（此時 liff.isLoggedIn() 應已為 true）
+    window.addEventListener('load', () => {
+      try {
+        const pending = sessionStorage.getItem('pending_send_text');
+        if (pending) {
+          sessionStorage.removeItem('pending_send_text');
+          // 只提示、不自動重送，避免使用者還沒看清楚內容就被送出
+          console.log('偵測到登入前暫存的卡片內容，請重新確認卡片並再次點擊發送。');
+        }
+      } catch (e) { /* 忽略 */ }
+    });
 
     function copyToClipboardFallback(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
