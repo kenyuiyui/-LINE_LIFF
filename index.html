@@ -51,6 +51,10 @@
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
        的最後一道保險，確保呈現給使用者的內容穩定是繁體中文。 -->
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"></script>
+  <!-- LIFF SDK：用於呼叫 shareTargetPicker() 讓使用者選擇要把整理好的
+       文字發送給誰（例如你的官方帳號）。這個 API 在一般瀏覽器與 LINE App
+       內都能呼叫，不需要透過內嵌視窗，因此不會撞到麥克風權限那道牆。 -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
   <div class="app">
@@ -63,6 +67,9 @@
         <b>🔑 設定 API Key (一次性設定)：</b>
         <div>請貼上你的 Groq 或 OpenAI API Key，金鑰只會存在你自己的手機記憶體中。</div>
         <input type="password" id="apiKeyInput" placeholder="gsk_... 或 sk-..." onchange="saveApiKey(this.value)">
+        <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--warn-border);">
+          <b>ℹ️ 產品定位：</b>這個工具只做「即時音轉文字」，錄音轉成文字後原始音檔就會被丟棄，不會留存也不會上傳保存。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
+        </div>
       </div>
 
       <div class="mode-switch">
@@ -89,7 +96,7 @@
     </main>
 
     <div class="action-bar" id="actionBar" style="display:none;">
-      <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 發送到 LINE 聊天室</button>
+      <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 選擇對象並發送</button>
     </div>
   </div>
 
@@ -338,8 +345,74 @@
       }
     }
 
-    function handleSend() {
-      alert('已將卡片筆記發送至 LINE 聊天室！\n\n內容：\n' + CardSandbox.cards.join('\n'));
+    // ---------- LIFF 初始化與發送邏輯 ----------
+    // 說明：這裡用 shareTargetPicker() 而非 sendMessages()，因為前者
+    // 在一般瀏覽器（非 LINE App 內嵌視窗）也能呼叫，不需要使用者困在
+    // 拿不到麥克風的 LIFF 內嵌視窗裡；代價是訊息以使用者自己的名義送出，
+    // 不是以你的機器人名義（這是產品決定過的取捨，見程式碼外的討論）。
+    //
+    // ⚠️ 待你填入：liffId 需要到 LINE Developers Console 裡，
+    // 你建立的 LIFF app 頁面上取得，格式通常像 "1234567890-AbCdEfGh"。
+    // 沒有正確填入前，這裡會停在初始化失敗、自動退回剪貼簿複製模式。
+    const LIFF_ID = '2011273067-abYzT84Y';
+
+    let liffReady = false;
+    (async function initLiff() {
+      if (LIFF_ID === 'YOUR_LIFF_ID_HERE') {
+        console.warn('尚未設定 LIFF_ID，發送功能將使用剪貼簿複製作為備援。');
+        return;
+      }
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        liffReady = true;
+      } catch (err) {
+        console.warn('LIFF 初始化失敗，發送功能將使用剪貼簿複製作為備援：', err);
+      }
+    })();
+
+    async function handleSend() {
+      const fullText = CardSandbox.cards
+        .map((c, i) => `${i + 1}. ${c}`)
+        .join('\n');
+
+      if (!fullText.trim()) {
+        alert('目前沒有任何卡片內容可以發送。');
+        return;
+      }
+
+      // 情境一：LIFF 已就緒且 shareTargetPicker 在目前環境可用
+      if (liffReady && typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker')) {
+        try {
+          const res = await liff.shareTargetPicker(
+            [{ type: 'text', text: fullText }],
+            { isMultiple: false } // 限定只能選一個對象，避免整理好的筆記一次發給多人
+          );
+          if (res) {
+            alert('已送出，請確認對方（例如你的官方帳號）是否收到。');
+          } else {
+            // res 為 falsy 但沒有拋錯，代表使用者可能在選擇畫面中途取消
+            alert('已取消發送。');
+          }
+        } catch (err) {
+          console.error('shareTargetPicker 發送失敗：', err);
+          alert('發送失敗，改為複製到剪貼簿，請手動貼上：\n' + err.message);
+          copyToClipboardFallback(fullText);
+        }
+        return;
+      }
+
+      // 情境二：LIFF 尚未就緒（例如 liffId 還沒設定、或不在支援環境），降級為複製
+      copyToClipboardFallback(fullText);
+    }
+
+    function copyToClipboardFallback(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => alert('已複製全文到剪貼簿，請手動貼到 LINE 聊天室。'))
+          .catch(() => alert('複製失敗，請手動選取以下內容複製：\n\n' + text));
+      } else {
+        alert('請手動選取以下內容複製：\n\n' + text);
+      }
     }
   </script>
 </body>
