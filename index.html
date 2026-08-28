@@ -47,6 +47,10 @@
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
   </style>
+  <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
+       簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
+       的最後一道保險，確保呈現給使用者的內容穩定是繁體中文。 -->
+  <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"></script>
 </head>
 <body>
   <div class="app">
@@ -108,11 +112,39 @@
     // 卡片管理
     const CardSandbox = {
       cards: [],
+
+      // 簡轉繁轉換器。用 lazy init（第一次用到才建立），並做防呆：
+      // 若 opencc-js 因故未能從 CDN 載入成功，不能讓整個轉寫功能掛掉，
+      // 這種情況下直接跳過轉換、使用原文字。
+      _s2tConverter: null,
+      _s2tInitTried: false,
+      getS2TConverter() {
+        if (this._s2tInitTried) return this._s2tConverter;
+        this._s2tInitTried = true;
+        try {
+          if (typeof OpenCC !== 'undefined' && OpenCC.Converter) {
+            this._s2tConverter = OpenCC.Converter({ from: 'cn', to: 'tw' });
+          }
+        } catch (e) {
+          console.warn('簡繁轉換套件初始化失敗，將直接使用原始文字：', e);
+        }
+        return this._s2tConverter;
+      },
+
       add(text) {
         if (!text.trim()) return;
-        this.cards.push(text.trim());
+        let finalText = text.trim();
+        const converter = this.getS2TConverter();
+        if (converter) {
+          try {
+            finalText = converter(finalText);
+          } catch (e) {
+            console.warn('簡繁轉換執行失敗，使用原始文字：', e);
+          }
+        }
+        this.cards.push(finalText);
         this.render();
-        document.getElementById('latestCardPreview').textContent = `📝 最新轉寫：「${text}」`;
+        document.getElementById('latestCardPreview').textContent = `📝 最新轉寫：「${finalText}」`;
       },
       render() {
         const list = document.getElementById('cardsList');
@@ -235,6 +267,14 @@
         formData.append('file', audioBlob, 'recording.webm');
         formData.append('model', apiKey.startsWith('gsk_') ? 'whisper-large-v3-turbo' : 'whisper-1');
         formData.append('language', 'zh');
+        // 修正：真機截圖發現同一場錄音裡，前三段輸出正確為繁體，第四段卻
+        // 跳成簡體。查證後確認這是 Whisper 模型本身的已知限制——它只有
+        // 單一種中文語言代碼「zh」，不區分繁簡，實際輸出偏向哪一種，
+        // 取決於模型內部機率判斷，同一次使用中途跳來跳去是已知現象。
+        // Groq/OpenAI 官方都支援 prompt 參數，用來引導輸出風格；給一段
+        // 繁體中文範例文字當提示，能讓模型傾向輸出同樣字體風格。
+        // 這不保證 100% 消除，但是官方建議的正規做法。
+        formData.append('prompt', '這是一段繁體中文的會議錄音，內容關於工作討論與進度回報。');
 
         const endpoint = apiKey.startsWith('gsk_')
           ? 'https://api.groq.com/openai/v1/audio/transcriptions'
