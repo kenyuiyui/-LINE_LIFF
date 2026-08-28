@@ -134,10 +134,27 @@
     };
 
     // 音訊錄製與 Groq/OpenAI Whisper API 轉寫引擎
+    //
+    // 分段錄音說明：Whisper API（不管是 Groq 或 OpenAI）本質上是「傳一段
+    // 完整音檔進去，換一段完整文字回來」的批次設計，沒有逐字即時串流這回事，
+    // 這是 API 本身的限制，不是我們程式碼能力不夠。
+    // 改為每 SEGMENT_MS 毫秒（目前設 15 秒）就結束目前這段錄音、送出去轉寫，
+    // 同時立刻開一個新的 MediaRecorder 接續錄下一段，讓卡片能陸續冒出來，
+    // 而不是整場會議錄完才一次出現。
+    //
+    // 已知代價（誠實記錄，這是分段方案本身的取捨，不是 bug）：
+    // 1. 不是真正逐字即時，卡片是「一段一段」冒出來，最長會有接近
+    //    SEGMENT_MS 的延遲才看到最新內容。
+    // 2. 每段切換的瞬間，如果剛好有一句話橫跨兩段的邊界，這句話可能被
+    //    攔腰切斷、分別出現在兩張卡片的頭尾，這是分段代替串流的固有限制。
+    // 3. 段數變多代表 API 呼叫次數變多，如果之後接的是需要計費的方案
+    //    （非免費額度），會直接影響費用。
     const DictationEngine = {
       mediaRecorder: null,
       audioChunks: [],
       isRecording: false,
+      segmentTimer: null,
+      SEGMENT_MS: 15000, // 每段錄音長度，可依實測體驗調整
 
       async start() {
         const apiKey = localStorage.getItem('whisper_api_key');
@@ -147,48 +164,79 @@
         }
 
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          this.mediaRecorder = new MediaRecorder(stream);
-          this.audioChunks = [];
-
-          this.mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) this.audioChunks.push(e.data);
-          };
-
-          this.mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-            await this.transcribeAudio(audioBlob);
-          };
-
-          this.mediaRecorder.start();
+          // stream 只在整場錄音開始時取得一次，之後每段重建 MediaRecorder
+          // 時重複使用同一個 stream，避免每 15 秒重新跳出麥克風權限詢問
+          this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           this.isRecording = true;
           this.updateUI(true);
+          this.startNewSegment();
         } catch (err) {
           alert('無法存取麥克風：' + err.message);
         }
       },
 
+      // 開始錄製新的一段（不是整場錄音的第一段，就是每 15 秒重啟一次）
+      startNewSegment() {
+        if (!this.isRecording || !this.stream) return;
+
+        this.mediaRecorder = new MediaRecorder(this.stream);
+        this.audioChunks = [];
+
+        this.mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) this.audioChunks.push(e.data);
+        };
+
+        this.mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          // 送出轉寫是非同步的，不等它完成就繼續錄下一段，
+          // 這樣多段轉寫可以並行進行，不會因為等 API 回應而漏錄
+          this.transcribeAudio(audioBlob);
+
+          // 如果整場錄音還在進行中，立刻開下一段；
+          // 若使用者已經按停止，這裡就不再開新的一段
+          if (this.isRecording) {
+            this.startNewSegment();
+          }
+        };
+
+        this.mediaRecorder.start();
+
+        // 設定計時器，時間到就結束這一段（觸發 onstop，裡面會自動接續下一段）
+        this.segmentTimer = setTimeout(() => {
+          if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+          }
+        }, this.SEGMENT_MS);
+      },
+
       stop() {
-        if (this.mediaRecorder && this.isRecording) {
+        this.isRecording = false; // 先標記，讓 onstop 裡的邏輯知道不用再開新段
+        clearTimeout(this.segmentTimer);
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
           this.mediaRecorder.stop();
-          this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-          this.isRecording = false;
-          this.updateUI(false);
         }
+        if (this.stream) {
+          this.stream.getTracks().forEach(track => track.stop());
+          this.stream = null;
+        }
+        this.updateUI(false);
       },
 
       async transcribeAudio(audioBlob) {
         const apiKey = localStorage.getItem('whisper_api_key');
         const statusText = document.getElementById('recSubText');
-        statusText.textContent = '⏳ 語音辨識轉寫中，請稍候...';
+        // 用計數器避免多段並行轉寫時，狀態文字互相覆蓋顯示不一致
+        this._pendingCount = (this._pendingCount || 0) + 1;
+        if (this.isRecording) {
+          statusText.textContent = `⏳ 背景轉寫中（${this._pendingCount} 段處理中）...`;
+        }
 
         const formData = new FormData();
         formData.append('file', audioBlob, 'recording.webm');
         formData.append('model', apiKey.startsWith('gsk_') ? 'whisper-large-v3-turbo' : 'whisper-1');
         formData.append('language', 'zh');
 
-        // 判斷使用 Groq 還是 OpenAI endpoint
-        const endpoint = apiKey.startsWith('gsk_') 
+        const endpoint = apiKey.startsWith('gsk_')
           ? 'https://api.groq.com/openai/v1/audio/transcriptions'
           : 'https://api.openai.com/v1/audio/transcriptions';
 
@@ -200,16 +248,24 @@
           });
 
           const data = await res.json();
-          if (data.text) {
-            CardSandbox.add(data.text);
-            statusText.textContent = '轉寫完成！可點擊按鈕再次錄音。';
-          } else {
-            alert('轉寫失敗：' + (data.error?.message || '未知錯誤'));
-            statusText.textContent = '轉寫失敗。';
+          this._pendingCount = Math.max(0, this._pendingCount - 1);
+
+          if (data.text && data.text.trim()) {
+            CardSandbox.add(data.text.trim());
+          }
+          if (this.isRecording) {
+            statusText.textContent = this._pendingCount > 0
+              ? `⏳ 背景轉寫中（${this._pendingCount} 段處理中）...`
+              : '錄音中，卡片會陸續出現。';
+          } else if (this._pendingCount === 0) {
+            statusText.textContent = '全部轉寫完成。';
           }
         } catch (err) {
-          alert('連線失敗：' + err.message);
-          statusText.textContent = '連線失敗。';
+          this._pendingCount = Math.max(0, this._pendingCount - 1);
+          console.error('轉寫失敗:', err);
+          if (this.isRecording) {
+            statusText.textContent = '⚠️ 有一段轉寫失敗，繼續錄音中（此段內容可能遺漏）';
+          }
         }
       },
 
@@ -222,9 +278,9 @@
         if (recording) {
           card.classList.add('recording');
           btn.className = 'btn-record-toggle stop';
-          btn.textContent = '停止錄音並轉寫';
+          btn.textContent = '停止錄音';
           status.textContent = '錄音中...';
-          sub.textContent = '對著手機講話，結束時點擊停止。';
+          sub.textContent = `每 ${this.SEGMENT_MS / 1000} 秒自動送出一段轉寫，卡片會陸續出現。`;
         } else {
           card.classList.remove('recording');
           btn.className = 'btn-record-toggle start';
