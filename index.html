@@ -46,122 +46,6 @@
     .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; }
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-
-    /* ---------- LIFF 內嵌瀏覽器導引畫面 ---------- */
-    /* 這層蓋在整個 app 上面，只有在偵測到「目前是 LINE 內嵌瀏覽器」時
-       才會顯示；顯示期間底下的錄音介面仍然存在於 DOM 中，只是被蓋住，
-       避免使用者在還沒切換到外部瀏覽器前，就先誤觸錄音功能。 */
-    #liffGateOverlay {
-      position: fixed;
-      inset: 0;
-      z-index: 999;
-      background: var(--bg);
-      display: none; /* 預設隱藏，由 JS 判斷後決定是否顯示 */
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 28px 24px;
-      text-align: center;
-    }
-    #liffGateOverlay .gate-icon {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: #eef6ff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 30px;
-      margin-bottom: 18px;
-    }
-    #liffGateOverlay h2 {
-      font-size: 17px;
-      margin: 0 0 8px;
-      font-weight: 700;
-    }
-    #liffGateOverlay p {
-      font-size: 13.5px;
-      color: var(--ink-soft);
-      line-height: 1.7;
-      margin: 0 0 22px;
-      max-width: 340px;
-    }
-    #liffGateOverlay .gate-reason {
-      font-size: 12px;
-      color: var(--ink-soft);
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 22px;
-      max-width: 340px;
-      line-height: 1.6;
-      text-align: left;
-    }
-    #liffGateOverlay .btn-open-external {
-      width: 100%;
-      max-width: 320px;
-      padding: 15px;
-      font-size: 15px;
-      font-weight: 700;
-      border: none;
-      border-radius: 14px;
-      background: var(--line-green);
-      color: #fff;
-      cursor: pointer;
-    }
-    #liffGateOverlay .btn-copy-link {
-      margin-top: 12px;
-      background: none;
-      border: none;
-      color: var(--ink-soft);
-      font-size: 12.5px;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-
-    /* ---------- 螢幕除錯面板 ---------- */
-    /* 暫時性除錯工具：把 LIFF 初始化過程中每一步的狀態直接印在畫面上，
-       方便無法連接電腦看 console 的情況下排查問題。確認 A/B 導引畫面
-       運作正常後，可以把這個面板整段移除（搜尋「除錯面板」找到起訖點）。 */
-    #debugPanel {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 9999;
-      background: #111827;
-      color: #4ade80;
-      font-family: "SF Mono", Consolas, monospace;
-      font-size: 11px;
-      line-height: 1.6;
-      padding: 8px 10px;
-      max-height: 40vh;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      border-bottom: 2px solid #4ade80;
-    }
-    #debugPanel .debug-title {
-      color: #fbbf24;
-      font-weight: 700;
-      margin-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    #debugPanel .debug-close {
-      background: none;
-      border: 1px solid #4ade80;
-      color: #4ade80;
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    #debugPanel .debug-line.error { color: #f87171; }
-    #debugPanel .debug-line.warn { color: #fbbf24; }
-    #debugPanel .debug-line.ok { color: #4ade80; font-weight: 700; }
   </style>
   <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
@@ -173,16 +57,6 @@
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
-  <!-- ========== 除錯面板開始：確認問題排除後可整段刪除 ========== -->
-  <div id="debugPanel">
-    <div class="debug-title">
-      <span>🐛 LIFF 除錯面板</span>
-      <button class="debug-close" onclick="document.getElementById('debugPanel').style.display='none'">關閉</button>
-    </div>
-    <div id="debugLog">尚未開始初始化...</div>
-  </div>
-  <!-- ========== 除錯面板結束 ========== -->
-
   <div class="app">
     <header>
       <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
@@ -224,25 +98,6 @@
     <div class="action-bar" id="actionBar" style="display:none;">
       <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 選擇對象並發送</button>
     </div>
-  </div>
-
-  <!-- ---------- LIFF 內嵌瀏覽器導引畫面 ----------
-       只有在 liff.init() 完成後確認 liff.isInClient() === true
-       （代表使用者目前正在 LINE App 內建瀏覽器）才會被 JS 顯示出來。
-       採用「顯示提示 + 手動按鈕」而非自動跳轉，理由：
-       1. 多數行動瀏覽器會擋自動觸發的視窗開啟/導頁行為，
-          必須綁在一次真實的使用者點擊事件上才可靠。
-       2. 讓使用者清楚知道「為什麼」被要求换到外部瀏覽器
-          （麥克風權限在 LINE 內嵌視窗內受限），減少困惑與誤觸。 -->
-  <div id="liffGateOverlay">
-    <div class="gate-icon">🌐</div>
-    <h2>請用外部瀏覽器開啟</h2>
-    <p>偵測到你目前是在 LINE App 內開啟本頁面。錄音功能需要瀏覽器的麥克風權限，這在 LINE 內建瀏覽器中無法正常運作，請改用手機的預設瀏覽器（Safari / Chrome）開啟。</p>
-    <div class="gate-reason">
-      ⚠️ 原因：LINE App 內建的網頁瀏覽器（內嵌 WebView）基於系統限制，無法授權網頁存取裝置麥克風，因此錄音功能在這裡會失敗。這不是本頁面的錯誤，而是 LINE App 內嵌瀏覽器的既有限制。
-    </div>
-    <button class="btn-open-external" id="openExternalBtn" onclick="openInExternalBrowser()">在外部瀏覽器開啟</button>
-    <button class="btn-copy-link" id="copyLinkBtn" onclick="copyCurrentLinkFallback()">或複製連結自行貼到瀏覽器</button>
   </div>
 
   <script>
@@ -502,104 +357,17 @@
     // 這裡刻意不在 init 時用 withLoginOnExternalBrowser 自動跳轉登入，
     // 因為那樣會讓使用者一打開頁面、都還沒開始錄音就被導去登入頁——
     // 改為只在真正要發送、且確認尚未登入時，才主動引導登入。
-    // ---------- 螢幕除錯面板用的小工具 ----------
-    // 暫時性除錯工具，確認問題排除後整段移除即可（連同上面 HTML 的
-    // #debugPanel 區塊，以及 CSS 裡的 #debugPanel 樣式一起刪）。
-    function debugLog(msg, level) {
-      const el = document.getElementById('debugLog');
-      if (!el) return;
-      const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-      const cls = level ? ` class="debug-line ${level}"` : ' class="debug-line"';
-      el.innerHTML += `<div${cls}>[${time}] ${msg}</div>`;
-    }
-
     const LIFF_ID = '2011273067-abYzT84Y';
-
-    debugLog('頁面載入完成，準備呼叫 liff.init()...');
-    debugLog('目前網址：' + window.location.href);
-    debugLog('liff SDK 是否已載入：' + (typeof liff !== 'undefined'));
 
     let liffReady = false;
     (async function initLiff() {
       try {
-        debugLog('開始執行 liff.init({ liffId: "' + LIFF_ID + '" })...');
         await liff.init({ liffId: LIFF_ID });
         liffReady = true;
-        debugLog('✅ liff.init() 成功', 'ok');
-
-        // ---------- LIFF 內嵌瀏覽器偵測（AB 導引） ----------
-        // liff.isInClient() 只有在 liff.init() 完成後才可信；在這之前
-        // 呼叫可能回傳不準確的結果，所以判斷邏輯放在 init 成功的分支內。
-        // 若使用者目前是在 LINE App 內建瀏覽器開啟本頁，錄音需要的
-        // getUserMedia 麥克風權限在該環境下無法正常取得，因此顯示導引
-        // 畫面，請使用者改用外部瀏覽器（Safari/Chrome 等）開啟。
-        const inClient = typeof liff.isInClient === 'function' ? liff.isInClient() : 'liff.isInClient 不存在';
-        debugLog('liff.isInClient() 回傳值：' + inClient);
-
-        if (typeof liff.isInClient === 'function' && liff.isInClient()) {
-          debugLog('➡️ 判定為 LINE 內嵌瀏覽器，呼叫 showLiffGate()', 'warn');
-          showLiffGate();
-          debugLog('showLiffGate() 已執行，overlay display = ' + document.getElementById('liffGateOverlay').style.display);
-        } else {
-          debugLog('➡️ 判定為外部瀏覽器（或 isInClient 不可用），不顯示導引畫面');
-        }
       } catch (err) {
-        debugLog('❌ liff.init() 拋出錯誤：' + (err && err.message ? err.message : String(err)), 'error');
         console.warn('LIFF 初始化失敗，發送功能將使用剪貼簿複製作為備援：', err);
-        // LIFF 初始化本身失敗時，liff.isInClient() 不可信（甚至可能拋錯），
-        // 因此不在這個分支嘗試判斷是否要顯示導引畫面，讓使用者仍可以在
-        // 目前環境內正常使用頁面（發送功能會走剪貼簿複製備援）。
       }
     })();
-
-    // 顯示「請用外部瀏覽器開啟」導引畫面
-    function showLiffGate() {
-      document.getElementById('liffGateOverlay').style.display = 'flex';
-    }
-
-    // 隱藏導引畫面（目前流程中不會主動呼叫，保留供未來擴充，例如
-    // 偵測到使用者其實可以直接在內嵌視窗操作某些功能時使用）
-    function hideLiffGate() {
-      document.getElementById('liffGateOverlay').style.display = 'none';
-    }
-
-    // 使用者點擊「在外部瀏覽器開啟」按鈕時觸發。
-    // 用 liff.openWindow({ external: true }) 開啟「目前這個 LIFF 網址本身」
-    // （保留原本網址與 LIFF 參數），讓使用者在外部瀏覽器裡仍然是同一個
-    // LIFF 應用、同一組已儲存的 API Key（localStorage 以網域為單位保存，
-    // 换成外部瀏覽器後 localStorage 會是全新的，因此使用者換到外部瀏覽器
-    // 後仍需要重新輸入一次 API Key，這是瀏覽器儲存機制本身的限制，
-    // 不是程式邏輯的疏漏）。
-    function openInExternalBrowser() {
-      const currentUrl = window.location.href;
-      try {
-        if (liffReady && typeof liff.openWindow === 'function') {
-          liff.openWindow({
-            url: currentUrl,
-            external: true
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn('liff.openWindow 呼叫失敗，改用複製連結備援：', err);
-      }
-      // liff.openWindow 不可用或呼叫失敗時，降級為複製連結，
-      // 讓使用者可以自行貼到外部瀏覽器網址列開啟
-      copyCurrentLinkFallback();
-    }
-
-    // 複製目前網址到剪貼簿，作為 liff.openWindow 無法使用時的備援，
-    // 也讓使用者有一個「不確定按鈕有沒有反應」時的替代手段
-    function copyCurrentLinkFallback() {
-      const currentUrl = window.location.href;
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(currentUrl)
-          .then(() => alert('已複製連結，請貼到手機的預設瀏覽器（Safari / Chrome）網址列開啟。'))
-          .catch(() => alert('複製失敗，請手動複製以下連結：\n\n' + currentUrl));
-      } else {
-        alert('請手動複製以下連結，貼到外部瀏覽器開啟：\n\n' + currentUrl);
-      }
-    }
 
     async function handleSend() {
       const fullText = CardSandbox.cards
