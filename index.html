@@ -3,13 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <!--
+    ★ 新增：CSP（Content-Security-Policy）
+    白名單只放這份頁面實際會用到的三個網域：
+    - cdn.jsdelivr.net：載入 opencc-js（簡轉繁）
+    - static.line-scdn.net：載入 LIFF SDK
+    - api.groq.com：Whisper 轉寫 API（透過 connect-src，因為是 fetch() 呼叫，不是載入 script）
+    其餘一律擋掉。這樣就算未來哪裡不小心被注入了一段惡意 <script src="...">
+    或想把資料 fetch 送到別的網域，瀏覽器會直接擋下，不會執行/送出。
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data:;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me;
+    frame-src https://access.line.me;
+    base-uri 'self';
+    form-action 'none';
+  ">
   <title>語音卡片筆記 — LIFF 專用版</title>
   <style>
     :root {
       --line-green: #06c755;
       --line-green-dark: #04a047;
+      --line-green-tint: #e8f9ee;
       --ink: #1a1d1f;
       --ink-soft: #6b7280;
+      --ink-faint: #9ca3af;
       --bg: #f5f6f8;
       --card-bg: #ffffff;
       --border: #e5e7eb;
@@ -20,12 +41,93 @@
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--ink); }
     .app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
-    header { padding: 14px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
-    header h1 { font-size: 15px; margin: 0 0 2px; font-weight: 700; }
+    header { padding: 18px 16px 14px; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+    header h1 { font-size: 15px; margin: 0 0 3px; font-weight: 700; }
     header .sub { font-size: 12px; color: var(--ink-soft); }
-    main { flex: 1; padding: 14px 16px 100px; }
-    .dev-panel { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 10px 12px; font-size: 11.5px; color: #7a5a00; margin-bottom: 12px; line-height: 1.6; }
-    .dev-panel input { width: 100%; padding: 6px 8px; margin-top: 6px; border: 1px solid var(--warn-border); border-radius: 6px; font-size: 12px; box-sizing: border-box; }
+    main { flex: 1; padding: 16px 16px 100px; }
+
+    /* API Key 設定卡片：簡約留白，綠色只用在需要引導動作的地方（申請教學、狀態勾號） */
+    .key-panel {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .key-panel .key-panel-label { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .key-panel .key-panel-desc { font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; line-height: 1.6; }
+    .key-panel input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 13px; box-sizing: border-box; background: var(--bg);
+    }
+    .key-panel input:focus { outline: none; border-color: var(--line-green); background: var(--card-bg); }
+
+    /* Key 狀態列：整合共用裝置清除功能於此，平時只是一行安靜的小字，不用色塊、不用紅色 */
+    .key-status-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+      font-size: 11.5px; color: var(--ink-faint);
+    }
+    .key-status-row .status-left { display: flex; align-items: center; gap: 5px; }
+    .key-status-row .status-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--line-green); flex-shrink: 0;
+    }
+    .key-status-row .status-dot.empty { background: var(--ink-faint); }
+    .key-status-row .btn-clear-link {
+      border: none; background: none; color: var(--ink-faint); cursor: pointer;
+      font-size: 11.5px; padding: 2px 4px; display: flex; align-items: center; gap: 3px;
+    }
+    .key-status-row .btn-clear-link:active { color: var(--danger); }
+
+    .key-panel details { margin-top: 10px; }
+    .key-panel summary {
+      cursor: pointer; font-weight: 600; font-size: 12px; color: var(--line-green-dark);
+      list-style: none; display: flex; align-items: center; gap: 4px;
+    }
+    .key-panel summary::-webkit-details-marker { display: none; }
+    .key-panel summary::before { content: '▸'; font-size: 10px; transition: transform 0.15s; }
+    .key-panel details[open] summary::before { transform: rotate(90deg); }
+    .key-panel .guide-body { margin-top: 8px; font-size: 12px; line-height: 1.7; color: var(--ink-soft); }
+    .key-panel .guide-note { margin-top: 6px; color: var(--ink-faint); font-size: 11.5px; }
+
+    /* ★ 新增：存取閘門樣式 */
+    .access-gate {
+      position: fixed; inset: 0; background: var(--bg); z-index: 2000;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .gate-panel {
+      max-width: 420px; width: 100%; background: var(--card-bg); border-radius: 18px;
+      padding: 28px 22px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .gate-spinner {
+      width: 36px; height: 36px; border-radius: 50%; margin: 0 auto 16px;
+      border: 3px solid var(--line-green-tint); border-top-color: var(--line-green);
+      animation: gateSpin 0.8s linear infinite;
+    }
+    @keyframes gateSpin { to { transform: rotate(360deg); } }
+    .gate-icon { font-size: 40px; margin-bottom: 12px; }
+    .gate-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .gate-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 20px; }
+    .btn-gate-primary {
+      width: 100%; padding: 13px; font-size: 14px; font-weight: 700; border: none;
+      border-radius: 12px; background: var(--line-green); color: #fff; cursor: pointer; margin-bottom: 8px;
+    }
+    .btn-gate-primary:disabled { background: var(--border); color: var(--ink-faint); cursor: not-allowed; }
+    .btn-gate-secondary {
+      width: 100%; padding: 13px; font-size: 13.5px; font-weight: 600; border: 1px solid var(--border);
+      border-radius: 12px; background: var(--card-bg); color: var(--ink-soft); cursor: pointer;
+    }
+    .gate-panel-consent { max-width: 440px; text-align: left; max-height: 88vh; display: flex; flex-direction: column; }
+    .gate-panel-consent .gate-title { text-align: center; }
+    .gate-consent-body {
+      font-size: 12.5px; line-height: 1.75; color: var(--ink); overflow-y: auto;
+      background: var(--bg); border-radius: 10px; padding: 14px 14px 4px; margin-bottom: 14px; flex: 1;
+    }
+    .gate-consent-body p { margin: 0 0 10px; }
+    .gate-consent-body ul { margin: 0 0 10px; padding-left: 18px; }
+    .gate-consent-body li { margin-bottom: 6px; }
+    .gate-consent-checkbox {
+      display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-soft);
+      margin-bottom: 14px; cursor: pointer;
+    }
+    .gate-consent-actions { display: flex; flex-direction: column; gap: 8px; }
     .meeting-mode { background: var(--card-bg); border-radius: 18px; padding: 32px 20px; text-align: center; border: 1px solid var(--border); }
     .meeting-mode.recording { background: linear-gradient(160deg, #0d1f14, #14291c); color: #fff; border: none; }
     .rec-orb { width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; background: #f0f1f3; font-size: 34px; transition: all 0.3s ease; }
@@ -154,11 +256,26 @@
   </style>
   <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
-       的最後一道保險，確保呈現給使用者的內容穩定是繁體中文。 -->
-  <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"></script>
+       的最後一道保險，確保呈現給使用者的內容穩定是繁體中文。
+
+       ★ 加上 SRI（Subresource Integrity）：CSP 只限制了「只能從
+       cdn.jsdelivr.net 載入 script」，但無法保證該網域回傳的內容
+       沒有被竄改（供應鏈攻擊風險）。integrity 屬性讓瀏覽器在執行前
+       先驗證下載回來的檔案雜湊值，不符就直接拒絕載入，不會執行。
+       這裡鎖定的是 npm 上 opencc-js@1.0.5 這個固定版本算出來的雜湊，
+       版本號已經釘死在網址上，之後升級版本需同步更新這裡的 hash。
+       crossorigin="anonymous" 是瀏覽器套用 SRI 檢查的必要條件。 -->
+  <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"
+          integrity="sha384-9JmxkgxoKE5gP14V/eBemUAwCKh8QSb5IFEJje/JNxxh8cn9hKsIs/q5Ho+mfVau"
+          crossorigin="anonymous"></script>
   <!-- LIFF SDK：用於呼叫 shareTargetPicker() 讓使用者選擇要把整理好的
        文字發送給誰（例如你的官方帳號）。這個 API 在一般瀏覽器與 LINE App
-       內都能呼叫，不需要透過內嵌視窗，因此不會撞到麥克風權限那道牆。 -->
+       內都能呼叫，不需要透過內嵌視窗，因此不會撞到麥克風權限那道牆。
+
+       ★ 這支「edge/2/sdk.js」官方會不定期原地更新內容（網址本身沒有
+       鎖定版號），加上 SRI 反而會導致 LINE 更新 SDK 後雜湊值對不上、
+       頁面直接載入失敗，因此刻意不對這支加 SRI，只靠上方 CSP 的
+       網域白名單限制來源。 -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
@@ -175,6 +292,7 @@
           <h4>開始使用前，請先知道這些事</h4>
           <ul style="padding-left:18px; margin:0;">
             <li>需要自己申請 Groq API Key 才能使用（免費，見下方輸入框旁的教學連結）</li>
+            <li><b>API Key 會存在這台裝置的瀏覽器裡</b>。如果這是公用或跟別人共用的裝置（例如公司電腦、借用的手機），請在下方「共用裝置」區塊清除資料，或使用完畢後手動清除，避免下一個使用者看到你的 Key 與筆記內容</li>
             <li>錄音轉成文字後，<b>原始音檔不會被保留</b>，只留文字卡片。如需留底請另外用手機錄音 App 同時錄一份</li>
             <li>轉寫過程會將這段音訊上傳到 Groq 的伺服器處理，語音內容不是完全留在你手機本機</li>
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
@@ -184,6 +302,14 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>資安強化：CSP、共用裝置資料清除</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>加入 Content-Security-Policy，限制頁面只能連到必要的網域，降低被注入惡意程式碼的風險</li>
+              <li>新增「共用裝置」提醒與一鍵清除本機資料工具，方便在公用裝置使用完畢後清乾淨</li>
+              <li>API Key 輸入框旁新增「忘記這把 Key」快捷按鈕</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>卡片編輯模式、雙發送管道、即時預覽</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>新增「合併／改順序／編輯內容」三種卡片編輯模式，預設唯讀避免誤觸</li>
@@ -243,7 +369,7 @@
     <div class="modal-box" style="max-width:380px;">
       <div class="modal-tabs"><button class="active" style="cursor:default;">ℹ️ 開始錄音前，先知道這件事</button></div>
       <div class="modal-body">
-        這個工具只做「即時音轉文字」，錄音轉成文字後<b>原始音檔就會被丟棄</b>，不會留存也不會上傳保存。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
+        這個工具只做「即時音轉文字」，錄音轉成文字後<b>原始音檔就會被丟棄</b>，不會留存也不會上傳保存，但轉寫過程<b>會把這段語音上傳到 Groq 雲端伺服器處理</b>。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
       </div>
       <div class="modal-footer">
         <label><input type="checkbox" id="dontShowRecordNoticeCheckbox" checked> 下次不用再提醒我</label>
@@ -252,20 +378,111 @@
     </div>
   </div>
 
-  <div class="app">
+  <!-- ★ 新增：清除本機資料的確認彈窗 -->
+  <div class="modal-overlay hidden" id="clearDataModal">
+    <div class="modal-box" style="max-width:380px;">
+      <div class="modal-tabs"><button class="active" style="cursor:default;">🧹 清除本機資料</button></div>
+      <div class="modal-body">
+        這會清除目前這台裝置、這個瀏覽器裡儲存的：
+        <ul style="padding-left:18px; margin:8px 0;">
+          <li>你填過的 Groq API Key</li>
+          <li>「不用再提醒」的已讀記錄（下次會重新看到提示彈窗）</li>
+          <li>尚未送出的暫存筆記內容（若有）</li>
+        </ul>
+        <b>不會影響：</b>目前畫面上還沒發送出去的卡片（清除後這些卡片仍會顯示，但重新整理頁面後就會消失，因為卡片本身只存在記憶體中，並未被永久保存）。
+        <br><br>
+        <b>⚠️ 這個工具清不到的地方：</b>如果你曾經用「複製到剪貼簿」功能，筆記內容可能還留在系統剪貼簿裡（這是手機/瀏覽器本身的機制，網頁無法主動清除）。若這是共用裝置，建議額外複製一段無關文字覆蓋掉。
+        <br><br>
+        確定要清除嗎？清除後需要重新輸入 API Key 才能繼續錄音。
+      </div>
+      <div class="modal-footer">
+        <div class="chat-preview-actions">
+          <button class="btn-cancel" onclick="ClearLocalData.cancel()">取消</button>
+          <button class="btn-confirm" style="background:var(--danger);" onclick="ClearLocalData.confirm()">確定清除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    ★ 新增：存取閘門（Access Gate）
+    這是使用者打開頁面後第一個看到的東西，蓋住整個畫面，下方的 .app
+    主體預設是 display:none，要等 AccessGate 判定「已登入 + 是好友 +
+    已同意使用須知」三個條件都成立，才會顯示真正的工具內容。
+
+    三種畫面用同一個 overlay 容器，靠 JS 切換要顯示哪一個：
+    1. gateLoading：正在驗證登入/好友狀態，避免空白畫面
+    2. gateNotFriend：不是好友，導去加好友，不提供任何工具功能
+    3. gateConsent：是好友，顯示使用須知，同意才放行；不同意就關閉頁面
+  -->
+  <div class="access-gate" id="accessGate">
+    <!-- 1. 驗證中 -->
+    <div class="gate-panel" id="gateLoading">
+      <div class="gate-spinner"></div>
+      <div class="gate-title">正在確認身份...</div>
+      <div class="gate-desc">請稍候，正在確認登入與好友狀態</div>
+    </div>
+
+    <!-- 2. 不是好友 -->
+    <div class="gate-panel" id="gateNotFriend" style="display:none;">
+      <div class="gate-icon">🤖</div>
+      <div class="gate-title">請先加官方帳號好友</div>
+      <div class="gate-desc">這個工具僅開放給已加好友的使用者。請先加好友，完成後回來這個頁面重新整理即可繼續。</div>
+      <button class="btn-gate-primary" onclick="AccessGate.goAddFriend()">前往加好友</button>
+      <button class="btn-gate-secondary" onclick="AccessGate.recheck()">我已經加了，重新檢查</button>
+    </div>
+
+    <!-- 3. 使用須知同意書 -->
+    <div class="gate-panel gate-panel-consent" id="gateConsent" style="display:none;">
+      <div class="gate-title">使用前，請詳閱以下說明</div>
+      <div class="gate-consent-body">
+        <p>這是一個由官方帳號提供的<b>個人開發小工具</b>，用來把語音整理成文字卡片。使用前請確認你已了解以下事項：</p>
+        <ul>
+          <li>需要自行申請並填入 Groq API Key 才能使用；<b>Key 會存在你這個裝置的瀏覽器裡</b>，若為共用裝置請於使用後清除本機資料</li>
+          <li>你錄製的語音內容<b>會上傳到 Groq 雲端伺服器</b>進行轉寫處理，原始音檔不會被保留，僅保留轉寫後的文字</li>
+          <li>本工具<b>不建議</b>用於處理真正機密或高度敏感的內容（例如商業機密、他人個資、密碼、身分證字號等）</li>
+          <li>這是個人維護的小工具，<b>沒有正式的客服或服務保證</b>，可能因故調整或中止服務</li>
+          <li>若你發現安全性問題或有濫用情形，歡迎透過官方帳號回報</li>
+        </ul>
+        <p>點選「我已閱讀並同意」代表你已了解並願意自行承擔上述使用情境下的風險；若不同意，請關閉此頁面。</p>
+      </div>
+      <label class="gate-consent-checkbox">
+        <input type="checkbox" id="consentCheckbox" onchange="AccessGate.onConsentCheckboxChange(this.checked)">
+        我已閱讀並了解以上內容
+      </label>
+      <div class="gate-consent-actions">
+        <button class="btn-gate-secondary" onclick="AccessGate.declineAndLeave()">不同意，離開頁面</button>
+        <button class="btn-gate-primary" id="consentAgreeBtn" disabled onclick="AccessGate.agreeAndEnter()">我已閱讀並同意</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app" id="mainApp" style="display:none;">
     <header>
       <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
       <div class="sub">MediaRecorder 前端錄音 ➔ Whisper API 雲端極速辨識</div>
     </header>
     <main>
-      <div class="dev-panel">
-        <b>🔑 設定 API Key (一次性設定)：</b>
-        <div>請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
+      <!-- API Key 設定卡片：共用裝置的清除功能整合成卡片內的一行小字連結，
+           平常安靜地待在那裡，不用色塊、不用紅色，只有真的需要時才點得到 -->
+      <div class="key-panel">
+        <div class="key-panel-label">🔑 設定 API Key</div>
+        <div class="key-panel-desc">請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
         <input type="password" id="apiKeyInput" placeholder="gsk_..." onchange="saveApiKey(this.value)">
 
-        <details style="margin-top:8px;">
-          <summary style="cursor:pointer; font-weight:600; font-size:12px;">🔗 還沒有 Groq API Key？點這裡看申請教學（約 2 分鐘，免信用卡）</summary>
-          <div style="margin-top:6px; font-size:12px; line-height:1.7;">
+        <div class="key-status-row">
+          <span class="status-left">
+            <span class="status-dot" id="keyStatusDot"></span>
+            <span id="keyStatusText">尚未設定 Key</span>
+          </span>
+          <button class="btn-clear-link" onclick="ClearLocalData.open()" title="共用裝置用完請清除，避免下一位使用者看到你的資料">
+            🧹 清除本機資料
+          </button>
+        </div>
+
+        <details>
+          <summary>還沒有 Groq API Key？點這裡看申請教學</summary>
+          <div class="guide-body">
             <ol style="margin:0; padding-left:18px;">
               <li>打開 <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>（會直接跳到 API Keys 頁面）</li>
               <li>用 Google／GitHub／Email 任一種方式註冊登入（Email 註冊需要驗證信箱）</li>
@@ -274,7 +491,7 @@
               <li>畫面會顯示一串以 <code>gsk_</code> 開頭的金鑰——<b>這串只會顯示這一次</b>，記得先複製起來，離開頁面後就看不到了</li>
               <li>回到這裡，把整串貼進上面的輸入框即可</li>
             </ol>
-            <div style="margin-top:6px; color:#7a5a00;">免費額度不需要信用卡，日常筆記用量通常足夠；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。</div>
+            <div class="guide-note">免費額度不需要信用卡，日常筆記用量通常足夠；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。</div>
           </div>
         </details>
       </div>
@@ -342,7 +559,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-08-cards-share';
+    const APP_VERSION = '2026-08-security-hardening';
 
     const IntroModal = {
       switchTab(tab) {
@@ -370,6 +587,48 @@
       }
     };
     IntroModal.initOnLoad();
+
+    // ---------- ★ 新增：清除本機資料工具 ----------
+    // 目的：因應「同一台裝置被多人共用」的場景（公用電腦、借用手機等）。
+    // localStorage / sessionStorage 是明碼存在裝置上的，前一個使用者
+    // 留下的 API Key、已讀記錄、暫存文字，下一個使用同一瀏覽器的人
+    // 有機會看到或誤用，所以提供一鍵清除、並在畫面最上方明顯提示。
+    const ClearLocalData = {
+      open() {
+        document.getElementById('clearDataModal').classList.remove('hidden');
+      },
+      cancel() {
+        document.getElementById('clearDataModal').classList.add('hidden');
+      },
+      confirm() {
+        try {
+          // 只清這個工具自己寫入的幾個 key，不動用 localStorage.clear()，
+          // 避免誤刪同網域下未來可能新增、但與本工具無關的其他資料
+          localStorage.removeItem('whisper_api_key');
+          localStorage.removeItem('intro_modal_seen_version');
+          localStorage.removeItem('record_notice_acknowledged');
+          sessionStorage.removeItem('pending_send_text');
+        } catch (e) {
+          console.warn('清除本機資料時發生問題：', e);
+        }
+        document.getElementById('apiKeyInput').value = '';
+        this.updateKeySavedIndicator();
+        document.getElementById('clearDataModal').classList.add('hidden');
+        alert('已清除這台裝置上的 API Key、已讀記錄與暫存內容。若要繼續使用，請重新輸入 API Key。');
+      },
+      // 依目前是否存有 Key，更新狀態列的小圓點顏色與文字說明。
+      // 用低調的方式呈現狀態，不用色塊或警示語氣，符合平時安靜、
+      // 只有需要時才互動的設計方向。
+      updateKeySavedIndicator() {
+        let hasKey = false;
+        try { hasKey = !!localStorage.getItem('whisper_api_key'); }
+        catch (e) { /* 忽略 */ }
+        document.getElementById('keyStatusDot').classList.toggle('empty', !hasKey);
+        document.getElementById('keyStatusText').textContent = hasKey
+          ? '這台裝置已記住一把 Key'
+          : '尚未設定 Key';
+      }
+    };
 
     // ---------- 發送前的聊天室預覽 ----------
     // 顯示模擬 LINE 對話氣泡的預覽彈窗，使用者按下彈窗裡的「確認發送」
@@ -435,7 +694,9 @@
     document.getElementById('apiKeyInput').value = localStorage.getItem('whisper_api_key') || '';
     function saveApiKey(val) {
       localStorage.setItem('whisper_api_key', val.trim());
+      ClearLocalData.updateKeySavedIndicator();
     }
+    ClearLocalData.updateKeySavedIndicator(); // 頁面載入時就先顯示目前狀態
 
     // 頁面切換
     function switchTab(tab) {
@@ -830,29 +1091,163 @@
       }
     };
 
-    // ---------- LIFF 初始化與發送邏輯 ----------
+    // ---------- ★ 存取閘門（Access Gate）----------
+    // 說明：原本的設計是「先顯示畫面，需要發送時才要求登入」，避免
+    // 打斷使用者。但既然現在要求「先加好友、同意使用須知才能用」，
+    // 存取邏輯整個反過來：先驗證、後顯示，主體工具（.app／#mainApp）
+    // 在驗證通過前完全是 display:none，使用者連錄音按鈕都碰不到。
+    //
+    // 流程：
+    // 1. liff.init() 完成後，若未登入 → liff.login()（因為後台
+    //    Add friend option 是 aggressive，登入流程中會自動插入一次
+    //    加好友確認畫面；但這只對「第一次登入這個 channel 的新使用者」
+    //    有效，舊使用者不會重複看到，所以不能只靠這個，一定要下面
+    //    第 2 步主動查詢才可靠）
+    // 2. 登入完成後呼叫 liff.getFriendship() 主動查詢好友狀態
+    //    （這支 API 需要 profile scope，已於後台開通）
+    // 3. friendFlag 為 false → 顯示「請先加好友」畫面，並提供
+    //    「重新檢查」按鈕（使用者離開去加好友後，回來不需要重新整理
+    //    網址，按這顆鈕會重新呼叫 getFriendship 就好）
+    // 4. friendFlag 為 true → 檢查 localStorage 是否已同意過使用須知
+    //    （同意記錄跟 APP_VERSION 綁定，未來使用須知內容更新時，把
+    //    CONSENT_VERSION 一起改掉，使用者就會重新看到同意書）
+    // 5. 尚未同意 → 顯示同意書，勾選確認框後「我已閱讀並同意」按鈕
+    //    才會從 disabled 變成可點擊，避免使用者沒看內容就手滑同意
+    // 6. 「不同意」→ 呼叫 liff.closeWindow()（僅在 LIFF 內嵌視窗有效）
+    //    並同時嘗試 window.close()（外部瀏覽器分頁），兩者都不保證
+    //    100% 成功關閉分頁是瀏覽器安全限制，因此同時顯示文字告知
+    //    使用者可以自行關閉分頁
+    // ★ LIFF ID 安全性說明：這串 ID 本質上是公開的識別碼（如同網址），
+    // 設計上就是要讓使用者能透過它開啟這個頁面，公開它本身不構成資安
+    // 風險。真正需要保護的邊界在 LINE Developers Console 後台幫這個
+    // channel 開通的權限範圍（scope），應定期檢查是否設得過寬。
+    const LIFF_ID = '2011273067-abYzT84Y';
+    let liffReady = false;
+
+    const CONSENT_VERSION = '2026-08-v1'; // 使用須知內容有實質變更時更新此版號，會讓所有人重新看到同意書
+
+    const AccessGate = {
+      _friendCheckInProgress: false,
+
+      showPanel(panelId) {
+        ['gateLoading', 'gateNotFriend', 'gateConsent'].forEach(id => {
+          document.getElementById(id).style.display = (id === panelId) ? 'block' : 'none';
+        });
+      },
+
+      async run() {
+        this.showPanel('gateLoading');
+        try {
+          await liff.init({ liffId: LIFF_ID });
+          liffReady = true;
+        } catch (err) {
+          // LIFF 初始化本身失敗（網址跟後台 Endpoint URL 對不上、liffId 有誤等），
+          // 這種情況無法驗證身份，保守起見直接擋下，不放行任何功能
+          console.error('LIFF 初始化失敗：', err);
+          document.getElementById('gateLoading').innerHTML =
+            '<div class="gate-title">無法載入</div><div class="gate-desc">初始化失敗，請確認網路連線後重新整理頁面。若持續發生，請透過官方帳號回報。</div>';
+          return;
+        }
+
+        if (!liff.isLoggedIn()) {
+          // aggressive 模式下，這一步系統會視情況自動插入加好友確認畫面
+          // （僅對第一次登入這個 channel 的使用者），登入完成後會導回本頁
+          liff.login({ redirectUri: window.location.href });
+          return; // 頁面即將導向登入頁，不用再往下執行
+        }
+
+        await this.checkFriendshipAndProceed();
+      },
+
+      async checkFriendshipAndProceed() {
+        if (this._friendCheckInProgress) return;
+        this._friendCheckInProgress = true;
+        this.showPanel('gateLoading');
+
+        try {
+          const { friendFlag } = await liff.getFriendship();
+          if (!friendFlag) {
+            this.showPanel('gateNotFriend');
+            return;
+          }
+          this.checkConsentAndProceed();
+        } catch (err) {
+          // getFriendship 失敗（例如 profile scope 未授權、access token 問題），
+          // 保守起見視為「無法確認好友狀態」，不放行，並給出可重試的路徑
+          console.error('好友狀態查詢失敗：', err);
+          document.getElementById('gateNotFriend').querySelector('.gate-desc').textContent =
+            '無法確認好友狀態，請確認已加好友並允許權限後，點下方按鈕重新檢查。';
+          this.showPanel('gateNotFriend');
+        } finally {
+          this._friendCheckInProgress = false;
+        }
+      },
+
+      goAddFriend() {
+        // 導去加好友，用 liff.openWindow 開外部連結（LIFF 內嵌視窗與
+        // 外部瀏覽器都適用），實際好友加取連結請替換成你官方帳號的網址
+        const addFriendUrl = 'https://line.me/R/ti/p/@your-bot-id'; // TODO: 換成你的官方帳號好友加取連結
+        if (typeof liff.openWindow === 'function') {
+          liff.openWindow({ url: addFriendUrl, external: true });
+        } else {
+          window.open(addFriendUrl, '_blank');
+        }
+      },
+
+      recheck() {
+        this.checkFriendshipAndProceed();
+      },
+
+      checkConsentAndProceed() {
+        let agreedVersion = null;
+        try { agreedVersion = localStorage.getItem('consent_agreed_version'); }
+        catch (e) { /* localStorage 不可用時，保守起見每次都要求同意 */ }
+
+        if (agreedVersion === CONSENT_VERSION) {
+          this.enterApp();
+        } else {
+          this.showPanel('gateConsent');
+        }
+      },
+
+      onConsentCheckboxChange(checked) {
+        document.getElementById('consentAgreeBtn').disabled = !checked;
+      },
+
+      agreeAndEnter() {
+        try { localStorage.setItem('consent_agreed_version', CONSENT_VERSION); }
+        catch (e) { /* 忽略，下次仍會顯示同意書，不影響核心功能 */ }
+        this.enterApp();
+      },
+
+      declineAndLeave() {
+        // 兩種關閉方式都嘗試，但都不保證一定成功（瀏覽器基於安全性
+        // 限制 window.close() 只能關閉由 script 開啟的分頁），因此
+        // 同時保留畫面上的文字說明，讓使用者知道可以自行關閉
+        if (liffReady && liff.isInClient() && typeof liff.closeWindow === 'function') {
+          liff.closeWindow();
+        }
+        try { window.close(); } catch (e) { /* 忽略 */ }
+
+        document.getElementById('gateConsent').innerHTML =
+          '<div class="gate-title">已結束使用</div><div class="gate-desc" style="margin-bottom:0;">你已選擇不同意使用須知，此工具的功能已停用。請關閉此分頁或視窗。</div>';
+      },
+
+      enterApp() {
+        document.getElementById('accessGate').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'flex';
+      }
+    };
+
+    // ---------- LIFF 發送邏輯 ----------
     // 說明：這裡用 shareTargetPicker() 而非 sendMessages()，因為前者
     // 在一般瀏覽器（非 LINE App 內嵌視窗）也能呼叫，不需要使用者困在
     // 拿不到麥克風的 LIFF 內嵌視窗裡；代價是訊息以使用者自己的名義送出，
     // 不是以你的機器人名義（這是產品決定過的取捨，見程式碼外的討論）。
-    //
-    // 實測發現：shareTargetPicker 除了要在後台開通同意條款外，官方文件
-    // 明確要求「使用者已登入」這個前提也要成立，在一般瀏覽器（非 LINE App
-    // 內嵌視窗）開啟時，liff.init() 本身不會自動幫你登入。
-    // 這裡刻意不在 init 時用 withLoginOnExternalBrowser 自動跳轉登入，
-    // 因為那樣會讓使用者一打開頁面、都還沒開始錄音就被導去登入頁——
-    // 改為只在真正要發送、且確認尚未登入時，才主動引導登入。
-    const LIFF_ID = '2011273067-abYzT84Y';
 
-    let liffReady = false;
-    (async function initLiff() {
-      try {
-        await liff.init({ liffId: LIFF_ID });
-        liffReady = true;
-      } catch (err) {
-        console.warn('LIFF 初始化失敗，發送功能將使用剪貼簿複製作為備援：', err);
-      }
-    })();
+    // 頁面一載入就啟動存取閘門驗證流程，取代原本「先顯示畫面、
+    // 發送時才登入」的延後式做法
+    AccessGate.run();
 
     // ---------- 送回聊天室（sendMessages）----------
     // 說明：這是查證 LINE 官方文件後找到、最貼近「文字倉庫」需求的做法。
@@ -863,9 +1258,12 @@
     // 官方文件列出的硬性限制：
     // 1. 只能在 LIFF 瀏覽器裡用，外部瀏覽器（liff.isInClient() 為 false）
     //    一定會失敗，這裡會直接偵測並提前告知，不會讓使用者白等錯誤訊息。
-    // 2. 若這個 LIFF 頁面是從「最近使用列表」重新載入的，呼叫會出錯，
-    //    使用者需要重新從聊天室點一次 LIFF 連結才能用——這是官方案例
-    //    明確提到的邊界情況，錯誤訊息裡會提醒使用者這個解法。
+    // 2. 這個 LIFF app 所在的 channel，後台要有開通訊息傳送（message write）
+    //    相關權限，沒開通時會拋出「The permission is not in LIFF app scope」
+    //    這則錯誤——真機實測過，開通後端 message write 權限即解決此問題。
+    //    這則錯誤訊息本身措辭含糊，官方案例也提過同一句錯誤在其他情境
+    //    （如從「最近使用列表」重新載入頁面）也可能出現，無法單從文字
+    //    本身判斷真正原因，錯誤提示裡會把已驗證過的原因列在最前面。
     async function handleSendToRoom() {
       const fullText = CardSandbox.cards
         .map(c => c.text)
@@ -889,9 +1287,16 @@
         alert('已送回聊天室。');
       } catch (err) {
         console.error('sendMessages 發送失敗：', err);
-        // 官方文件提到：若此 LIFF 頁面是從「最近使用列表」重新載入的，
-        // 呼叫會失敗，需要使用者重新從聊天室點一次連結才能用
-        alert('發送失敗：' + err.message + '\n\n若你是從「最近使用」列表重新打開這個頁面，請改為直接從跟機器人的聊天室重新點一次連結後再試。已改為複製到剪貼簿，請手動貼上。');
+        // 這裡列出的排查順序是依實測驗證過的可能性排的：後台權限設定
+        // 是已確認會導致此錯誤的原因，「最近使用列表」是官方文件提過、
+        // 但尚未實測驗證的次要可能性
+        alert(
+          '發送失敗：' + err.message +
+          '\n\n可能原因（請依序檢查）：\n' +
+          '1. LINE Developers Console 後台，這個 LIFF app 所在的 channel 尚未開通訊息傳送（message write）權限\n' +
+          '2. 若你是從「最近使用」列表重新打開這個頁面，請改為直接從跟機器人的聊天室重新點一次連結後再試\n\n' +
+          '已改為複製到剪貼簿，請手動貼上。'
+        );
         copyToClipboardFallback(fullText);
       }
     }
@@ -965,10 +1370,14 @@
       } catch (e) { /* 忽略 */ }
     });
 
+    // ★ 剪貼簿殘留提醒：navigator.clipboard.writeText() 寫入的內容會停留
+    // 在作業系統的剪貼簿裡，直到被下一次複製動作覆蓋掉。這是共用裝置
+    // 情境下另一個容易被忽略的資料殘留點——跟 localStorage 不同，
+    // 網頁端沒有標準 API 能主動清空系統剪貼簿，只能提醒使用者留意。
     function copyToClipboardFallback(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text)
-          .then(() => alert('已複製全文到剪貼簿，請手動貼到 LINE 聊天室。'))
+          .then(() => alert('已複製全文到剪貼簿，請手動貼到 LINE 聊天室。\n\n提醒：內容會留在系統剪貼簿裡，若這是共用裝置，貼上後建議複製一段無關的文字覆蓋掉，避免下一位使用者貼上時看到你的筆記內容。'))
           .catch(() => alert('複製失敗，請手動選取以下內容複製：\n\n' + text));
       } else {
         alert('請手動選取以下內容複製：\n\n' + text);
