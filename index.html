@@ -68,23 +68,33 @@
     .edit-mode-hint.show { display: block; }
     .card.readonly { cursor: default; }
     .card.mode-merge { border-color: var(--line-green); }
-    .card.mode-reorder { cursor: grab; }
-    .card.mode-reorder.dragging { opacity: 0.4; }
+    .card.mode-reorder { border-color: #7aa8ff; }
     .card.mode-edit .card-text { outline: none; background: #fafbfc; border-radius: 6px; padding: 2px 4px; }
-    .card-actions-inline { display: flex; gap: 4px; }
+    .card-actions-inline { display: flex; gap: 4px; flex-wrap: wrap; }
     .card-actions-inline button {
-      border: none; background: none; cursor: pointer; font-size: 15px;
-      padding: 3px 6px; border-radius: 6px; color: var(--ink-soft);
+      border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 13px;
+      padding: 5px 9px; border-radius: 8px; color: var(--ink-soft); font-weight: 600;
     }
+    .card-actions-inline button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .card-actions-inline button.del { border-color: transparent; }
     .card-actions-inline button.del:hover { background: #fdeaea; color: var(--danger); }
-    .card-actions-inline button.merge:hover { background: #e8f9ee; color: var(--line-green-dark); }
-    .card-handle { color: #c7cbd1; font-size: 16px; padding-right: 4px; user-select: none; }
+    .card-actions-inline button.merge { color: var(--line-green-dark); border-color: var(--line-green); }
+    .card-actions-inline button.merge:hover { background: #e8f9ee; }
+    .card-actions-inline button.reorder-btn:not(:disabled):hover { background: #eef3ff; color: #4a72d6; border-color: #7aa8ff; }
     .cards { display: flex; flex-direction: column; gap: 8px; }
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-text { font-size: 14.5px; line-height: 1.5; color: var(--ink); word-break: break-word; }
     .action-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 20px 16px 16px; }
+    .share-option {
+      padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+      margin-bottom: 8px; cursor: pointer; transition: background 0.15s;
+    }
+    .share-option:last-child { margin-bottom: 0; }
+    .share-option:active { background: #f2f3f5; }
+    .share-option-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .share-option-desc { font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; }
     .send-btn-row { display: flex; gap: 8px; }
-    .btn-primary { flex: 1.3; padding: 14px; font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: var(--line-green); color: white; cursor: pointer; }
+    .btn-primary { flex: 1; padding: 14px; font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: var(--line-green); color: white; cursor: pointer; }
     .btn-secondary { flex: 1; padding: 14px; font-size: 14px; font-weight: 700; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); color: var(--ink); cursor: pointer; }
     .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; }
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
@@ -168,7 +178,7 @@
             <li>錄音轉成文字後，<b>原始音檔不會被保留</b>，只留文字卡片。如需留底請另外用手機錄音 App 同時錄一份</li>
             <li>轉寫過程會將這段音訊上傳到 Groq 的伺服器處理，語音內容不是完全留在你手機本機</li>
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
-            <li>發送功能有兩種：「LINE 好友選單」需要先登入 LINE；「手機分享」則是呼叫系統分享，兩者互相獨立，其中一個用不了可以換用另一個</li>
+            <li>發送功能有三種：「送回聊天室」直接存回你打開此頁面時所在的聊天室（僅限從 LINE 聊天室進入時可用，最推薦）；「LINE 好友選單」需要先登入 LINE 才能選對象發送；「手機分享」在 LINE 內開啟時會自動改走好友選單（LINE 內建瀏覽器對系統分享有限制）</li>
           </ul>
         </div>
         <div id="modalChangelogContent" style="display:none;">
@@ -302,11 +312,28 @@
 
     <div class="action-bar" id="actionBar" style="display:none;">
       <div class="send-btn-row">
-        <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 LINE 好友選單</button>
-        <button class="btn-secondary" id="shareBtn" onclick="handleWebShare()">📲 手機分享</button>
+        <button class="btn-primary" id="sendToRoomBtn" onclick="handleSendToRoom()">📥 送回聊天室</button>
+        <button class="btn-secondary" id="shareOutBtn" onclick="ShareMenu.open()">🔗 分享出去 ▾</button>
       </div>
-      <div style="font-size:11px; color:var(--ink-soft); text-align:center; margin-top:6px;">
-        LINE 好友選單：送出後在清單裡找你的機器人帳號　|　手機分享：跳出系統分享選項，自己選 LINE 再選對象
+    </div>
+  </div>
+
+  <!-- 分享出去的子選單彈窗：兩個選項，各自附上限制與建議說明 -->
+  <div class="modal-overlay hidden" id="shareMenuModal">
+    <div class="modal-box" style="max-width:380px;">
+      <div class="modal-tabs"><button class="active" style="cursor:default;">🔗 分享出去</button></div>
+      <div class="modal-body" style="padding:12px;">
+        <div class="share-option" onclick="ShareMenu.selectLineFriend()">
+          <div class="share-option-title">📤 LINE 好友分享</div>
+          <div class="share-option-desc">跳出 LINE 好友／群組清單，挑一個對象發送。<b>需要先登入 LINE</b>，且對方要在你的好友清單裡才選得到。</div>
+        </div>
+        <div class="share-option" onclick="ShareMenu.selectOtherApp()">
+          <div class="share-option-title">📲 分享至其他應用程式</div>
+          <div class="share-option-desc">跳出手機系統的分享選單（LINE、簡訊、Email 等）。<b>在 LINE 內開啟此頁面時無法使用</b>（LINE 內建瀏覽器限制），會自動改用「LINE 好友分享」；在一般瀏覽器（如 Chrome、Safari）開啟時才能正常跳出系統選單。</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--card-bg); color:var(--ink-soft); cursor:pointer;" onclick="ShareMenu.close()">取消</button>
       </div>
     </div>
   </div>
@@ -386,6 +413,24 @@
       }
     };
 
+    // ---------- 分享出去的子選單 ----------
+    const ShareMenu = {
+      open() {
+        document.getElementById('shareMenuModal').classList.remove('hidden');
+      },
+      close() {
+        document.getElementById('shareMenuModal').classList.add('hidden');
+      },
+      selectLineFriend() {
+        this.close();
+        handleSend();
+      },
+      selectOtherApp() {
+        this.close();
+        handleWebShare();
+      }
+    };
+
     // 讀取/儲存 API Key
     document.getElementById('apiKeyInput').value = localStorage.getItem('whisper_api_key') || '';
     function saveApiKey(val) {
@@ -424,8 +469,8 @@
 
         const hint = document.getElementById('editModeHint');
         const hints = {
-          merge: '合併模式：點卡片上的 🔗 按鈕，把它和下一張卡片合併成一句。',
-          reorder: '改順序模式：按住卡片左側的 ⠿ 拖曳，調整卡片先後順序。',
+          merge: '合併模式：點卡片上的「↓ 合併」按鈕，把它和下一張卡片合併成一句。',
+          reorder: '改順序模式：點「↑」「↓」調整前後一格，點「⤒」直接移到最上面。',
           edit: '編輯內容模式：點卡片文字即可直接修改，點 ✕ 可以刪除整張卡片。'
         };
         if (this.current) {
@@ -485,12 +530,17 @@
           container.innerHTML = '<div class="live-preview-empty">尚未有轉寫內容</div>';
           return;
         }
-        container.innerHTML = this.cards.map((c, i) => `
-          <div class="live-preview-item"><span class="idx">${i + 1}.</span>${this.escapeHtml(c.text)}</div>
+        container.innerHTML = this.cards.map(c => `
+          <div class="live-preview-item">${this.escapeHtml(c.text)}</div>
         `).join('');
         container.scrollTop = container.scrollHeight;
       },
 
+      // 修正說明：合併/改順序原本用拖曳（draggable + dragstart/drop），
+      // 但拖曳在手機觸控螢幕上手感不穩定、容易誤觸或拖不動，改成
+      // 明確的按鈕操作——合併模式給「↓ 與下一句合併」，改順序模式給
+      // 「↑ 上移」「↓ 下移」「⤒ 移至頂層」，每個動作都是一次確定的點擊，
+      // 不需要考驗手指的拖曳精準度。
       render() {
         const list = document.getElementById('cardsList');
         if (this.cards.length === 0) {
@@ -503,32 +553,31 @@
         list.innerHTML = this.cards.map((card, i) => {
           const modeClass = mode ? `mode-${mode}` : 'readonly';
           const isEditable = mode === 'edit';
-          const isDraggable = mode === 'reorder';
+          const isLast = i === this.cards.length - 1;
+          const isFirst = i === 0;
 
           let actionsHtml = '';
-          if (mode === 'merge' && i < this.cards.length - 1) {
-            actionsHtml = `<button class="merge" title="與下一句合併" onclick="CardSandbox.mergeWithNext(${card.id})">🔗</button>`;
+          if (mode === 'merge' && !isLast) {
+            actionsHtml = `<button class="merge" title="與下一句合併" onclick="CardSandbox.mergeWithNext(${card.id})">↓ 合併</button>`;
+          } else if (mode === 'reorder') {
+            actionsHtml = `
+              <button class="reorder-btn" title="上移" onclick="CardSandbox.moveUp(${card.id})" ${isFirst ? 'disabled' : ''}>↑</button>
+              <button class="reorder-btn" title="下移" onclick="CardSandbox.moveDown(${card.id})" ${isLast ? 'disabled' : ''}>↓</button>
+              <button class="reorder-btn" title="移至頂層" onclick="CardSandbox.moveToTop(${card.id})" ${isFirst ? 'disabled' : ''}>⤒</button>
+            `;
           } else if (mode === 'edit') {
             actionsHtml = `<button class="del" title="刪除" onclick="CardSandbox.remove(${card.id})">✕</button>`;
           }
 
-          const handleHtml = isDraggable ? '<span class="card-handle">⠿</span>' : '';
-
           return `
-            <div class="card ${modeClass}" data-id="${card.id}"
-                 ${isDraggable ? 'draggable="true"' : ''}>
-              ${handleHtml}
+            <div class="card ${modeClass}" data-id="${card.id}">
               <span class="card-text"
                     ${isEditable ? 'contenteditable="true"' : ''}
-                    ${isEditable ? `onblur="CardSandbox.update(${card.id}, this.innerText)"` : ''}>${i + 1}. ${this.escapeHtml(card.text)}</span>
+                    ${isEditable ? `onblur="CardSandbox.update(${card.id}, this.innerText)"` : ''}>${this.escapeHtml(card.text)}</span>
               ${actionsHtml ? `<div class="card-actions-inline">${actionsHtml}</div>` : ''}
             </div>
           `;
         }).join('');
-
-        if (mode === 'reorder') {
-          this.attachDragHandlers(list);
-        }
       },
 
       escapeHtml(str) {
@@ -540,7 +589,7 @@
       update(id, newText) {
         const card = this.cards.find(c => c.id === id);
         if (card) {
-          card.text = newText.replace(/^\d+\.\s*/, '').trim();
+          card.text = newText.trim();
         }
         this.render();
       },
@@ -558,29 +607,26 @@
         this.render();
       },
 
-      reorder(fromId, toId) {
-        const fromIdx = this.cards.findIndex(c => c.id === fromId);
-        const toIdx = this.cards.findIndex(c => c.id === toId);
-        if (fromIdx === -1 || toIdx === -1) return;
-        const [moved] = this.cards.splice(fromIdx, 1);
-        this.cards.splice(toIdx, 0, moved);
+      moveUp(id) {
+        const idx = this.cards.findIndex(c => c.id === id);
+        if (idx <= 0) return;
+        [this.cards[idx - 1], this.cards[idx]] = [this.cards[idx], this.cards[idx - 1]];
         this.render();
       },
 
-      attachDragHandlers(container) {
-        const cardEls = container.querySelectorAll('.card[draggable="true"]');
-        cardEls.forEach(el => {
-          el.addEventListener('dragstart', () => el.classList.add('dragging'));
-          el.addEventListener('dragend', () => el.classList.remove('dragging'));
-          el.addEventListener('dragover', (e) => e.preventDefault());
-          el.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const draggingEl = container.querySelector('.dragging');
-            if (draggingEl && draggingEl !== el) {
-              CardSandbox.reorder(Number(draggingEl.dataset.id), Number(el.dataset.id));
-            }
-          });
-        });
+      moveDown(id) {
+        const idx = this.cards.findIndex(c => c.id === id);
+        if (idx === -1 || idx === this.cards.length - 1) return;
+        [this.cards[idx], this.cards[idx + 1]] = [this.cards[idx + 1], this.cards[idx]];
+        this.render();
+      },
+
+      moveToTop(id) {
+        const idx = this.cards.findIndex(c => c.id === id);
+        if (idx <= 0) return;
+        const [moved] = this.cards.splice(idx, 1);
+        this.cards.unshift(moved);
+        this.render();
       }
     };
 
@@ -808,9 +854,51 @@
       }
     })();
 
+    // ---------- 送回聊天室（sendMessages）----------
+    // 說明：這是查證 LINE 官方文件後找到、最貼近「文字倉庫」需求的做法。
+    // liff.sendMessages() 會把訊息以使用者身份，送到「使用者打開這個
+    // LIFF 頁面時所在的那個聊天室」——不需要選擇對象，因為對象從一開始
+    // 就是固定的（使用者是從跟機器人的對話裡點連結進來的）。
+    //
+    // 官方文件列出的硬性限制：
+    // 1. 只能在 LIFF 瀏覽器裡用，外部瀏覽器（liff.isInClient() 為 false）
+    //    一定會失敗，這裡會直接偵測並提前告知，不會讓使用者白等錯誤訊息。
+    // 2. 若這個 LIFF 頁面是從「最近使用列表」重新載入的，呼叫會出錯，
+    //    使用者需要重新從聊天室點一次 LIFF 連結才能用——這是官方案例
+    //    明確提到的邊界情況，錯誤訊息裡會提醒使用者這個解法。
+    async function handleSendToRoom() {
+      const fullText = CardSandbox.cards
+        .map(c => c.text)
+        .join('\n');
+      if (!fullText.trim()) {
+        alert('目前沒有任何卡片內容可以發送。');
+        return;
+      }
+
+      if (!liffReady || typeof liff.isInClient !== 'function' || !liff.isInClient()) {
+        alert('這個功能只能在 LINE 聊天室裡開啟這個頁面時使用（目前不是這個環境），請改用下方另外兩種發送方式，或回到跟機器人的聊天室重新點開連結。');
+        return;
+      }
+
+      ChatPreview.show(fullText, '目前這個聊天室（原對話）', () => doSendToRoom(fullText));
+    }
+
+    async function doSendToRoom(fullText) {
+      try {
+        await liff.sendMessages([{ type: 'text', text: fullText }]);
+        alert('已送回聊天室。');
+      } catch (err) {
+        console.error('sendMessages 發送失敗：', err);
+        // 官方文件提到：若此 LIFF 頁面是從「最近使用列表」重新載入的，
+        // 呼叫會失敗，需要使用者重新從聊天室點一次連結才能用
+        alert('發送失敗：' + err.message + '\n\n若你是從「最近使用」列表重新打開這個頁面，請改為直接從跟機器人的聊天室重新點一次連結後再試。已改為複製到剪貼簿，請手動貼上。');
+        copyToClipboardFallback(fullText);
+      }
+    }
+
     async function handleSend() {
       const fullText = CardSandbox.cards
-        .map((c, i) => `${i + 1}. ${c.text}`)
+        .map(c => c.text)
         .join('\n');
       if (!fullText.trim()) {
         alert('目前沒有任何卡片內容可以發送。');
@@ -887,27 +975,31 @@
       }
     }
 
-    // ---------- 手機系統分享（Web Share API，跟 LIFF/登入完全無關）----------
-    // 說明：navigator.share() 是瀏覽器原生標準功能，不需要 LIFF 初始化、
-    // 不需要 LINE 登入，任何支援的瀏覽器都能呼叫，跳出來的是手機系統層級
-    // 的分享選單（LINE、簡訊、Email...等，由系統決定列出哪些 App）。
-    // 跟 shareTargetPicker 互相獨立，一個不能用不影響另一個。
-    //
-    // 已知限制（誠實記錄，這是這個 API 本身的行為，不是我們能調整的）：
-    // - 選了 LINE 之後要傳給誰，是在 LINE App 自己的畫面裡選，我們的網頁
-    //   完全不會知道使用者最後選了誰、甚至不確定訊息是否真的送達。
-    // - 規格要求必須由使用者的點擊直接觸發，不能用程式碼自動呼叫
-    //   （這裡本來就是綁在按鈕 onclick 上，天生符合這個要求）。
-    // - 並非所有瀏覽器都支援（例如 Firefox 目前仍需另外開啟實驗旗標），
-    //   不支援時会自動降級為剪貼簿複製。
+    // ---------- 手機系統分享 ----------
+    // 說明：查證後發現 navigator.share()（Web Share API）在 LIFF 內嵌
+    // 視窗裡幾乎必定失敗——這是 LINE 官方文件自己承認的已知限制
+    // （LIFF 瀏覽器不支援外部瀏覽器才有的部分網頁技術），也在 LINE
+    // 官方案例集裡看到對應寫法：用 liff.isInClient() 先判斷環境，
+    // 在 LIFF 裡直接改走 shareTargetPicker，只有外部瀏覽器才用
+    // navigator.share。這裡照這個方向調整，不再讓使用者在 LIFF 裡
+    // 白等一次注定失敗的嘗試。
     async function handleWebShare() {
       const fullText = CardSandbox.cards
-        .map((c, i) => `${i + 1}. ${c.text}`)
+        .map(c => c.text)
         .join('\n');
       if (!fullText.trim()) {
         alert('目前沒有任何卡片內容可以發送。');
         return;
       }
+
+      // 在 LIFF 內嵌視窗裡：navigator.share 幾乎必定被容器擋下，
+      // 直接改用跟「LINE 好友選單」相同的 shareTargetPicker 邏輯，
+      // 不多跑一次注定失敗的嘗試
+      if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
+        ChatPreview.show(fullText, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(fullText));
+        return;
+      }
+
       ChatPreview.show(fullText, '手機系統分享', () => doWebShare(fullText));
     }
 
