@@ -33,19 +33,91 @@
     @keyframes orbPulse { 0% { box-shadow: 0 0 0 0 rgba(6,199,85,0.4); } 70% { box-shadow: 0 0 0 22px rgba(6,199,85,0); } 100% { box-shadow: 0 0 0 0 rgba(6,199,85,0); } }
     .rec-status-text { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .rec-sub-text { font-size: 12.5px; opacity: 0.7; margin-bottom: 20px; line-height: 1.6; }
-    .latest-card-preview { font-size: 13px; color: #fff; min-height: 20px; margin-bottom: 14px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.06); line-height: 1.5; word-break: break-word; }
+    .live-preview-list {
+      max-height: 220px; overflow-y: auto; margin-bottom: 14px;
+      border-radius: 8px; background: rgba(255,255,255,0.06);
+      text-align: left; padding: 4px;
+    }
+    .live-preview-empty {
+      font-size: 13px; color: rgba(255,255,255,0.5); padding: 10px; text-align: center;
+    }
+    .live-preview-item {
+      font-size: 13px; color: #fff; line-height: 1.5; word-break: break-word;
+      padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      animation: fadeInCard 0.25s ease;
+    }
+    .live-preview-item:last-child { border-bottom: none; }
+    .live-preview-item .idx { color: rgba(255,255,255,0.45); margin-right: 4px; }
+    @keyframes fadeInCard { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .btn-record-toggle { width: 100%; padding: 15px; font-size: 15px; font-weight: 700; border: none; border-radius: 14px; cursor: pointer; }
     .btn-record-toggle.start { background: var(--line-green); color: #fff; }
     .btn-record-toggle.stop { background: var(--danger); color: #fff; }
     .section-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px; }
+    .edit-mode-bar { display: flex; gap: 6px; margin-bottom: 10px; }
+    .edit-mode-bar button {
+      flex: 1; padding: 8px 4px; font-size: 11.5px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--card-bg);
+      border-radius: 8px; cursor: pointer; color: var(--ink-soft);
+    }
+    .edit-mode-bar button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .edit-mode-hint {
+      font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;
+      padding: 6px 10px; background: var(--warn-bg); border-radius: 8px;
+      display: none;
+    }
+    .edit-mode-hint.show { display: block; }
+    .card.readonly { cursor: default; }
+    .card.mode-merge { border-color: var(--line-green); }
+    .card.mode-reorder { cursor: grab; }
+    .card.mode-reorder.dragging { opacity: 0.4; }
+    .card.mode-edit .card-text { outline: none; background: #fafbfc; border-radius: 6px; padding: 2px 4px; }
+    .card-actions-inline { display: flex; gap: 4px; }
+    .card-actions-inline button {
+      border: none; background: none; cursor: pointer; font-size: 15px;
+      padding: 3px 6px; border-radius: 6px; color: var(--ink-soft);
+    }
+    .card-actions-inline button.del:hover { background: #fdeaea; color: var(--danger); }
+    .card-actions-inline button.merge:hover { background: #e8f9ee; color: var(--line-green-dark); }
+    .card-handle { color: #c7cbd1; font-size: 16px; padding-right: 4px; user-select: none; }
     .cards { display: flex; flex-direction: column; gap: 8px; }
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-text { font-size: 14.5px; line-height: 1.5; color: var(--ink); word-break: break-word; }
     .action-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 20px 16px 16px; }
-    .btn-primary { width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border: none; border-radius: 12px; background: var(--line-green); color: white; cursor: pointer; }
+    .send-btn-row { display: flex; gap: 8px; }
+    .btn-primary { flex: 1.3; padding: 14px; font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: var(--line-green); color: white; cursor: pointer; }
+    .btn-secondary { flex: 1; padding: 14px; font-size: 14px; font-weight: 700; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); color: var(--ink); cursor: pointer; }
     .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; }
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: var(--card-bg); border-radius: 16px; max-width: 440px;
+      width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .modal-tabs button {
+      flex: 1; padding: 14px; font-size: 13px; font-weight: 700;
+      border: none; background: none; cursor: pointer; color: var(--ink-soft);
+      border-bottom: 2px solid transparent;
+    }
+    .modal-tabs button.active { color: var(--ink); border-bottom-color: var(--line-green); }
+    .modal-body { padding: 16px; overflow-y: auto; font-size: 13px; line-height: 1.7; color: var(--ink); }
+    .modal-body h4 { margin: 0 0 6px; font-size: 13px; }
+    .modal-body .version-entry { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px dashed var(--border); }
+    .modal-body .version-entry:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .modal-body .version-tag { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--line-green-dark); background: #e8f9ee; padding: 2px 8px; border-radius: 10px; margin-bottom: 4px; }
+    .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .modal-footer button {
+      width: 100%; padding: 12px; font-size: 14px; font-weight: 700;
+      border: none; border-radius: 10px; background: var(--line-green); color: #fff; cursor: pointer;
+    }
+    .modal-footer label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); margin-bottom: 10px; }
   </style>
   <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
@@ -57,6 +129,58 @@
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
+  <!-- 首次進站提示彈窗：兩頁（注意事項／更新內容），關閉後記住已讀版本，
+       不會每次重新整理都跳出來打擾，但版本號更新時會重新提示。 -->
+  <div class="modal-overlay" id="introModal">
+    <div class="modal-box">
+      <div class="modal-tabs">
+        <button id="modalTabNotice" class="active" onclick="IntroModal.switchTab('notice')">⚠️ 使用注意事項</button>
+        <button id="modalTabChangelog" onclick="IntroModal.switchTab('changelog')">🆕 更新內容</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div id="modalNoticeContent">
+          <h4>開始使用前，請先知道這些事</h4>
+          <ul style="padding-left:18px; margin:0;">
+            <li>需要自己申請 Groq API Key 才能使用（免費，見下方輸入框旁的教學連結）</li>
+            <li>錄音轉成文字後，<b>原始音檔不會被保留</b>，只留文字卡片。如需留底請另外用手機錄音 App 同時錄一份</li>
+            <li>轉寫過程會將這段音訊上傳到 Groq 的伺服器處理，語音內容不是完全留在你手機本機</li>
+            <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
+            <li>發送功能有兩種：「LINE 好友選單」需要先登入 LINE；「手機分享」則是呼叫系統分享，兩者互相獨立，其中一個用不了可以換用另一個</li>
+          </ul>
+        </div>
+        <div id="modalChangelogContent" style="display:none;">
+          <div class="version-entry">
+            <span class="version-tag">最新</span>
+            <h4>卡片編輯模式、雙發送管道、即時預覽</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>新增「合併／改順序／編輯內容」三種卡片編輯模式，預設唯讀避免誤觸</li>
+              <li>新增「手機系統分享」作為第二種發送方式，不需要 LINE 登入</li>
+              <li>會議中畫面改為即時列出所有卡片，不再只顯示最新一則</li>
+              <li>簡化為僅支援 Groq（移除 OpenAI 選項），並加入申請教學</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>LINE 發送功能</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>接上 LIFF SDK，可透過 shareTargetPicker 選擇好友／機器人發送</li>
+              <li>加入簡體轉繁體保險（Whisper 偶爾會輸出簡體字）</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>分段錄音</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>改為每 15 秒自動切段送出轉寫，卡片可以陸續出現，不用等整場錄完</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <label><input type="checkbox" id="dontShowAgainCheckbox"> 這個版本不用再提醒我</label>
+        <button onclick="IntroModal.close()">我知道了，開始使用</button>
+      </div>
+    </div>
+  </div>
+
   <div class="app">
     <header>
       <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
@@ -65,8 +189,24 @@
     <main>
       <div class="dev-panel">
         <b>🔑 設定 API Key (一次性設定)：</b>
-        <div>請貼上你的 Groq 或 OpenAI API Key，金鑰只會存在你自己的手機記憶體中。</div>
-        <input type="password" id="apiKeyInput" placeholder="gsk_... 或 sk-..." onchange="saveApiKey(this.value)">
+        <div>請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
+        <input type="password" id="apiKeyInput" placeholder="gsk_..." onchange="saveApiKey(this.value)">
+
+        <details style="margin-top:8px;">
+          <summary style="cursor:pointer; font-weight:600; font-size:12px;">🔗 還沒有 Groq API Key？點這裡看申請教學（約 2 分鐘，免信用卡）</summary>
+          <div style="margin-top:6px; font-size:12px; line-height:1.7;">
+            <ol style="margin:0; padding-left:18px;">
+              <li>打開 <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>（會直接跳到 API Keys 頁面）</li>
+              <li>用 Google／GitHub／Email 任一種方式註冊登入（Email 註冊需要驗證信箱）</li>
+              <li>登入後點畫面上的「<b>Create API Key</b>」按鈕</li>
+              <li>隨便輸入一個名稱（例如「我的筆記」），送出</li>
+              <li>畫面會顯示一串以 <code>gsk_</code> 開頭的金鑰——<b>這串只會顯示這一次</b>，記得先複製起來，離開頁面後就看不到了</li>
+              <li>回到這裡，把整串貼進上面的輸入框即可</li>
+            </ol>
+            <div style="margin-top:6px; color:#7a5a00;">免費額度不需要信用卡，日常筆記用量通常足夠；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。</div>
+          </div>
+        </details>
+
         <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--warn-border);">
           <b>ℹ️ 產品定位：</b>這個工具只做「即時音轉文字」，錄音轉成文字後原始音檔就會被丟棄，不會留存也不會上傳保存。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
         </div>
@@ -83,7 +223,9 @@
           <div class="rec-orb" id="recOrb">🎙️</div>
           <div class="rec-status-text" id="recStatusText">尚未開始</div>
           <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始錄音（100% 支援 LIFF 內部）</div>
-          <div class="latest-card-preview" id="latestCardPreview">尚未有轉寫內容</div>
+          <div class="live-preview-list" id="livePreviewList">
+            <div class="live-preview-empty">尚未有轉寫內容</div>
+          </div>
           <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始會議錄音</button>
         </div>
       </div>
@@ -91,16 +233,60 @@
       <!-- 會議後 -->
       <div id="reviewView" style="display:none;">
         <div class="section-label">整理完成的語音卡片</div>
+        <div class="edit-mode-bar">
+          <button id="modeMergeBtn" onclick="EditModeManager.toggle('merge')">🔗 合併模式</button>
+          <button id="modeReorderBtn" onclick="EditModeManager.toggle('reorder')">↕️ 改順序模式</button>
+          <button id="modeEditBtn" onclick="EditModeManager.toggle('edit')">✏️ 編輯內容模式</button>
+        </div>
+        <div class="edit-mode-hint" id="editModeHint"></div>
         <div class="cards" id="cardsList"></div>
       </div>
     </main>
 
     <div class="action-bar" id="actionBar" style="display:none;">
-      <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 選擇對象並發送</button>
+      <div class="send-btn-row">
+        <button class="btn-primary" id="sendBtn" onclick="handleSend()">📤 LINE 好友選單</button>
+        <button class="btn-secondary" id="shareBtn" onclick="handleWebShare()">📲 手機分享</button>
+      </div>
+      <div style="font-size:11px; color:var(--ink-soft); text-align:center; margin-top:6px;">
+        LINE 好友選單：送出後在清單裡找你的機器人帳號　|　手機分享：跳出系統分享選項，自己選 LINE 再選對象
+      </div>
     </div>
   </div>
 
   <script>
+    // ---------- 首次進站提示彈窗 ----------
+    // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
+    // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
+    const APP_VERSION = '2026-08-cards-share';
+
+    const IntroModal = {
+      switchTab(tab) {
+        const isNotice = tab === 'notice';
+        document.getElementById('modalTabNotice').classList.toggle('active', isNotice);
+        document.getElementById('modalTabChangelog').classList.toggle('active', !isNotice);
+        document.getElementById('modalNoticeContent').style.display = isNotice ? 'block' : 'none';
+        document.getElementById('modalChangelogContent').style.display = isNotice ? 'none' : 'block';
+      },
+      close() {
+        const dontShowAgain = document.getElementById('dontShowAgainCheckbox').checked;
+        if (dontShowAgain) {
+          try { localStorage.setItem('intro_modal_seen_version', APP_VERSION); }
+          catch (e) { /* localStorage 不可用時，下次仍會顯示，不影響核心功能 */ }
+        }
+        document.getElementById('introModal').classList.add('hidden');
+      },
+      initOnLoad() {
+        let seenVersion = null;
+        try { seenVersion = localStorage.getItem('intro_modal_seen_version'); }
+        catch (e) { /* 忽略 */ }
+        if (seenVersion === APP_VERSION) {
+          document.getElementById('introModal').classList.add('hidden');
+        }
+      }
+    };
+    IntroModal.initOnLoad();
+
     // 讀取/儲存 API Key
     document.getElementById('apiKeyInput').value = localStorage.getItem('whisper_api_key') || '';
     function saveApiKey(val) {
@@ -117,8 +303,45 @@
     }
 
     // 卡片管理
+    // ---------- 編輯模式管理（合併／改順序／編輯內容，三選一互斥）----------
+    const EditModeManager = {
+      current: null, // null | 'merge' | 'reorder' | 'edit'
+
+      toggle(mode) {
+        this.current = (this.current === mode) ? null : mode;
+        this.render();
+        CardSandbox.render();
+      },
+
+      render() {
+        const buttons = {
+          merge: document.getElementById('modeMergeBtn'),
+          reorder: document.getElementById('modeReorderBtn'),
+          edit: document.getElementById('modeEditBtn')
+        };
+        Object.keys(buttons).forEach(key => {
+          buttons[key].classList.toggle('active', this.current === key);
+        });
+
+        const hint = document.getElementById('editModeHint');
+        const hints = {
+          merge: '合併模式：點卡片上的 🔗 按鈕，把它和下一張卡片合併成一句。',
+          reorder: '改順序模式：按住卡片左側的 ⠿ 拖曳，調整卡片先後順序。',
+          edit: '編輯內容模式：點卡片文字即可直接修改，點 ✕ 可以刪除整張卡片。'
+        };
+        if (this.current) {
+          hint.textContent = hints[this.current];
+          hint.classList.add('show');
+        } else {
+          hint.classList.remove('show');
+        }
+      }
+    };
+
+    // 卡片管理
     const CardSandbox = {
-      cards: [],
+      cards: [], // { id, text }
+      nextId: 1,
 
       // 簡轉繁轉換器。用 lazy init（第一次用到才建立），並做防呆：
       // 若 opencc-js 因故未能從 CDN 載入成功，不能讓整個轉寫功能掛掉，
@@ -149,34 +372,124 @@
             console.warn('簡繁轉換執行失敗，使用原始文字：', e);
           }
         }
-        this.cards.push(finalText);
+        this.cards.push({ id: this.nextId++, text: finalText });
         this.render();
-        document.getElementById('latestCardPreview').textContent = `📝 最新轉寫：「${finalText}」`;
+        this.renderLivePreview();
       },
+
+      // 會議中畫面的即時預覽：列出目前為止所有卡片（不只是最新一張），
+      // 每次新增都自動捲到底部，讓使用者不用手動滑就能看到最新內容
+      renderLivePreview() {
+        const container = document.getElementById('livePreviewList');
+        if (!container) return;
+        if (this.cards.length === 0) {
+          container.innerHTML = '<div class="live-preview-empty">尚未有轉寫內容</div>';
+          return;
+        }
+        container.innerHTML = this.cards.map((c, i) => `
+          <div class="live-preview-item"><span class="idx">${i + 1}.</span>${this.escapeHtml(c.text)}</div>
+        `).join('');
+        container.scrollTop = container.scrollHeight;
+      },
+
       render() {
         const list = document.getElementById('cardsList');
         if (this.cards.length === 0) {
           list.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">尚無卡片</div>';
           return;
         }
-        list.innerHTML = this.cards.map((c, i) => `
-          <div class="card">
-            <span class="card-text">${i + 1}. ${c}</span>
-            <button onclick="CardSandbox.remove(${i})" style="border:none;background:none;color:#e0393e;cursor:pointer;">刪除</button>
-          </div>
-        `).join('');
+
+        const mode = EditModeManager.current; // null | 'merge' | 'reorder' | 'edit'
+
+        list.innerHTML = this.cards.map((card, i) => {
+          const modeClass = mode ? `mode-${mode}` : 'readonly';
+          const isEditable = mode === 'edit';
+          const isDraggable = mode === 'reorder';
+
+          let actionsHtml = '';
+          if (mode === 'merge' && i < this.cards.length - 1) {
+            actionsHtml = `<button class="merge" title="與下一句合併" onclick="CardSandbox.mergeWithNext(${card.id})">🔗</button>`;
+          } else if (mode === 'edit') {
+            actionsHtml = `<button class="del" title="刪除" onclick="CardSandbox.remove(${card.id})">✕</button>`;
+          }
+
+          const handleHtml = isDraggable ? '<span class="card-handle">⠿</span>' : '';
+
+          return `
+            <div class="card ${modeClass}" data-id="${card.id}"
+                 ${isDraggable ? 'draggable="true"' : ''}>
+              ${handleHtml}
+              <span class="card-text"
+                    ${isEditable ? 'contenteditable="true"' : ''}
+                    ${isEditable ? `onblur="CardSandbox.update(${card.id}, this.innerText)"` : ''}>${i + 1}. ${this.escapeHtml(card.text)}</span>
+              ${actionsHtml ? `<div class="card-actions-inline">${actionsHtml}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        if (mode === 'reorder') {
+          this.attachDragHandlers(list);
+        }
       },
-      remove(index) {
-        this.cards.splice(index, 1);
+
+      escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      },
+
+      update(id, newText) {
+        const card = this.cards.find(c => c.id === id);
+        if (card) {
+          card.text = newText.replace(/^\d+\.\s*/, '').trim();
+        }
         this.render();
+      },
+
+      remove(id) {
+        this.cards = this.cards.filter(c => c.id !== id);
+        this.render();
+      },
+
+      mergeWithNext(id) {
+        const idx = this.cards.findIndex(c => c.id === id);
+        if (idx === -1 || idx === this.cards.length - 1) return;
+        this.cards[idx].text = this.cards[idx].text.replace(/[。！？]$/, '') + '，' + this.cards[idx + 1].text;
+        this.cards.splice(idx + 1, 1);
+        this.render();
+      },
+
+      reorder(fromId, toId) {
+        const fromIdx = this.cards.findIndex(c => c.id === fromId);
+        const toIdx = this.cards.findIndex(c => c.id === toId);
+        if (fromIdx === -1 || toIdx === -1) return;
+        const [moved] = this.cards.splice(fromIdx, 1);
+        this.cards.splice(toIdx, 0, moved);
+        this.render();
+      },
+
+      attachDragHandlers(container) {
+        const cardEls = container.querySelectorAll('.card[draggable="true"]');
+        cardEls.forEach(el => {
+          el.addEventListener('dragstart', () => el.classList.add('dragging'));
+          el.addEventListener('dragend', () => el.classList.remove('dragging'));
+          el.addEventListener('dragover', (e) => e.preventDefault());
+          el.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const draggingEl = container.querySelector('.dragging');
+            if (draggingEl && draggingEl !== el) {
+              CardSandbox.reorder(Number(draggingEl.dataset.id), Number(el.dataset.id));
+            }
+          });
+        });
       }
     };
 
-    // 音訊錄製與 Groq/OpenAI Whisper API 轉寫引擎
+    // 音訊錄製與 Groq Whisper API 轉寫引擎
     //
-    // 分段錄音說明：Whisper API（不管是 Groq 或 OpenAI）本質上是「傳一段
-    // 完整音檔進去，換一段完整文字回來」的批次設計，沒有逐字即時串流這回事，
-    // 這是 API 本身的限制，不是我們程式碼能力不夠。
+    // 分段錄音說明：Whisper API 本質上是「傳一段完整音檔進去，換一段完整
+    // 文字回來」的批次設計，沒有逐字即時串流這回事，這是 API 本身的限制，
+    // 不是我們程式碼能力不夠。
     // 改為每 SEGMENT_MS 毫秒（目前設 15 秒）就結束目前這段錄音、送出去轉寫，
     // 同時立刻開一個新的 MediaRecorder 接續錄下一段，讓卡片能陸續冒出來，
     // 而不是整場會議錄完才一次出現。
@@ -272,20 +585,18 @@
 
         const formData = new FormData();
         formData.append('file', audioBlob, 'recording.webm');
-        formData.append('model', apiKey.startsWith('gsk_') ? 'whisper-large-v3-turbo' : 'whisper-1');
+        formData.append('model', 'whisper-large-v3-turbo');
         formData.append('language', 'zh');
         // 修正：真機截圖發現同一場錄音裡，前三段輸出正確為繁體，第四段卻
         // 跳成簡體。查證後確認這是 Whisper 模型本身的已知限制——它只有
         // 單一種中文語言代碼「zh」，不區分繁簡，實際輸出偏向哪一種，
         // 取決於模型內部機率判斷，同一次使用中途跳來跳去是已知現象。
-        // Groq/OpenAI 官方都支援 prompt 參數，用來引導輸出風格；給一段
-        // 繁體中文範例文字當提示，能讓模型傾向輸出同樣字體風格。
-        // 這不保證 100% 消除，但是官方建議的正規做法。
+        // Groq 支援 prompt 參數，用來引導輸出風格；給一段繁體中文範例文字
+        // 當提示，能讓模型傾向輸出同樣字體風格。這不保證 100% 消除，
+        // 但是官方建議的正規做法。
         formData.append('prompt', '這是一段繁體中文的會議錄音，內容關於工作討論與進度回報。');
 
-        const endpoint = apiKey.startsWith('gsk_')
-          ? 'https://api.groq.com/openai/v1/audio/transcriptions'
-          : 'https://api.openai.com/v1/audio/transcriptions';
+        const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
 
         try {
           const res = await fetch(endpoint, {
@@ -371,7 +682,7 @@
 
     async function handleSend() {
       const fullText = CardSandbox.cards
-        .map((c, i) => `${i + 1}. ${c}`)
+        .map((c, i) => `${i + 1}. ${c.text}`)
         .join('\n');
 
       if (!fullText.trim()) {
@@ -443,6 +754,59 @@
           .catch(() => alert('複製失敗，請手動選取以下內容複製：\n\n' + text));
       } else {
         alert('請手動選取以下內容複製：\n\n' + text);
+      }
+    }
+
+    // ---------- 手機系統分享（Web Share API，跟 LIFF/登入完全無關）----------
+    // 說明：navigator.share() 是瀏覽器原生標準功能，不需要 LIFF 初始化、
+    // 不需要 LINE 登入，任何支援的瀏覽器都能呼叫，跳出來的是手機系統層級
+    // 的分享選單（LINE、簡訊、Email...等，由系統決定列出哪些 App）。
+    // 跟 shareTargetPicker 互相獨立，一個不能用不影響另一個。
+    //
+    // 已知限制（誠實記錄，這是這個 API 本身的行為，不是我們能調整的）：
+    // - 選了 LINE 之後要傳給誰，是在 LINE App 自己的畫面裡選，我們的網頁
+    //   完全不會知道使用者最後選了誰、甚至不確定訊息是否真的送達。
+    // - 規格要求必須由使用者的點擊直接觸發，不能用程式碼自動呼叫
+    //   （這裡本來就是綁在按鈕 onclick 上，天生符合這個要求）。
+    // - 並非所有瀏覽器都支援（例如 Firefox 目前仍需另外開啟實驗旗標），
+    //   不支援時会自動降級為剪貼簿複製。
+    async function handleWebShare() {
+      const fullText = CardSandbox.cards
+        .map((c, i) => `${i + 1}. ${c.text}`)
+        .join('\n');
+
+      if (!fullText.trim()) {
+        alert('目前沒有任何卡片內容可以發送。');
+        return;
+      }
+
+      if (!navigator.share) {
+        alert('此瀏覽器不支援系統分享功能，改為複製到剪貼簿。');
+        copyToClipboardFallback(fullText);
+        return;
+      }
+
+      const shareData = { text: fullText };
+
+      try {
+        // 有 canShare 就先驗證一次，避免呼叫 share() 時才發現資料格式不被接受
+        if (navigator.canShare && !navigator.canShare(shareData)) {
+          alert('此瀏覽器不支援分享這種內容，改為複製到剪貼簿。');
+          copyToClipboardFallback(fullText);
+          return;
+        }
+        await navigator.share(shareData);
+        // 規格上 Android 的 Promise 在資料成功交給分享目標時 resolve，
+        // 不代表訊息一定送達對方，這裡的提示措辭刻意保守
+        console.log('已交給系統分享機制，請自行確認對方是否收到。');
+      } catch (err) {
+        // AbortError：使用者自己取消了分享選單，是正常操作，不用當成錯誤處理
+        if (err.name === 'AbortError') {
+          return;
+        }
+        console.error('系統分享失敗：', err);
+        alert('分享失敗，改為複製到剪貼簿：\n' + err.message);
+        copyToClipboardFallback(fullText);
       }
     }
   </script>
