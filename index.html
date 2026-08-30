@@ -118,6 +118,29 @@
       border: none; border-radius: 10px; background: var(--line-green); color: #fff; cursor: pointer;
     }
     .modal-footer label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); margin-bottom: 10px; }
+
+    /* 聊天室預覽彈窗：模擬 LINE 對話氣泡，讓使用者送出前先看內容長怎樣 */
+    .chat-preview-bg {
+      background: #8dc63f url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%237fb838"/></svg>');
+      background-size: 40px 40px;
+      padding: 16px 12px; border-radius: 10px; margin-bottom: 4px;
+    }
+    .chat-bubble-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+    .chat-bubble {
+      max-width: 78%; background: #8de055; color: #1a1d1f;
+      padding: 9px 12px; border-radius: 14px 14px 2px 14px;
+      font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+    }
+    .chat-bubble-time { font-size: 10px; color: #fff; opacity: 0.85; align-self: flex-end; margin-right: 6px; }
+    .chat-preview-target { font-size: 11.5px; color: var(--ink-soft); margin-bottom: 10px; text-align: center; }
+    .chat-preview-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .chat-preview-actions button {
+      flex: 1; padding: 12px; font-size: 13.5px; font-weight: 700;
+      border-radius: 10px; cursor: pointer;
+    }
+    .chat-preview-actions .btn-cancel { border: 1px solid var(--border); background: var(--card-bg); color: var(--ink-soft); }
+    .chat-preview-actions .btn-confirm { border: none; background: var(--line-green); color: #fff; }
   </style>
   <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
@@ -155,7 +178,7 @@
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>新增「合併／改順序／編輯內容」三種卡片編輯模式，預設唯讀避免誤觸</li>
               <li>新增「手機系統分享」作為第二種發送方式，不需要 LINE 登入</li>
-              <li>會議中畫面改為即時列出所有卡片，不再只顯示最新一則</li>
+              <li>即時錄音轉文字畫面改為即時列出所有卡片，不再只顯示最新一則</li>
               <li>簡化為僅支援 Groq（移除 OpenAI 選項），並加入申請教學</li>
             </ul>
           </div>
@@ -177,6 +200,44 @@
       <div class="modal-footer">
         <label><input type="checkbox" id="dontShowAgainCheckbox"> 這個版本不用再提醒我</label>
         <button onclick="IntroModal.close()">我知道了，開始使用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 發送前的聊天室預覽彈窗：模擬 LINE 對話氣泡，讓使用者送出前
+       先確認內容長什麼樣子，確認後才真正觸發發送/複製動作。 -->
+  <div class="modal-overlay hidden" id="chatPreviewModal">
+    <div class="modal-box" style="max-width:380px;">
+      <div class="modal-tabs"><button class="active" style="cursor:default;">📋 發送前預覽</button></div>
+      <div class="modal-body" style="padding:12px;">
+        <div class="chat-preview-target" id="chatPreviewTarget"></div>
+        <div class="chat-preview-bg">
+          <div class="chat-bubble-row">
+            <span class="chat-bubble-time" id="chatPreviewTime"></span>
+            <div class="chat-bubble" id="chatPreviewBubble"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="chat-preview-actions">
+          <button class="btn-cancel" onclick="ChatPreview.cancel()">取消</button>
+          <button class="btn-confirm" id="chatPreviewConfirmBtn">確認發送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 產品定位提醒彈窗：改為第一次點「開始錄音」時才跳出，而不是常駐佔版面。
+       確認過一次後記住，之後點開始錄音不會再打斷。 -->
+  <div class="modal-overlay hidden" id="recordNoticeModal">
+    <div class="modal-box" style="max-width:380px;">
+      <div class="modal-tabs"><button class="active" style="cursor:default;">ℹ️ 開始錄音前，先知道這件事</button></div>
+      <div class="modal-body">
+        這個工具只做「即時音轉文字」，錄音轉成文字後<b>原始音檔就會被丟棄</b>，不會留存也不會上傳保存。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
+      </div>
+      <div class="modal-footer">
+        <label><input type="checkbox" id="dontShowRecordNoticeCheckbox" checked> 下次不用再提醒我</label>
+        <button onclick="RecordNotice.confirm()">知道了，開始錄音</button>
       </div>
     </div>
   </div>
@@ -206,15 +267,11 @@
             <div style="margin-top:6px; color:#7a5a00;">免費額度不需要信用卡，日常筆記用量通常足夠；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。</div>
           </div>
         </details>
-
-        <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--warn-border);">
-          <b>ℹ️ 產品定位：</b>這個工具只做「即時音轉文字」，錄音轉成文字後原始音檔就會被丟棄，不會留存也不會上傳保存。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
-        </div>
       </div>
 
       <div class="mode-switch">
-        <button id="tabMeeting" class="active" onclick="switchTab('meeting')">會議中畫面</button>
-        <button id="tabReview" onclick="switchTab('review')">會議後編輯</button>
+        <button id="tabMeeting" class="active" onclick="switchTab('meeting')">即時錄音轉文字</button>
+        <button id="tabReview" onclick="switchTab('review')">錄音內容編輯</button>
       </div>
 
       <!-- 會議中 -->
@@ -226,7 +283,7 @@
           <div class="live-preview-list" id="livePreviewList">
             <div class="live-preview-empty">尚未有轉寫內容</div>
           </div>
-          <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始會議錄音</button>
+          <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始錄音</button>
         </div>
       </div>
 
@@ -286,6 +343,48 @@
       }
     };
     IntroModal.initOnLoad();
+
+    // ---------- 發送前的聊天室預覽 ----------
+    // 顯示模擬 LINE 對話氣泡的預覽彈窗，使用者按下彈窗裡的「確認發送」
+    // 才會真正呼叫傳入的 onConfirm callback（也就是 doSend / doWebShare）。
+    //
+    // 重要技術細節：Web Share API 的 navigator.share() 要求呼叫當下必須
+    // 處於「transient activation」狀態（使用者剛做了有效的互動動作），
+    // 這裡刻意讓 doWebShare 是在「確認發送」按鈕自己的 onclick 事件裡
+    // 直接被呼叫，而不是等某個計時器或非同步流程跑完才呼叫——按鈕本身
+    // 的點擊就是一次新的、有效的使用者激活，這樣才不會讓中間插入的預覽
+    // 步驟意外讓分享功能失效。
+    const ChatPreview = {
+      _pendingConfirm: null,
+
+      show(text, targetLabel, onConfirm) {
+        document.getElementById('chatPreviewTarget').textContent = `發送對象：${targetLabel}`;
+        document.getElementById('chatPreviewBubble').textContent = text;
+        const now = new Date();
+        document.getElementById('chatPreviewTime').textContent =
+          `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        this._pendingConfirm = onConfirm;
+        const confirmBtn = document.getElementById('chatPreviewConfirmBtn');
+        // 每次都重新綁定 onclick（而非用 addEventListener 疊加），避免
+        // 連續開好幾次預覽時，舊的 callback 沒清掉、被重複觸發
+        confirmBtn.onclick = () => {
+          this.hide();
+          if (this._pendingConfirm) this._pendingConfirm();
+        };
+
+        document.getElementById('chatPreviewModal').classList.remove('hidden');
+      },
+
+      cancel() {
+        this._pendingConfirm = null;
+        this.hide();
+      },
+
+      hide() {
+        document.getElementById('chatPreviewModal').classList.add('hidden');
+      }
+    };
 
     // 讀取/儲存 API Key
     document.getElementById('apiKeyInput').value = localStorage.getItem('whisper_api_key') || '';
@@ -377,7 +476,7 @@
         this.renderLivePreview();
       },
 
-      // 會議中畫面的即時預覽：列出目前為止所有卡片（不只是最新一張），
+      // 即時錄音轉文字畫面的即時預覽：列出目前為止所有卡片（不只是最新一張），
       // 每次新增都自動捲到底部，讓使用者不用手動滑就能看到最新內容
       renderLivePreview() {
         const container = document.getElementById('livePreviewList');
@@ -642,7 +741,7 @@
         } else {
           card.classList.remove('recording');
           btn.className = 'btn-record-toggle start';
-          btn.textContent = '開始會議錄音';
+          btn.textContent = '開始錄音';
           status.textContent = '尚未開始';
         }
       }
@@ -651,10 +750,39 @@
     function toggleMeetingRecording() {
       if (DictationEngine.isRecording) {
         DictationEngine.stop();
+        return;
+      }
+      // 第一次點「開始錄音」（或使用者未曾勾選「下次不用再提醒」）時，
+      // 先跳出產品定位提醒，確認後才真正開始錄音；已確認過的情況下
+      // 直接開始，不會每次錄音都被打斷。
+      if (RecordNotice.shouldShow()) {
+        RecordNotice.show();
       } else {
         DictationEngine.start();
       }
     }
+
+    const RecordNotice = {
+      shouldShow() {
+        try {
+          return localStorage.getItem('record_notice_acknowledged') !== 'true';
+        } catch (e) {
+          return true; // localStorage 不可用時，保守起見每次都提醒
+        }
+      },
+      show() {
+        document.getElementById('recordNoticeModal').classList.remove('hidden');
+      },
+      confirm() {
+        const dontShowAgain = document.getElementById('dontShowRecordNoticeCheckbox').checked;
+        if (dontShowAgain) {
+          try { localStorage.setItem('record_notice_acknowledged', 'true'); }
+          catch (e) { /* 忽略，下次仍會提醒 */ }
+        }
+        document.getElementById('recordNoticeModal').classList.add('hidden');
+        DictationEngine.start();
+      }
+    };
 
     // ---------- LIFF 初始化與發送邏輯 ----------
     // 說明：這裡用 shareTargetPicker() 而非 sendMessages()，因為前者
@@ -684,12 +812,14 @@
       const fullText = CardSandbox.cards
         .map((c, i) => `${i + 1}. ${c.text}`)
         .join('\n');
-
       if (!fullText.trim()) {
         alert('目前沒有任何卡片內容可以發送。');
         return;
       }
+      ChatPreview.show(fullText, 'LINE 好友選單', () => doSend(fullText));
+    }
 
+    async function doSend(fullText) {
       if (!liffReady) {
         // LIFF 初始化本身失敗（可能是網址跟後台登記的 Endpoint URL 對不上、
         // 或 liffId 有誤），這種情況無法救，直接降級
@@ -774,14 +904,16 @@
       const fullText = CardSandbox.cards
         .map((c, i) => `${i + 1}. ${c.text}`)
         .join('\n');
-
       if (!fullText.trim()) {
         alert('目前沒有任何卡片內容可以發送。');
         return;
       }
+      ChatPreview.show(fullText, '手機系統分享', () => doWebShare(fullText));
+    }
 
+    async function doWebShare(fullText) {
       if (!navigator.share) {
-        alert('此瀏覽器不支援系統分享功能，改為複製到剪貼簿。');
+        alert('目前所在的瀏覽器環境不支援系統分享（LINE 內建瀏覽器對此功能有限制），已改為複製到剪貼簿，請手動貼上。');
         copyToClipboardFallback(fullText);
         return;
       }
