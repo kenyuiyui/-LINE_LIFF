@@ -268,6 +268,21 @@
     }
     .chat-preview-actions .btn-cancel { border: 1px solid var(--border); background: var(--card-bg); color: var(--ink-soft); }
     .chat-preview-actions .btn-confirm { border: none; background: var(--line-green); color: #fff; }
+
+    /* ★ 新增：內容儲存提醒 toast。輕量、幾秒後自動消失，不需要使用者
+       手動關閉，只在關鍵時刻（第一次錄完/發送成功後）出現，平常不佔畫面。 */
+    .storage-toast {
+      position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(10px);
+      max-width: 420px; width: calc(100% - 40px);
+      background: rgba(26,29,31,0.94); color: #fff; border-radius: 12px;
+      padding: 11px 14px; font-size: 12.5px; line-height: 1.6;
+      display: flex; align-items: flex-start; gap: 8px;
+      z-index: 1500; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .storage-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .storage-toast .toast-icon { flex-shrink: 0; font-size: 14px; line-height: 1.6; }
+    .storage-toast .toast-text b { color: #8de055; }
   </style>
   <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
@@ -311,6 +326,7 @@
             <li>錄音轉成文字後，<b>原始音檔不會被保留</b>，只留文字卡片。如需留底請另外用手機錄音 App 同時錄一份</li>
             <li>轉寫過程會將這段音訊上傳到 Groq 的伺服器處理，語音內容不是完全留在你手機本機</li>
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
+            <li><b>整理好的語音卡片會自動儲存在這台裝置的瀏覽器裡</b>，就算不小心切出去、誤觸上一頁或重新整理，回來也找得回來；但這也代表若為共用裝置，請務必在使用完畢後於 API Key 卡片內點「清除本機資料」，避免下一位使用者看到你的內容</li>
             <li>發送功能有三種：「送回聊天室」直接存回你打開此頁面時所在的聊天室（僅限從 LINE 聊天室進入時可用，最推薦）；「LINE 好友選單」需要先登入 LINE 才能選對象發送；「手機分享」在 LINE 內開啟時會自動改走好友選單（LINE 內建瀏覽器對系統分享有限制）</li>
           </ul>
         </div>
@@ -402,13 +418,12 @@
         <ul style="padding-left:18px; margin:8px 0;">
           <li>你填過的 Groq API Key</li>
           <li>「不用再提醒」的已讀記錄（下次會重新看到提示彈窗）</li>
-          <li>尚未送出的暫存筆記內容（若有）</li>
+          <li>登入跳轉前暫存的待發送文字（若有）</li>
+          <li><b>目前尚未發送出去的語音卡片內容</b>（卡片會自動即時儲存，方便誤觸返回或切換分頁時找回，但也代表清除時會一併被刪除，且無法復原）</li>
         </ul>
-        <b>不會影響：</b>目前畫面上還沒發送出去的卡片（清除後這些卡片仍會顯示，但重新整理頁面後就會消失，因為卡片本身只存在記憶體中，並未被永久保存）。
-        <br><br>
         <b>⚠️ 這個工具清不到的地方：</b>如果你曾經用「複製到剪貼簿」功能，筆記內容可能還留在系統剪貼簿裡（這是手機/瀏覽器本身的機制，網頁無法主動清除）。若這是共用裝置，建議額外複製一段無關文字覆蓋掉。
         <br><br>
-        確定要清除嗎？清除後需要重新輸入 API Key 才能繼續錄音。
+        確定要清除嗎？清除後需要重新輸入 API Key 才能繼續錄音，<b>目前的卡片內容也將無法復原</b>。
       </div>
       <div class="modal-footer">
         <div class="chat-preview-actions">
@@ -455,6 +470,7 @@
         <ul>
           <li>需要自行申請並填入 Groq API Key 才能使用；<b>Key 會存在你這個裝置的瀏覽器裡</b>，若為共用裝置請於使用後清除本機資料</li>
           <li>你錄製的語音內容<b>會上傳到 Groq 雲端伺服器</b>進行轉寫處理，原始音檔不會被保留，僅保留轉寫後的文字</li>
+          <li>整理好的<b>語音卡片內容同樣會存在這個裝置的瀏覽器裡</b>，方便誤觸返回或切出頁面時找回，若為共用裝置也請於使用後一併清除</li>
           <li>本工具<b>不建議</b>用於處理真正機密或高度敏感的內容（例如商業機密、他人個資、密碼、身分證字號等）</li>
           <li>這是個人維護的小工具，<b>沒有正式的客服或服務保證</b>，可能因故調整或中止服務</li>
           <li>若你發現安全性問題或有濫用情形，歡迎透過官方帳號回報</li>
@@ -473,6 +489,11 @@
   </div>
 
   <div class="app" id="mainApp" style="display:none;">
+    <!-- ★ 新增：內容儲存提醒 toast 容器，平常隱藏，關鍵時刻由 StorageToast.show() 觸發 -->
+    <div class="storage-toast" id="storageToast">
+      <span class="toast-icon">💾</span>
+      <span class="toast-text" id="storageToastText"></span>
+    </div>
     <header>
       <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
       <div class="sub">MediaRecorder 前端錄音 ➔ Whisper API 雲端極速辨識</div>
@@ -626,10 +647,17 @@
         } catch (e) {
           console.warn('清除本機資料時發生問題：', e);
         }
+        // ★ 卡片草稿現在也會自動持久化保存，屬於共用裝置需要清除的
+        // 機敏資料範圍，一併清掉，並立即重繪畫面讓卡片列表跟著清空
+        CardSandbox.clearPersisted();
+        CardSandbox.cards = [];
+        CardSandbox.render();
+        CardSandbox.renderLivePreview();
+
         document.getElementById('apiKeyInput').value = '';
         this.updateKeySavedIndicator();
         document.getElementById('clearDataModal').classList.add('hidden');
-        alert('已清除這台裝置上的 API Key、已讀記錄與暫存內容。若要繼續使用，請重新輸入 API Key。');
+        alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
       },
       // 依目前是否存有 Key，更新狀態列的小圓點顏色與文字說明。
       // 用低調的方式呈現狀態，不用色塊或警示語氣，符合平時安靜、
@@ -759,9 +787,36 @@
     };
 
     // 卡片管理
+    // ★ 卡片持久化：CardSandbox.cards 原本只存在記憶體裡，任何導致頁面
+    // 重新執行 JS 的動作（誤觸瀏覽器上一頁、切出去再切回來被系統回收、
+    // 不小心重新整理）都會讓辛苦錄好的內容整個消失、無法復原。
+    // 這裡改成每次卡片陣列有異動，就自動同步寫進 localStorage，頁面
+    // 載入時自動撈回來還原，跟 API Key 一樣可以撐過分頁關閉。
+    //
+    // 這也代表卡片內容現在跟 API Key 一樣，屬於「共用裝置需要清除」
+    // 的機敏資料範圍，ClearLocalData 那邊會一併處理。
+    // ★ 內容儲存提醒 toast：只在關鍵時刻出現（這次使用中第一次成功新增
+    // 卡片、以及每次發送成功後），平常不佔畫面，幾秒後自動淡出消失，
+    // 不需要使用者手動關閉。目的是讓使用者知道「內容有被留住」，同時
+    // 委婉提醒共用裝置要記得清除，但不用常駐的方式打擾操作。
+    const StorageToast = {
+      _timer: null,
+      show(text) {
+        const toast = document.getElementById('storageToast');
+        const textEl = document.getElementById('storageToastText');
+        textEl.innerHTML = text;
+        toast.classList.add('show');
+        clearTimeout(this._timer);
+        this._timer = setTimeout(() => toast.classList.remove('show'), 4200);
+      }
+    };
+
+    const CARDS_STORAGE_KEY = 'voice_cards_draft';
+
     const CardSandbox = {
       cards: [], // { id, text }
       nextId: 1,
+      _hasShownFirstSaveToast: false, // 這次瀏覽期間是否已經顯示過「首次儲存」提醒，避免每張卡片都跳一次
 
       // 簡轉繁轉換器。用 lazy init（第一次用到才建立），並做防呆：
       // 若 opencc-js 因故未能從 CDN 載入成功，不能讓整個轉寫功能掛掉，
@@ -781,6 +836,46 @@
         return this._s2tConverter;
       },
 
+      // 把目前的卡片陣列寫進 localStorage。用 try-catch 包起來是因為
+      // localStorage 可能因隱私模式、容量已滿等原因寫入失敗——寫入失敗
+      // 頂多是「這次异動沒被存到」，不應該讓卡片新增/編輯這些核心操作
+      // 因此直接掛掉，所以只記警告、不中斷流程。
+      persist() {
+        try {
+          localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify({
+            cards: this.cards,
+            nextId: this.nextId
+          }));
+        } catch (e) {
+          console.warn('卡片內容自動儲存失敗（可能是儲存空間已滿或隱私模式）：', e);
+        }
+      },
+
+      // 頁面載入時呼叫一次，把上次留下的卡片內容還原回來。
+      // 對任何格式不符預期的舊資料都直接放棄還原、從空清單開始，
+      // 避免因為一筆壞資料讓整個工具連帶掛掉。
+      restore() {
+        let raw = null;
+        try { raw = localStorage.getItem(CARDS_STORAGE_KEY); }
+        catch (e) { return; }
+        if (!raw) return;
+
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.cards)) {
+            this.cards = parsed.cards.filter(c => c && typeof c.id !== 'undefined' && typeof c.text === 'string');
+            this.nextId = typeof parsed.nextId === 'number' ? parsed.nextId : (this.cards.length + 1);
+          }
+        } catch (e) {
+          console.warn('還原上次卡片內容失敗，將從空白開始：', e);
+        }
+      },
+
+      clearPersisted() {
+        try { localStorage.removeItem(CARDS_STORAGE_KEY); }
+        catch (e) { /* 忽略 */ }
+      },
+
       add(text) {
         if (!text.trim()) return;
         let finalText = text.trim();
@@ -793,8 +888,16 @@
           }
         }
         this.cards.push({ id: this.nextId++, text: finalText });
+        this.persist();
         this.render();
         this.renderLivePreview();
+
+        // ★ 這次瀏覽期間第一次成功新增卡片時，跳出一次性提醒，
+        // 之後同一次瀏覽不會再為了新卡片重複顯示
+        if (!this._hasShownFirstSaveToast) {
+          this._hasShownFirstSaveToast = true;
+          StorageToast.show('內容已<b>自動儲存</b>在這個裝置上，切換分頁或不小心返回也不會消失。若為共用裝置，請於使用後至上方清除本機資料。');
+        }
       },
 
       // 即時錄音轉文字畫面的即時預覽：列出目前為止所有卡片（不只是最新一張），
@@ -867,11 +970,13 @@
         if (card) {
           card.text = newText.trim();
         }
+        this.persist();
         this.render();
       },
 
       remove(id) {
         this.cards = this.cards.filter(c => c.id !== id);
+        this.persist();
         this.render();
       },
 
@@ -880,6 +985,7 @@
         if (idx === -1 || idx === this.cards.length - 1) return;
         this.cards[idx].text = this.cards[idx].text.replace(/[。！？]$/, '') + '，' + this.cards[idx + 1].text;
         this.cards.splice(idx + 1, 1);
+        this.persist();
         this.render();
       },
 
@@ -887,6 +993,7 @@
         const idx = this.cards.findIndex(c => c.id === id);
         if (idx <= 0) return;
         [this.cards[idx - 1], this.cards[idx]] = [this.cards[idx], this.cards[idx - 1]];
+        this.persist();
         this.render();
       },
 
@@ -894,6 +1001,7 @@
         const idx = this.cards.findIndex(c => c.id === id);
         if (idx === -1 || idx === this.cards.length - 1) return;
         [this.cards[idx], this.cards[idx + 1]] = [this.cards[idx + 1], this.cards[idx]];
+        this.persist();
         this.render();
       },
 
@@ -902,6 +1010,7 @@
         if (idx <= 0) return;
         const [moved] = this.cards.splice(idx, 1);
         this.cards.unshift(moved);
+        this.persist();
         this.render();
       }
     };
@@ -1139,7 +1248,7 @@
     const LIFF_ID = '2011273067-abYzT84Y';
     let liffReady = false;
 
-    const CONSENT_VERSION = '2026-08-v1'; // 使用須知內容有實質變更時更新此版號，會讓所有人重新看到同意書
+    const CONSENT_VERSION = '2026-08-v2'; // 使用須知內容有實質變更時更新此版號，會讓所有人重新看到同意書
 
     const AccessGate = {
       _friendCheckInProgress: false,
@@ -1201,7 +1310,7 @@
       goAddFriend() {
         // 導去加好友，用 liff.openWindow 開外部連結（LIFF 內嵌視窗與
         // 外部瀏覽器都適用），實際好友加取連結請替換成你官方帳號的網址
-        const addFriendUrl = 'https://line.me/R/ti/p/@your-bot-id'; // TODO: 換成你的官方帳號好友加取連結
+        const addFriendUrl = 'https://line.me/R/ti/p/@165tgzzz'; // TODO: 換成你的官方帳號好友加取連結
         if (typeof liff.openWindow === 'function') {
           liff.openWindow({ url: addFriendUrl, external: true });
         } else {
@@ -1251,6 +1360,19 @@
       enterApp() {
         document.getElementById('accessGate').style.display = 'none';
         document.getElementById('mainApp').style.display = 'flex';
+
+        // 還原上次留下的卡片內容（若有），讓誤觸上一頁、切出去被系統
+        // 回收分頁等情境下辛苦錄的內容不會憑空消失
+        CardSandbox.restore();
+        CardSandbox.render();
+        CardSandbox.renderLivePreview();
+
+        // 若還原後發現有內容，直接切到「錄音內容編輯」分頁並顯示發送
+        // 按鈕列，讓使用者第一時間就看到救回來的卡片，而不是還要自己
+        // 想到要點分頁切換才發現內容還在
+        if (CardSandbox.cards.length > 0) {
+          switchTab('review');
+        }
       }
     };
 
@@ -1300,6 +1422,7 @@
       try {
         await liff.sendMessages([{ type: 'text', text: fullText }]);
         alert('已送回聊天室。');
+        StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
       } catch (err) {
         console.error('sendMessages 發送失敗：', err);
         // 這裡列出的排查順序是依實測驗證過的可能性排的：後台權限設定
@@ -1356,6 +1479,7 @@
           );
           if (res) {
             alert('已送出，請確認對方（例如你的官方帳號）是否收到。');
+            StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
           } else {
             // res 為 falsy 但沒有拋錯，代表使用者可能在選擇畫面中途取消
             alert('已取消發送。');
@@ -1447,6 +1571,7 @@
         // 規格上 Android 的 Promise 在資料成功交給分享目標時 resolve，
         // 不代表訊息一定送達對方，這裡的提示措辭刻意保守
         console.log('已交給系統分享機制，請自行確認對方是否收到。');
+        StorageToast.show('已交給系統分享。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
       } catch (err) {
         // AbortError：使用者自己取消了分享選單，是正常操作，不用當成錯誤處理
         if (err.name === 'AbortError') {
@@ -1459,4 +1584,4 @@
     }
   </script>
 </body>
-</html>
+</html>ㄑ
