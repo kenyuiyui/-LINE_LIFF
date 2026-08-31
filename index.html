@@ -90,11 +90,17 @@
     /* ★ 新增：存取閘門樣式 */
     .access-gate {
       position: fixed; inset: 0; background: var(--bg); z-index: 2000;
-      display: flex; align-items: center; justify-content: center; padding: 20px;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 20px; overflow-y: auto;
+      /* 100dvh：行動瀏覽器會動態扣掉網址列／工具列高度，比 100vh 準確，
+         避免內容被網址列擋住卻無法捲動的問題。外層本身也設 overflow-y:auto
+         當作最後一道保險——就算某支手機不支援 dvh，使用者仍可整頁捲動找到按鈕。 */
+      min-height: 100vh; min-height: 100dvh;
     }
     .gate-panel {
       max-width: 420px; width: 100%; background: var(--card-bg); border-radius: 18px;
       padding: 28px 22px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      margin: auto; /* 內容較短時，靠 margin:auto 在捲動容器內垂直置中 */
     }
     .gate-spinner {
       width: 36px; height: 36px; border-radius: 50%; margin: 0 auto 16px;
@@ -114,20 +120,29 @@
       width: 100%; padding: 13px; font-size: 13.5px; font-weight: 600; border: 1px solid var(--border);
       border-radius: 12px; background: var(--card-bg); color: var(--ink-soft); cursor: pointer;
     }
-    .gate-panel-consent { max-width: 440px; text-align: left; max-height: 88vh; display: flex; flex-direction: column; }
-    .gate-panel-consent .gate-title { text-align: center; }
+    /* 同意書卡片：拿掉外層 max-height 限制交由 .access-gate 統一處理捲動，
+       內文區塊 .gate-consent-body 保留自己的 overflow-y:auto 作為次要捲軸
+       （文字內容本身在小螢幕上可以先局部捲動看完，不用整頁一直滑）。
+       flex-shrink:0 確保勾選框跟按鈕不會被 flex:1 的內文區塊擠壓到消失。 */
+    .gate-panel-consent {
+      max-width: 440px; text-align: left; display: flex; flex-direction: column;
+      max-height: none;
+    }
+    .gate-panel-consent .gate-title { text-align: center; flex-shrink: 0; }
     .gate-consent-body {
-      font-size: 12.5px; line-height: 1.75; color: var(--ink); overflow-y: auto;
-      background: var(--bg); border-radius: 10px; padding: 14px 14px 4px; margin-bottom: 14px; flex: 1;
+      font-size: 12.5px; line-height: 1.75; color: var(--ink);
+      background: var(--bg); border-radius: 10px; padding: 14px 14px 4px; margin-bottom: 14px;
+      max-height: 45vh; overflow-y: auto; flex-shrink: 0;
+      -webkit-overflow-scrolling: touch;
     }
     .gate-consent-body p { margin: 0 0 10px; }
     .gate-consent-body ul { margin: 0 0 10px; padding-left: 18px; }
     .gate-consent-body li { margin-bottom: 6px; }
     .gate-consent-checkbox {
       display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-soft);
-      margin-bottom: 14px; cursor: pointer;
+      margin-bottom: 14px; cursor: pointer; flex-shrink: 0;
     }
-    .gate-consent-actions { display: flex; flex-direction: column; gap: 8px; }
+    .gate-consent-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
     .meeting-mode { background: var(--card-bg); border-radius: 18px; padding: 32px 20px; text-align: center; border: 1px solid var(--border); }
     .meeting-mode.recording { background: linear-gradient(160deg, #0d1f14, #14291c); color: #fff; border: none; }
     .rec-orb { width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; background: #f0f1f3; font-size: 34px; transition: all 0.3s ease; }
