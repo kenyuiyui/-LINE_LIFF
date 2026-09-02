@@ -29,26 +29,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <!--
-    ★ 新增：CSP（Content-Security-Policy）
-    白名單只放這份頁面實際會用到的三個網域：
+    ★ CSP（Content-Security-Policy）
+    白名單只放這份頁面實際會用到的網域：
     - cdn.jsdelivr.net：載入 opencc-js（簡轉繁）
     - static.line-scdn.net：載入 LIFF SDK
     - api.groq.com：Whisper 轉寫 API（透過 connect-src，因為是 fetch() 呼叫，不是載入 script）
+    - generativelanguage.googleapis.com：Gemini 會議摘要 API（同樣是 fetch() 呼叫）
     其餘一律擋掉。這樣就算未來哪裡不小心被注入了一段惡意 <script src="...">
     或想把資料 fetch 送到別的網域，瀏覽器會直接擋下，不會執行/送出。
-
-    ★ TODO：SummaryModule 的 Gemini 呼叫目前還是純佔位（見 _callGemini
-    註解），還沒有真正對外 fetch。等實作串接 Gemini API 時，記得在下面
-    connect-src 那行加上 https://generativelanguage.googleapis.com，
-    否則會被這道 CSP 直接擋下、fetch 失敗。現在先不預先開放，避免
-    白名單放了目前程式碼實際用不到的網域。
   -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com;
     frame-src https://access.line.me;
     base-uri 'self';
     form-action 'none';
@@ -1148,28 +1143,33 @@
       }
     };
 
-    // ---------- ★ 新增：會議摘要模組（目前為框架階段，尚未接上真正的 Gemini 呼叫）----------
-    //
-    // 設計原則：這裡只先把「入口 → 處理 → 出口」的骨架搭起來，讓
-    // UI（按鈕、loading 狀態、輸出區塊）都能先跑通，之後真正要接 Gemini
-    // 時，只需要動 `_callGemini()` 這一個函式內部的實作，其他都不用改。
+    // ---------- ★ 會議摘要模組 ----------
     //
     // 入口：SummaryModule.generate()，由「生成會議摘要」按鈕觸發
     //   - 讀取 CardSandbox 目前所有卡片文字，組成一段完整逐字稿
     //   - 讀取使用者存好的 Gemini API Key
     //   - 沒有卡片內容 / 沒有 Key 時，直接擋下並提示，不會呼叫下一步
     //
-    // 處理：_callGemini(fullText, apiKey) —— 目前是 TODO 佔位
-    //   - 之後要接的實際流程大致是：
-    //     1. 組一段 prompt（例如「請將以下會議逐字稿整理成條列式重點摘要」+ fullText）
-    //     2. fetch Gemini 的 generateContent 端點，帶上 apiKey
-    //     3. 解析回傳的 JSON，取出摘要文字
-    //     4. 錯誤處理（Key 無效、額度用盡、逐字稿過長需要分段送出等）
-    //   - 兩小時會議逐字稿可能很長，實作時要注意 Gemini 的 context 長度限制，
-    //     必要時可能需要仿照 LINE 分段發送那樣，先做分段摘要再彙整
+    // 處理：_callGemini(fullText, apiKey) —— 已串接 Gemini API
+    //   - 組一段 prompt，請 Gemini 把逐字稿整理成條列式重點摘要
+    //   - 呼叫 generateContent 端點，帶上 apiKey（用 header 傳遞，不放在
+    //     URL query string，避免 Key 意外留在瀏覽器網路紀錄或伺服器日誌裡）
+    //   - 解析回傳的 JSON，取出摘要文字
+    //   - 涵蓋常見錯誤情況：Key 無效、額度用盡、內容被安全機制擋下、
+    //     網路錯誤、回應格式不如預期
     //
     // 出口：render 出摘要文字到 #summaryOutputBox，或錯誤訊息
     const SummaryModule = {
+
+      // ★ Gemini 模型名稱集中寫在這裡，方便之後更新。
+      // Google 的 Flash 系列模型疊代很快，寫死的版本號可能在幾個月後
+      // 被下架或有更新版本可用。若之後發現這個模型無法呼叫（錯誤訊息
+      // 通常會是 404 not found），到 https://ai.google.dev/gemini-api/docs/models
+      // 查目前可用的模型名稱，把下面這行改掉即可，不需要動其他任何程式碼。
+      // 注意：官方也提供 'gemini-flash-latest' 這種浮動別名，會自動指向
+      // 目前最新版本，但曾發生過官方悄悄把它切換到非預期版本的案例，
+      // 這裡選擇寫死明確版本號，行為更可預期、可控。
+      GEMINI_MODEL: 'gemini-3.7-flash',
 
       // 目前執行狀態，避免使用者連續點擊按鈕重複觸發
       isGenerating: false,
@@ -1204,32 +1204,90 @@
         }
       },
 
-      // ---------- 處理：實際呼叫 Gemini 的地方，目前是 TODO 佔位 ----------
+      // ---------- 處理：實際呼叫 Gemini 的地方 ----------
       // 輸入：fullText（整段會議逐字稿文字）、apiKey（使用者填入的 Gemini Key）
-      // 輸出：Promise<string>，resolve 一段摘要文字
-      //
-      // TODO：串接 Gemini API。先保留假資料回傳，讓按鈕→loading→
-      // 出口顯示這整條流程可以先被驗證、先讓前端行為看得到，
-      // 之後只要把下面這段換成真正的 fetch 呼叫即可，不用動其他任何地方。
+      // 輸出：Promise<string>，resolve 一段摘要文字；失敗時 throw 一個
+      // 帶有清楚訊息的 Error，讓上層 generate() 的 catch 顯示給使用者看
       async _callGemini(fullText, apiKey) {
-        // --- 佔位邏輯開始：模擬網路延遲，之後整段替換成真正的 fetch ---
-        await new Promise(resolve => setTimeout(resolve, 800));
-        return '（尚未接上 Gemini，這是佔位假資料）\n\n' +
-          '這裡之後會顯示由 Gemini 根據整段會議逐字稿（目前共 ' + fullText.length + ' 字）整理出的重點摘要。';
-        // --- 佔位邏輯結束 ---
+        // 兩小時會議逐字稿約數萬字，遠低於 Gemini Flash 系列 1M tokens
+        // 的 context window 上限，不需要像 LINE 發送那樣額外做分段，
+        // 整段逐字稿可以一次送出。
+        const prompt =
+          '你是一個會議記錄整理助手。請將以下會議逐字稿整理成清楚的重點摘要，' +
+          '格式要求：\n' +
+          '1. 先用 1-2 句話整體總結這場會議的主題\n' +
+          '2. 接著用條列式列出討論到的重點，每點盡量簡潔\n' +
+          '3. 如果逐字稿中有提到待辦事項、下一步行動或需要追蹤的事情，' +
+          '額外列一個「待辦事項」區塊\n' +
+          '4. 直接輸出整理結果，不需要額外的開場白或結語\n\n' +
+          '以下是會議逐字稿：\n\n' + fullText;
 
-        // 之後大致會長這樣（僅供參考，尚未實作）：
-        //
-        // const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        // const res = await fetch(endpoint, {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({
-        //     contents: [{ parts: [{ text: '請將以下會議逐字稿整理成條列式重點摘要：\n\n' + fullText }] }]
-        //   })
-        // });
-        // const data = await res.json();
-        // return data.candidates[0].content.parts[0].text;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.GEMINI_MODEL}:generateContent`;
+
+        let res;
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // 用 header 傳 Key（官方目前建議的做法），而不是放在 URL
+              // query string，避免 Key 被瀏覽器紀錄、代理伺服器日誌等
+              // 意外留存
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
+        } catch (networkErr) {
+          // fetch 本身拋出例外，通常代表網路完全連不上（離線、CSP 擋下、
+          // DNS 失敗等），與下面「連上了但 API 回傳錯誤」的情況分開處理
+          throw new Error('無法連線到 Gemini 伺服器，請檢查網路連線：' + networkErr.message);
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          throw new Error('Gemini 回應格式異常，無法解析（HTTP ' + res.status + '）');
+        }
+
+        if (!res.ok) {
+          // Gemini 錯誤回應通常帶有 { error: { code, message, status } }，
+          // 把訊息取出來，並針對最常見的幾種狀況給更明確的中文說明，
+          // 比直接丟原始英文錯誤訊息更容易讓使用者知道下一步該怎麼做
+          const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          if (res.status === 400 && /API key not valid/i.test(apiMessage)) {
+            throw new Error('Gemini API Key 無效，請確認貼上的 Key 是否正確。');
+          }
+          if (res.status === 403) {
+            throw new Error('沒有權限使用這個 Gemini API Key（可能是 Key 被限制或專案未啟用），詳細訊息：' + apiMessage);
+          }
+          if (res.status === 429) {
+            throw new Error('已達 Gemini API 的請求額度上限，請稍後再試：' + apiMessage);
+          }
+          if (res.status === 404) {
+            throw new Error('找不到指定的 Gemini 模型（' + this.GEMINI_MODEL + '），可能已被下架，請回報開發者更新模型名稱：' + apiMessage);
+          }
+          throw new Error(apiMessage);
+        }
+
+        // 正常情況下文字結果的路徑是 candidates[0].content.parts[0].text，
+        // 但如果內容被安全機制擋下、或模型沒有回傳文字，這條路徑可能不存在，
+        // 這裡做防呆並給出對使用者有意義的錯誤訊息，而不是直接噴 undefined
+        const candidate = data && data.candidates && data.candidates[0];
+        if (!candidate) {
+          throw new Error('Gemini 沒有回傳任何結果，請稍後再試一次。');
+        }
+        if (candidate.finishReason === 'SAFETY') {
+          throw new Error('這段內容被 Gemini 的安全機制擋下，無法生成摘要。');
+        }
+        const text = candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
+        if (!text || !text.trim()) {
+          throw new Error('Gemini 回傳了空白結果，請稍後再試一次。');
+        }
+
+        return text.trim();
       },
 
       // ---------- 出口：把結果畫到畫面上 ----------
@@ -1254,7 +1312,9 @@
         if (loading) {
           box.classList.remove('empty');
           box.classList.add('loading');
-          box.textContent = '正在生成摘要，請稍候...';
+          // 逐字稿較長時（例如長會議），Gemini 生成可能需要十幾秒到
+          // 更久，這裡先說明清楚，避免使用者以為卡住而重複點擊
+          box.textContent = '正在生成摘要，請稍候...（逐字稿較長時可能需要一些時間）';
         }
       }
     };
