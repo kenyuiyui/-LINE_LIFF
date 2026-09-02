@@ -1209,20 +1209,30 @@
       // 輸出：Promise<string>，resolve 一段摘要文字；失敗時 throw 一個
       // 帶有清楚訊息的 Error，讓上層 generate() 的 catch 顯示給使用者看
       async _callGemini(fullText, apiKey) {
-        // 兩小時會議逐字稿約數萬字，遠低於 Gemini Flash 系列 1M tokens
-        // 的 context window 上限，不需要像 LINE 發送那樣額外做分段，
-        // 整段逐字稿可以一次送出。
-        const prompt =
-          '你是一個會議記錄整理助手。請將以下會議逐字稿整理成清楚的重點摘要，' +
-          '格式要求：\n' +
-          '1. 先用 1-2 句話整體總結這場會議的主題\n' +
-          '2. 接著用條列式列出討論到的重點，每點盡量簡潔\n' +
-          '3. 如果逐字稿中有提到待辦事項、下一步行動或需要追蹤的事情，' +
-          '額外列一個「待辦事項」區塊\n' +
-          '4. 直接輸出整理結果，不需要額外的開場白或結語\n\n' +
-          '以下是會議逐字稿：\n\n' + fullText;
+        // ★ 關鍵 1：請確保 class 內的 GEMINI_MODEL 設定為 'gemini-2.5-flash'
+        // 如果原本是 'gemini-pro' 或舊版模型，會因為舊版輸入上限較小且不支援最新 API 結構而報錯
+        const modelName = this.GEMINI_MODEL || 'gemini-2.5-flash';
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.GEMINI_MODEL}:generateContent`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+        // ★ 關鍵 2：將系統指令 (systemInstruction) 與使用者逐字稿內容 (contents) 拆開
+        // 這樣可以避免提示詞過長時導致模型混淆，並能完美支援超過 800 字至上萬字的逐字稿
+        const payload = {
+          systemInstruction: {
+            parts: [{
+              text: '你是一個會議記錄整理助手。請將使用者提供給你的會議逐字稿整理成清楚的重點摘要。\n' +
+                    '格式要求：\n' +
+                    '1. 先用 1-2 句話整體總結這場會議的主題\n' +
+                    '2. 接著用條列式列出討論到的重點，每點盡量簡潔\n' +
+                    '3. 如果逐字稿中有提到待辦事項、下一步行動或需要追蹤的事情，額外列一個「待辦事項」區塊\n' +
+                    '4. 直接輸出整理結果，不需要額外的開場白或結語'
+            }]
+          },
+          contents: [{
+            role: 'user',
+            parts: [{ text: fullText }] // 超過 800 字的長文字獨立放這裡
+          }]
+        };
 
         let res;
         try {
@@ -1230,18 +1240,11 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              // 用 header 傳 Key（官方目前建議的做法），而不是放在 URL
-              // query string，避免 Key 被瀏覽器紀錄、代理伺服器日誌等
-              // 意外留存
               'x-goog-api-key': apiKey
             },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }]
-            })
+            body: JSON.stringify(payload)
           });
         } catch (networkErr) {
-          // fetch 本身拋出例外，通常代表網路完全連不上（離線、CSP 擋下、
-          // DNS 失敗等），與下面「連上了但 API 回傳錯誤」的情況分開處理
           throw new Error('無法連線到 Gemini 伺服器，請檢查網路連線：' + networkErr.message);
         }
 
@@ -1253,9 +1256,6 @@
         }
 
         if (!res.ok) {
-          // Gemini 錯誤回應通常帶有 { error: { code, message, status } }，
-          // 把訊息取出來，並針對最常見的幾種狀況給更明確的中文說明，
-          // 比直接丟原始英文錯誤訊息更容易讓使用者知道下一步該怎麼做
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
           if (res.status === 400 && /API key not valid/i.test(apiMessage)) {
             throw new Error('Gemini API Key 無效，請確認貼上的 Key 是否正確。');
@@ -1267,14 +1267,11 @@
             throw new Error('已達 Gemini API 的請求額度上限，請稍後再試：' + apiMessage);
           }
           if (res.status === 404) {
-            throw new Error('找不到指定的 Gemini 模型（' + this.GEMINI_MODEL + '），可能已被下架，請回報開發者更新模型名稱：' + apiMessage);
+            throw new Error('找不到指定的 Gemini 模型（' + modelName + '），可能已被下架或名稱錯誤：' + apiMessage);
           }
           throw new Error(apiMessage);
         }
 
-        // 正常情況下文字結果的路徑是 candidates[0].content.parts[0].text，
-        // 但如果內容被安全機制擋下、或模型沒有回傳文字，這條路徑可能不存在，
-        // 這裡做防呆並給出對使用者有意義的錯誤訊息，而不是直接噴 undefined
         const candidate = data && data.candidates && data.candidates[0];
         if (!candidate) {
           throw new Error('Gemini 沒有回傳任何結果，請稍後再試一次。');
@@ -1282,7 +1279,11 @@
         if (candidate.finishReason === 'SAFETY') {
           throw new Error('這段內容被 Gemini 的安全機制擋下，無法生成摘要。');
         }
-        const text = candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
+        
+        // 修正取值邏輯：確保多個 parts 時能正確組合文字
+        const parts = candidate.content && candidate.content.parts;
+        const text = parts ? parts.map(p => p.text).join('') : '';
+
         if (!text || !text.trim()) {
           throw new Error('Gemini 回傳了空白結果，請稍後再試一次。');
         }
