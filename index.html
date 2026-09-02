@@ -1204,7 +1204,7 @@
         }
       },
 
-      // ---------- 處理：實際呼叫 Gemini 的地方 ----------
+           // ---------- 處理：實際呼叫 Gemini 的地方 ----------
       // 輸入：fullText（整段會議逐字稿文字）、apiKey（使用者填入的 Gemini Key）
       // 輸出：Promise<string>，resolve 一段摘要文字；失敗時 throw 一個
       // 帶有清楚訊息的 Error，讓上層 generate() 的 catch 顯示給使用者看
@@ -1216,21 +1216,24 @@
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
         // ★ 關鍵 2：將系統指令 (systemInstruction) 與使用者逐字稿內容 (contents) 拆開
-        // 這樣可以避免提示詞過長時導致模型混淆，並能完美支援超過 800 字至上萬字的逐字稿
+        // 並在 contents 中使用 Markdown 標籤化的結構包裹 fullText
         const payload = {
           systemInstruction: {
             parts: [{
-              text: '你是一個會議記錄整理助手。請將使用者提供給你的會議逐字稿整理成清楚的重點摘要。\n' +
-                    '格式要求：\n' +
+              text: '<role>\n你是一個會議記錄整理助手。請針對使用者在下方 meeting_log 標籤內提供的會議逐字稿進行分析與整理，並輸出清楚的重點摘要。\n<role>\n' +
+                    '<demand>\n' +
                     '1. 先用 1-2 句話整體總結這場會議的主題\n' +
                     '2. 接著用條列式列出討論到的重點，每點盡量簡潔\n' +
                     '3. 如果逐字稿中有提到待辦事項、下一步行動或需要追蹤的事情，額外列一個「待辦事項」區塊\n' +
-                    '4. 直接輸出整理結果，不需要額外的開場白或結語'
+                    '4. 直接輸出整理結果，不需要額外的開場白或結語\n'+
+                    '<demand>\n'
             }]
           },
           contents: [{
             role: 'user',
-            parts: [{ text: fullText }] // 超過 800 字的長文字獨立放這裡
+            parts: [{ 
+              text: `<meeting_log>\n${fullText}\n</meeting_log>` 
+            }]
           }]
         };
 
