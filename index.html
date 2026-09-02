@@ -36,6 +36,12 @@
     - api.groq.com：Whisper 轉寫 API（透過 connect-src，因為是 fetch() 呼叫，不是載入 script）
     其餘一律擋掉。這樣就算未來哪裡不小心被注入了一段惡意 <script src="...">
     或想把資料 fetch 送到別的網域，瀏覽器會直接擋下，不會執行/送出。
+
+    ★ TODO：SummaryModule 的 Gemini 呼叫目前還是純佔位（見 _callGemini
+    註解），還沒有真正對外 fetch。等實作串接 Gemini API 時，記得在下面
+    connect-src 那行加上 https://generativelanguage.googleapis.com，
+    否則會被這道 CSP 直接擋下、fetch 失敗。現在先不預先開放，避免
+    白名單放了目前程式碼實際用不到的網域。
   -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
@@ -175,6 +181,26 @@
     @keyframes orbPulse { 0% { box-shadow: 0 0 0 0 rgba(6,199,85,0.4); } 70% { box-shadow: 0 0 0 22px rgba(6,199,85,0); } 100% { box-shadow: 0 0 0 0 rgba(6,199,85,0); } }
     .rec-status-text { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .rec-sub-text { font-size: 12.5px; opacity: 0.7; margin-bottom: 20px; line-height: 1.6; }
+
+    /* ★ 新增：辨識語言選單，樣式比照 mode-switch 的簡約風格，
+       放在錄音卡片外面獨立一列，錄音中會加上 disabled 樣式避免誤觸 */
+    .lang-select-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 10px 12px; margin-bottom: 12px;
+    }
+    .lang-select-label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+    .lang-select-row select {
+      border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+      padding: 6px 8px; font-size: 12.5px; color: var(--ink); font-weight: 600;
+    }
+    .lang-select-row select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ★ 新增：自動模式下顯示目前偵測到的語言，低調小字，不搶眼 */
+    .lang-detect-hint {
+      font-size: 11.5px; color: rgba(255,255,255,0.6); margin-bottom: 14px;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
     .live-preview-list {
       max-height: 220px; overflow-y: auto; margin-bottom: 14px;
       border-radius: 8px; background: rgba(255,255,255,0.06);
@@ -195,6 +221,21 @@
     .btn-record-toggle.start { background: var(--line-green); color: #fff; }
     .btn-record-toggle.stop { background: var(--danger); color: #fff; }
     .section-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px; }
+
+    /* ★ 新增：會議摘要模組樣式，比照既有卡片/按鈕視覺語言，先求外觀一致，
+       之後接上真正的 Gemini 呼叫時不需要再改樣式。 */
+    .summary-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 4px; }
+    .btn-summary-generate {
+      width: 100%; padding: 12px; font-size: 13.5px; font-weight: 700; border: none;
+      border-radius: 10px; background: var(--line-green); color: #fff; cursor: pointer;
+    }
+    .btn-summary-generate:disabled { background: var(--border); color: var(--ink-faint); cursor: not-allowed; }
+    .summary-output {
+      margin-top: 12px; font-size: 13px; line-height: 1.7; color: var(--ink);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .summary-output.empty { color: var(--ink-faint); font-size: 12px; line-height: 1.6; }
+    .summary-output.loading { color: var(--ink-soft); }
     .edit-mode-bar { display: flex; gap: 6px; margin-bottom: 10px; }
     .edit-mode-bar button {
       flex: 1; padding: 8px 4px; font-size: 11.5px; font-weight: 600;
@@ -557,6 +598,21 @@
         </details>
       </div>
 
+      <!-- ★ 新增：會議摘要模組的 Key 設定卡片，樣式比照上方 Groq Key 卡片。
+           選填——沒有這把 Key 也完全不影響錄音／轉寫／發送等既有功能，
+           只有點擊「生成會議摘要」時才會用到，未設定時按鈕會提示先去設定。 -->
+      <div class="key-panel">
+        <div class="key-panel-label">🧠 設定 Gemini API Key（會議摘要用，選填）</div>
+        <div class="key-panel-desc">要使用「生成會議摘要」功能才需要填寫，金鑰同樣只存在你自己的手機瀏覽器裡。</div>
+        <input type="password" id="geminiApiKeyInput" placeholder="AIza..." onchange="saveGeminiApiKey(this.value)">
+        <div class="key-status-row">
+          <span class="status-left">
+            <span class="status-dot" id="geminiKeyStatusDot"></span>
+            <span id="geminiKeyStatusText">尚未設定 Key</span>
+          </span>
+        </div>
+      </div>
+
       <div class="mode-switch">
         <button id="tabMeeting" class="active" onclick="switchTab('meeting')">即時錄音轉文字</button>
         <button id="tabReview" onclick="switchTab('review')">錄音內容編輯</button>
@@ -564,10 +620,28 @@
 
       <!-- 會議中 -->
       <div id="meetingView">
+
+        <!-- ★ 新增：辨識語言選擇。中文/英文/日文會鎖定對應的 language
+             參數與同語言 prompt；自動則不鎖定語言，改用每段轉寫結果
+             附帶的偵測語言動態調整接下來 60 秒要用的參數，見
+             LanguageManager 註解。錄音中鎖定，避免中途切換造成語言
+             參數與已錄製內容的邏輯狀態混亂。 -->
+        <div class="lang-select-row">
+          <label for="langSelect" class="lang-select-label">🌐 辨識語言</label>
+          <select id="langSelect" onchange="LanguageManager.onUserSelect(this.value)">
+            <option value="zh" selected>中文</option>
+            <option value="en">英文</option>
+            <option value="ja">日文</option>
+            <option value="auto">自動（中英日混雜）</option>
+          </select>
+        </div>
+
         <div class="meeting-mode" id="meetingCard">
           <div class="rec-orb" id="recOrb">🎙️</div>
           <div class="rec-status-text" id="recStatusText">尚未開始</div>
           <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始錄音（100% 支援 LIFF 內部）</div>
+          <!-- ★ 新增：自動模式下顯示目前偵測到的語言，固定語言模式下維持隱藏 -->
+          <div class="lang-detect-hint" id="langDetectHint" style="display:none;"></div>
           <div class="live-preview-list" id="livePreviewList">
             <div class="live-preview-empty">尚未有轉寫內容</div>
           </div>
@@ -577,6 +651,19 @@
 
       <!-- 會議後 -->
       <div id="reviewView" style="display:none;">
+
+        <!-- ★ 新增：會議摘要模組（框架階段）。
+             這是「入口」：按鈕觸發 SummaryModule.generate()。
+             這是「出口」：下方 summaryOutputBox 顯示產生的摘要內容。
+             中間實際呼叫 Gemini 的邏輯目前是佔位假資料，見下方 SummaryModule 註解。 -->
+        <div class="section-label">會議摘要</div>
+        <div class="summary-panel" id="summaryPanel">
+          <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成會議摘要</button>
+          <div class="summary-output empty" id="summaryOutputBox">
+            尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。
+          </div>
+        </div>
+
         <div class="section-label">整理完成的語音卡片</div>
         <div class="edit-mode-bar">
           <button id="modeMergeBtn" onclick="EditModeManager.toggle('merge')">🔗 合併模式</button>
@@ -666,6 +753,7 @@
           // 只清這個工具自己寫入的幾個 key，不動用 localStorage.clear()，
           // 避免誤刪同網域下未來可能新增、但與本工具無關的其他資料
           localStorage.removeItem('whisper_api_key');
+          localStorage.removeItem('gemini_api_key'); // ★ 新增：摘要模組的 Key 一併納入清除範圍
           localStorage.removeItem('intro_modal_seen_version');
           localStorage.removeItem('record_notice_acknowledged');
           sessionStorage.removeItem('pending_send_text');
@@ -680,7 +768,9 @@
         CardSandbox.renderLivePreview();
 
         document.getElementById('apiKeyInput').value = '';
+        document.getElementById('geminiApiKeyInput').value = ''; // ★ 新增
         this.updateKeySavedIndicator();
+        this.updateGeminiKeySavedIndicator(); // ★ 新增
         document.getElementById('clearDataModal').classList.add('hidden');
         alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
       },
@@ -693,6 +783,16 @@
         catch (e) { /* 忽略 */ }
         document.getElementById('keyStatusDot').classList.toggle('empty', !hasKey);
         document.getElementById('keyStatusText').textContent = hasKey
+          ? '這台裝置已記住一把 Key'
+          : '尚未設定 Key';
+      },
+      // ★ 新增：Gemini Key 狀態列，邏輯與上面 Groq 版本對稱
+      updateGeminiKeySavedIndicator() {
+        let hasKey = false;
+        try { hasKey = !!localStorage.getItem('gemini_api_key'); }
+        catch (e) { /* 忽略 */ }
+        document.getElementById('geminiKeyStatusDot').classList.toggle('empty', !hasKey);
+        document.getElementById('geminiKeyStatusText').textContent = hasKey
           ? '這台裝置已記住一把 Key'
           : '尚未設定 Key';
       }
@@ -765,6 +865,14 @@
       ClearLocalData.updateKeySavedIndicator();
     }
     ClearLocalData.updateKeySavedIndicator(); // 頁面載入時就先顯示目前狀態
+
+    // ★ 新增：讀取/儲存 Gemini API Key（會議摘要模組用），寫法與上面 Groq Key 對稱
+    document.getElementById('geminiApiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
+    function saveGeminiApiKey(val) {
+      localStorage.setItem('gemini_api_key', val.trim());
+      ClearLocalData.updateGeminiKeySavedIndicator();
+    }
+    ClearLocalData.updateGeminiKeySavedIndicator(); // 頁面載入時就先顯示目前狀態
 
     // 頁面切換
     function switchTab(tab) {
@@ -1040,6 +1148,117 @@
       }
     };
 
+    // ---------- ★ 新增：會議摘要模組（目前為框架階段，尚未接上真正的 Gemini 呼叫）----------
+    //
+    // 設計原則：這裡只先把「入口 → 處理 → 出口」的骨架搭起來，讓
+    // UI（按鈕、loading 狀態、輸出區塊）都能先跑通，之後真正要接 Gemini
+    // 時，只需要動 `_callGemini()` 這一個函式內部的實作，其他都不用改。
+    //
+    // 入口：SummaryModule.generate()，由「生成會議摘要」按鈕觸發
+    //   - 讀取 CardSandbox 目前所有卡片文字，組成一段完整逐字稿
+    //   - 讀取使用者存好的 Gemini API Key
+    //   - 沒有卡片內容 / 沒有 Key 時，直接擋下並提示，不會呼叫下一步
+    //
+    // 處理：_callGemini(fullText, apiKey) —— 目前是 TODO 佔位
+    //   - 之後要接的實際流程大致是：
+    //     1. 組一段 prompt（例如「請將以下會議逐字稿整理成條列式重點摘要」+ fullText）
+    //     2. fetch Gemini 的 generateContent 端點，帶上 apiKey
+    //     3. 解析回傳的 JSON，取出摘要文字
+    //     4. 錯誤處理（Key 無效、額度用盡、逐字稿過長需要分段送出等）
+    //   - 兩小時會議逐字稿可能很長，實作時要注意 Gemini 的 context 長度限制，
+    //     必要時可能需要仿照 LINE 分段發送那樣，先做分段摘要再彙整
+    //
+    // 出口：render 出摘要文字到 #summaryOutputBox，或錯誤訊息
+    const SummaryModule = {
+
+      // 目前執行狀態，避免使用者連續點擊按鈕重複觸發
+      isGenerating: false,
+
+      async generate() {
+        if (this.isGenerating) return;
+
+        const fullText = CardSandbox.cards.map(c => c.text).join('\n');
+        if (!fullText.trim()) {
+          alert('目前沒有任何卡片內容，請先錄音或編輯出至少一張卡片，再生成摘要。');
+          return;
+        }
+
+        const apiKey = localStorage.getItem('gemini_api_key');
+        if (!apiKey) {
+          alert('請先在上方「設定 Gemini API Key」卡片內填入你的 Key，才能使用會議摘要功能。');
+          return;
+        }
+
+        this.isGenerating = true;
+        this._setLoadingUI(true);
+
+        try {
+          const summaryText = await this._callGemini(fullText, apiKey);
+          this._renderSummary(summaryText);
+        } catch (err) {
+          console.error('生成會議摘要失敗：', err);
+          this._renderError('生成摘要失敗：' + err.message);
+        } finally {
+          this.isGenerating = false;
+          this._setLoadingUI(false);
+        }
+      },
+
+      // ---------- 處理：實際呼叫 Gemini 的地方，目前是 TODO 佔位 ----------
+      // 輸入：fullText（整段會議逐字稿文字）、apiKey（使用者填入的 Gemini Key）
+      // 輸出：Promise<string>，resolve 一段摘要文字
+      //
+      // TODO：串接 Gemini API。先保留假資料回傳，讓按鈕→loading→
+      // 出口顯示這整條流程可以先被驗證、先讓前端行為看得到，
+      // 之後只要把下面這段換成真正的 fetch 呼叫即可，不用動其他任何地方。
+      async _callGemini(fullText, apiKey) {
+        // --- 佔位邏輯開始：模擬網路延遲，之後整段替換成真正的 fetch ---
+        await new Promise(resolve => setTimeout(resolve, 800));
+        return '（尚未接上 Gemini，這是佔位假資料）\n\n' +
+          '這裡之後會顯示由 Gemini 根據整段會議逐字稿（目前共 ' + fullText.length + ' 字）整理出的重點摘要。';
+        // --- 佔位邏輯結束 ---
+
+        // 之後大致會長這樣（僅供參考，尚未實作）：
+        //
+        // const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        // const res = await fetch(endpoint, {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+        //     contents: [{ parts: [{ text: '請將以下會議逐字稿整理成條列式重點摘要：\n\n' + fullText }] }]
+        //   })
+        // });
+        // const data = await res.json();
+        // return data.candidates[0].content.parts[0].text;
+      },
+
+      // ---------- 出口：把結果畫到畫面上 ----------
+      _renderSummary(text) {
+        const box = document.getElementById('summaryOutputBox');
+        box.classList.remove('empty', 'loading');
+        box.textContent = text;
+      },
+
+      _renderError(text) {
+        const box = document.getElementById('summaryOutputBox');
+        box.classList.remove('loading');
+        box.classList.add('empty');
+        box.textContent = text;
+      },
+
+      _setLoadingUI(loading) {
+        const btn = document.getElementById('summaryGenerateBtn');
+        const box = document.getElementById('summaryOutputBox');
+        btn.disabled = loading;
+        btn.textContent = loading ? '⏳ 生成中...' : '📝 生成會議摘要';
+        if (loading) {
+          box.classList.remove('empty');
+          box.classList.add('loading');
+          box.textContent = '正在生成摘要，請稍候...';
+        }
+      }
+    };
+
     // 音訊錄製與 Groq Whisper API 轉寫引擎
     //
     // 分段錄音說明：Whisper API 本質上是「傳一段完整音檔進去，換一段完整
@@ -1056,12 +1275,163 @@
     //    攔腰切斷、分別出現在兩張卡片的頭尾，這是分段代替串流的固有限制。
     // 3. 段數變多代表 API 呼叫次數變多，如果之後接的是需要計費的方案
     //    （非免費額度），會直接影響費用。
+    // ---------- ★ 新增：辨識語言管理（固定語言 / 自動偵測）----------
+    //
+    // 使用者可在錄音前選「中文／英文／日文」其中一種固定語言，或選
+    // 「自動」讓系統動態判斷。三種固定語言各自對應一組 (languageCode,
+    // prompt) 組合，prompt 特意用該語言本身書寫（中文用中文prompt、
+    // 英文用英文prompt、日文用日文prompt），讓 Whisper 的文字延續預測
+    // 機制更貼合目標語言的語感與字體慣例。
+    //
+    // 自動模式的運作方式：
+    // 1. 每段轉寫送出時，不鎖定 language（除非前一次偵測還在 60 秒
+    //    有效期內，見下方 getParamsForSegment）
+    // 2. 改用 response_format=verbose_json 呼叫 Groq，這樣轉寫結果會
+    //    附帶 Whisper 自己偵測到的語言代碼，不需要另外花一次 API 呼叫
+    //    專門偵測語言
+    // 3. 拿到偵測結果後，記錄下來並設定 60 秒的有效期。在這 60 秒內，
+    //    接下來的分段轉寫會鎖定該語言的 (languageCode, prompt)，
+    //    提高這段時間內轉寫的準確度
+    // 4. 60 秒一到，自動失效、退回不鎖定語言的純自動偵測狀態，直到
+    //    下一次轉寫結果帶回新的偵測語言，重新鎖定 60 秒
+    //
+    // 這個機制不會額外增加 API 呼叫次數（偵測搭順風車，不用獨立呼叫），
+    // 但能在自動模式下也享有「鎖定語言」的準確度優勢，同時仍保有中途
+    // 切換語言的彈性（不會像固定語言模式那樣整場錄音卡死在一種語言）。
+    const LanguageManager = {
+      FIXED_LANG_CONFIG: {
+        zh: { languageCode: 'zh', prompt: '這是一段會議錄音，內容關於工作討論與進度回報。' },
+        en: { languageCode: 'en', prompt: 'This is a recording of a business meeting discussing work updates and progress.' },
+        ja: { languageCode: 'ja', prompt: 'これは仕事の進捗報告や打ち合わせに関する会議の録音です。' }
+      },
+
+      AUTO_LOCK_MS: 60000, // 偵測到語言後，鎖定該語言的有效期
+
+      selectedMode: 'zh', // 使用者下拉選單目前選的值：'zh' | 'en' | 'ja' | 'auto'
+
+      // 自動模式下，目前鎖定的語言與到期時間（非自動模式下不使用這兩個欄位）
+      autoDetectedLang: null,
+      autoLockExpiresAt: 0,
+
+      // 下拉選單 onchange 時呼叫，錄音中選單本身會被 disable，
+      // 這裡多一層防呆，避免萬一被繞過 UI 限制直接觸發變更
+      onUserSelect(value) {
+        if (DictationEngine.isRecording) return;
+        this.selectedMode = value;
+        this.resetAutoState();
+        this.updateDetectHintVisibility();
+      },
+
+      // 開始新一場錄音時重置自動偵測狀態，避免延續到上一場錄音的判斷結果
+      resetAutoState() {
+        this.autoDetectedLang = null;
+        this.autoLockExpiresAt = 0;
+        this.hideDetectHint();
+      },
+
+      // 根據目前模式，決定「這一段」轉寫要用的 language 參數與 prompt。
+      // 回傳 null 代表不鎖定語言（純自動偵測，交給 Whisper 自行判斷）。
+      getParamsForSegment() {
+        if (this.selectedMode !== 'auto') {
+          return this.FIXED_LANG_CONFIG[this.selectedMode] || null;
+        }
+        // 自動模式：檢查目前是否還在上一次偵測結果的鎖定有效期內
+        if (this.autoDetectedLang && Date.now() < this.autoLockExpiresAt) {
+          const config = this.FIXED_LANG_CONFIG[this.autoDetectedLang];
+          if (config) return config;
+        }
+        return null; // 尚未有偵測結果，或已過期，回到純自動偵測
+      },
+
+      // 轉寫結果回來後呼叫，帶入 verbose_json 回傳的 language 欄位。
+      // 只有自動模式才需要處理這個回呼；固定語言模式下即使拿到偵測結果
+      // 也不使用，因為使用者已經明確指定語言。
+      onDetectedLanguage(detectedLangRaw) {
+        if (this.selectedMode !== 'auto' || !detectedLangRaw) return;
+
+        // Whisper 回傳的 language 欄位是完整語言名稱（如 "english"、
+        // "japanese"、"chinese"）而不是 ISO 代碼，這裡做對應轉換；
+        // 只認得中/英/日三種，其餘語言目前不特別處理、維持純自動偵測，
+        // 避免誤鎖定成不支援的 prompt 組合
+        const map = { chinese: 'zh', english: 'en', japanese: 'ja' };
+        const langCode = map[detectedLangRaw.toLowerCase()];
+        if (!langCode) return;
+
+        this.autoDetectedLang = langCode;
+        this.autoLockExpiresAt = Date.now() + this.AUTO_LOCK_MS;
+        this.showDetectHint(langCode);
+      },
+
+      showDetectHint(langCode) {
+        const labels = { zh: '中文', en: '英文', ja: '日文' };
+        const hint = document.getElementById('langDetectHint');
+        if (!hint) return;
+        hint.textContent = `🌐 偵測到：${labels[langCode] || langCode}`;
+        hint.style.display = 'flex';
+      },
+
+      hideDetectHint() {
+        const hint = document.getElementById('langDetectHint');
+        if (hint) hint.style.display = 'none';
+      },
+
+      // 只有自動模式才需要顯示偵測提示欄位，固定語言模式下維持隱藏
+      updateDetectHintVisibility() {
+        if (this.selectedMode !== 'auto') this.hideDetectHint();
+      },
+
+      // 錄音中鎖住選單，避免中途切換造成語言參數與已錄製內容邏輯混亂；
+      // 停止後解鎖，恢復可選擇狀態
+      setSelectLocked(locked) {
+        const select = document.getElementById('langSelect');
+        if (select) select.disabled = locked;
+      }
+    };
+
     const DictationEngine = {
       mediaRecorder: null,
       audioChunks: [],
       isRecording: false,
       segmentTimer: null,
       SEGMENT_MS: 15000, // 每段錄音長度，可依實測體驗調整
+      SILENCE_RMS_THRESHOLD: 0.01, // 靜音判定門檻，可依實測環境雜訊調整，見 isSegmentSilent 說明
+
+      // ★ 新增：靜音片段偵測，避免把幾乎沒聲音的 15 秒送去 Whisper。
+      // 背景：Whisper 類模型對「靜音或極低音量音檔」有已知的幻覺
+      // （hallucination）傾向——沒有真正語音輸入時，模型仍會被迫產生
+      // 一段文字輸出，常見的就是流行歌詞、片頭字幕、頻道結尾語這類
+      // 內容，因為訓練資料裡大量靜音片段常搭配這類文字（歌曲間奏、
+      // 影片片尾）。原本的邏輯是每段錄音結束後無條件送出轉寫，即使
+      // 那 15 秒完全沒人說話也照送，這是奇怪生成文字冒出來的主因。
+      //
+      // 做法：用 Web Audio API 把這段音訊解碼、計算均方根音量（RMS），
+      // 低於門檻視為靜音，直接跳過、不呼叫 API，同時也省下一次
+      // 不必要的付費 API 呼叫。
+      //
+      // 門檻值 0.01 是經驗值，不是理論算出來的精確數字：安靜室內的
+      // 環境雜訊通常在這個值以下，正常說話音量會明顯超過。如果實測
+      // 發現「小聲說話」被誤判成靜音而漏掉，可以把這個值調低；如果
+      // 反而「有雜訊但沒人說話」的片段還是被送出去轉寫，可以調高。
+      async isSegmentSilent(audioBlob) {
+        try {
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          const audioCtx = new AudioCtx();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          const data = audioBuffer.getChannelData(0);
+          let sumSquares = 0;
+          for (let i = 0; i < data.length; i++) sumSquares += data[i] * data[i];
+          const rms = Math.sqrt(sumSquares / data.length);
+          audioCtx.close();
+          return rms < this.SILENCE_RMS_THRESHOLD;
+        } catch (e) {
+          // 解碼失敗時（例如格式不支援、瀏覽器相容性問題），保守起見
+          // 視為「非靜音」，照原本邏輯送去轉寫，避免因為偵測工具本身
+          // 出錯而漏掉真正有內容的片段
+          console.warn('靜音偵測失敗，改為照常送出轉寫：', e);
+          return false;
+        }
+      },
 
       async start() {
         const apiKey = localStorage.getItem('whisper_api_key');
@@ -1070,15 +1440,58 @@
           return;
         }
 
+        // ★ 新增：開始新一場錄音時，重置自動語言偵測狀態（避免延續
+        // 到上一場錄音的判斷結果），並鎖住語言選單避免錄音中被更改
+        LanguageManager.resetAutoState();
+        LanguageManager.setSelectLocked(true);
+
         try {
           // stream 只在整場錄音開始時取得一次，之後每段重建 MediaRecorder
           // 時重複使用同一個 stream，避免每 15 秒重新跳出麥克風權限詢問
-          this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          //
+          // ★ 修正：原本只傳 { audio: true }，等於完全用瀏覽器預設值開
+          // 麥克風。手機瀏覽器預設會開 echoCancellation（回音消除）和
+          // noiseSuppression（降噪），這兩個是為了「講電話/視訊通話」
+          // 設計的，會積極壓低背景音，容易連帶把稍遠、稍小聲的說話內容
+          // 一起壓掉（例如會議室裡離手機較遠的人）。改成明確指定
+          // constraints，關掉會議場景不需要的通話優化，並開自動增益，
+          // 讓忽大忽小的音量自動拉到合理範圍。
+          //
+          // 注意：這些是「建議值」不是「保證值」——瀏覽器會盡量遵守，
+          // 但如果裝置硬體或作業系統不支援某個設定，會自動忽略、退回
+          // 預設值，不會拋出錯誤。
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: false, // 關閉回音消除：會議室沒有喇叭外放對講的
+                                        // 問題，但這功能有時會誤判、削弱正常人聲
+              noiseSuppression: false, // 關閉降噪：降噪演算法容易連同小聲/遠處
+                                        // 人聲一起壓掉，Whisper 本身對背景雜訊
+                                        // 有一定容忍度，不需要瀏覽器先處理過
+              autoGainControl: true,   // 開啟自動增益：讓忽大忽小的音量自動拉到
+                                        // 合理範圍，對「離手機較遠的人聲」有幫助
+              channelCount: 1,         // 單聲道：語音辨識用不到立體聲，也能減少
+                                        // 檔案大小、加快上傳轉寫速度
+              sampleRate: 48000        // 提高取樣率上限（部分裝置預設較低），
+                                        // 錄到更多高頻細節
+            }
+          });
+
+          // 記錄實際套用的音訊設定，方便日後排查「某些裝置聽起來還是
+          // 不清楚」時，能先確認是不是硬體/系統沒有支援上面要求的設定，
+          // 而不是程式碼沒生效
+          const track = this.stream.getAudioTracks()[0];
+          if (track && track.getSettings) {
+            console.log('麥克風實際套用的音訊設定：', track.getSettings());
+          }
+
           this.isRecording = true;
           this.updateUI(true);
           this.startNewSegment();
         } catch (err) {
           alert('無法存取麥克風：' + err.message);
+          // ★ 新增：取得麥克風失敗，錄音實際上沒有開始，選單應解鎖
+          // 讓使用者能重新選擇語言後再試一次
+          LanguageManager.setSelectLocked(false);
         }
       },
 
@@ -1086,7 +1499,10 @@
       startNewSegment() {
         if (!this.isRecording || !this.stream) return;
 
-        this.mediaRecorder = new MediaRecorder(this.stream);
+        // ★ 新增：明確指定 audioBitsPerSecond，避免部分裝置給到過低
+        // 的預設值（通常落在 96kbps 上下）。語音其實 64-128kbps 就很
+        // 夠用，這裡設 128kbps 確保音質足夠、同時檔案不會過大。
+        this.mediaRecorder = new MediaRecorder(this.stream, { audioBitsPerSecond: 128000 });
         this.audioChunks = [];
 
         this.mediaRecorder.ondataavailable = (e) => {
@@ -1127,11 +1543,28 @@
           this.stream = null;
         }
         this.updateUI(false);
+        // ★ 新增：錄音結束，解鎖語言選單，讓使用者可以為下一場錄音
+        // 重新選擇語言。偵測提示（自動模式）仍保留顯示，讓使用者能
+        // 看到最後一次偵測到的語言是什麼，直到下次開始新錄音才重置
+        LanguageManager.setSelectLocked(false);
       },
 
       async transcribeAudio(audioBlob) {
-        const apiKey = localStorage.getItem('whisper_api_key');
         const statusText = document.getElementById('recSubText');
+
+        // ★ 新增：送出前先判斷這段是否幾乎靜音，是的話直接跳過，
+        // 不佔用一次 API 呼叫，也避免 Whisper 對靜音片段產生幻覺文字
+        // （見上方 isSegmentSilent 註解）。這裡刻意放在 _pendingCount
+        // 計數之前判斷，靜音片段完全不會進入「背景轉寫中」的狀態顯示。
+        const silent = await this.isSegmentSilent(audioBlob);
+        if (silent) {
+          if (this.isRecording && !this._pendingCount) {
+            statusText.textContent = '錄音中，卡片會陸續出現。';
+          }
+          return;
+        }
+
+        const apiKey = localStorage.getItem('whisper_api_key');
         // 用計數器避免多段並行轉寫時，狀態文字互相覆蓋顯示不一致
         this._pendingCount = (this._pendingCount || 0) + 1;
         if (this.isRecording) {
@@ -1141,15 +1574,25 @@
         const formData = new FormData();
         formData.append('file', audioBlob, 'recording.webm');
         formData.append('model', 'whisper-large-v3-turbo');
-        formData.append('language', 'zh');
-        // 修正：真機截圖發現同一場錄音裡，前三段輸出正確為繁體，第四段卻
-        // 跳成簡體。查證後確認這是 Whisper 模型本身的已知限制——它只有
-        // 單一種中文語言代碼「zh」，不區分繁簡，實際輸出偏向哪一種，
-        // 取決於模型內部機率判斷，同一次使用中途跳來跳去是已知現象。
-        // Groq 支援 prompt 參數，用來引導輸出風格；給一段繁體中文範例文字
-        // 當提示，能讓模型傾向輸出同樣字體風格。這不保證 100% 消除，
-        // 但是官方建議的正規做法。
-        formData.append('prompt', '這是一段繁體中文的會議錄音，內容關於工作討論與進度回報。');
+
+        // ★ 修改：語言參數與 prompt 改由 LanguageManager 統一決定，
+        // 不再寫死。固定語言模式（中/英/日）回傳對應的 (languageCode,
+        // prompt)；自動模式視目前是否在 60 秒鎖定期內，回傳鎖定語言
+        // 的組合、或 null（純自動偵測，不傳 language 參數）。
+        const langParams = LanguageManager.getParamsForSegment();
+        if (langParams) {
+          formData.append('language', langParams.languageCode);
+          formData.append('prompt', langParams.prompt);
+        } else {
+          // 純自動偵測：不傳 language，prompt 也不帶語言/字體傾向，
+          // 避免用單一語言的文字前綴把模型拉向某個方向
+          formData.append('prompt', 'This is a recording of a meeting.');
+        }
+
+        // ★ 修改：改用 verbose_json 格式，讓回傳結果附帶 Whisper 自己
+        // 偵測到的語言（data.language），自動模式靠這個欄位動態調整
+        // 接下來的語言鎖定，不需要另外呼叫一次 API 專門偵測語言。
+        formData.append('response_format', 'verbose_json');
 
         const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
 
@@ -1162,6 +1605,11 @@
 
           const data = await res.json();
           this._pendingCount = Math.max(0, this._pendingCount - 1);
+
+          // ★ 新增：自動模式下，用這段的偵測結果更新接下來 60 秒要
+          // 鎖定的語言。固定語言模式下 onDetectedLanguage 內部會直接
+          // 略過，不影響行為。
+          LanguageManager.onDetectedLanguage(data.language);
 
           if (data.text && data.text.trim()) {
             CardSandbox.add(data.text.trim());
@@ -1443,10 +1891,53 @@
       ChatPreview.show(fullText, '目前這個聊天室（原對話）', () => doSendToRoom(fullText));
     }
 
+    // ★ 新增：LINE 文字訊息單則有 5000 字元上限，超過會直接被拒絕或
+    // 失敗。長會議（例如兩小時）逐字稿累積起來輕鬆破萬字，必須先切段
+    // 才能送出。LINE_MAX_CHARS 刻意設得比 5000 略保守一點，留一點餘裕
+    // 給加在每則訊息前面的「(n/總數)」標記文字；
+    // LINE_MAX_MESSAGES_PER_CALL 則是 liff.sendMessages() 官方文件規定
+    // 單次呼叫最多帶 5 則訊息，超過要拆成多次呼叫依序送出。
+    const LINE_MAX_CHARS = 4800;
+    const LINE_MAX_MESSAGES_PER_CALL = 5;
+
+    // 把長文字切成多段，每段不超過 maxChars。盡量在換行處切斷，
+    // 避免把同一句話從中間攔腰切開、拆到兩則訊息裡；找不到適合的換行
+    // 位置（例如整段幾乎沒有換行）時才退而求其次直接依字數硬切。
+    function splitTextForLine(text, maxChars) {
+      const segments = [];
+      let remaining = text;
+      while (remaining.length > 0) {
+        if (remaining.length <= maxChars) {
+          segments.push(remaining);
+          break;
+        }
+        let cutAt = remaining.lastIndexOf('\n', maxChars);
+        if (cutAt <= 0) cutAt = maxChars; // 找不到換行點就直接依字數切
+        segments.push(remaining.slice(0, cutAt));
+        remaining = remaining.slice(cutAt).replace(/^\n/, '');
+      }
+      return segments;
+    }
+
     async function doSendToRoom(fullText) {
+      // 先切成不超過單則上限的段落；只有一段時不加編號標記，
+      // 維持原本單則訊息的呈現方式，不干擾短內容的使用體驗
+      const segments = splitTextForLine(fullText, LINE_MAX_CHARS);
+      const messages = segments.map((text, idx) => ({
+        type: 'text',
+        text: segments.length > 1 ? `（${idx + 1}/${segments.length}）\n${text}` : text
+      }));
+
       try {
-        await liff.sendMessages([{ type: 'text', text: fullText }]);
-        alert('已送回聊天室。');
+        // sendMessages 單次最多帶 5 則訊息，超過就拆成多次呼叫依序送出，
+        // 用 for 迴圈依序 await，確保訊息送達聊天室的順序跟逐字稿順序一致
+        for (let i = 0; i < messages.length; i += LINE_MAX_MESSAGES_PER_CALL) {
+          const batch = messages.slice(i, i + LINE_MAX_MESSAGES_PER_CALL);
+          await liff.sendMessages(batch);
+        }
+        alert(segments.length > 1
+          ? `已分成 ${segments.length} 則訊息送回聊天室。`
+          : '已送回聊天室。');
         StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
       } catch (err) {
         console.error('sendMessages 發送失敗：', err);
@@ -1458,7 +1949,8 @@
           '\n\n可能原因（請依序檢查）：\n' +
           '1. LINE Developers Console 後台，這個 LIFF app 所在的 channel 尚未開通訊息傳送（message write）權限\n' +
           '2. 若你是從「最近使用」列表重新打開這個頁面，請改為直接從跟機器人的聊天室重新點一次連結後再試\n\n' +
-          '已改為複製到剪貼簿，請手動貼上。'
+          '已改為複製到剪貼簿，請手動貼上。\n' +
+          '（注意：若失敗發生在分段送出過程中，前面幾段可能已經成功送達，剪貼簿內容為完整全文，請自行比對避免重複貼上。）'
         );
         copyToClipboardFallback(fullText);
       }
