@@ -401,7 +401,7 @@
     .btn-shared-notes-load:disabled { background: var(--border); color: var(--ink-faint); cursor: not-allowed; }
     .shared-notes-error {
       font-size: 11.5px; color: var(--danger); margin-bottom: 10px; line-height: 1.6;
-      display: none;
+      display: none; white-space: pre-wrap;
     }
     .shared-notes-error.show { display: block; }
     .shared-notes-loading {
@@ -1394,7 +1394,25 @@
           res = await fetch(exportUrl);
         } catch (networkErr) {
           this.setLoading(false);
-          this.showError('無法連線讀取這份表格，請檢查網路連線後再試一次。');
+          // ★ 修正：原本這裡不分青紅皂白都顯示「請檢查網路連線」，但
+          // fetch() 在這裡失敗的常見原因其實有好幾種，籠統的訊息讓人
+          // 沒辦法判斷該怎麼排除。改成把瀏覽器實際回報的錯誤內容
+          // （networkErr.message／name）一併顯示出來，並針對「在 LINE
+          // App 內建瀏覽器（LIFF webview）」這個已知會擋第三方網域
+          // fetch 的情境，額外給一條明確提示——這是實測過會出現的
+          // 情況：CSP 已經放行 docs.google.com、Sheet 共用設定也正確，
+          // 但某些 Android LINE 版本的 webview 仍會在系統網路層直接
+          // 擋下對 docs.google.com 的請求，導致 fetch 丟出
+          // TypeError: Failed to fetch，此時單靠「檢查網路連線」這句
+          // 話完全無助於使用者判斷問題出在哪。
+          const isInLiffClient = liffReady && typeof liff.isInClient === 'function' && liff.isInClient();
+          let msg = `讀取失敗，瀏覽器回報：${networkErr.name || 'Error'}${networkErr.message ? '：' + networkErr.message : ''}`;
+          if (isInLiffClient) {
+            msg += '\n\n你目前是在 LINE App 內建瀏覽器開啟這個頁面。部分手機的 LINE 內建瀏覽器會擋下讀取 Google 表格的連線，就算網路正常、表格共用設定也正確，仍可能出現這個錯誤。建議點右上角「⋮」選擇「用瀏覽器開啟」，改用手機的 Chrome／Safari 開啟這個頁面後再試一次。';
+          } else {
+            msg += '\n\n請確認網路連線正常後再試一次；若持續發生，可能是這個瀏覽器環境的限制，可嘗試換一般瀏覽器（如 Chrome、Safari）開啟後再試。';
+          }
+          this.showError(msg);
           return;
         }
 
@@ -1403,8 +1421,15 @@
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) {
             this.showError('無法讀取這份表格，請確認共用設定已改為「知道連結的使用者可檢視」。');
+          } else if (res.status === 0) {
+            // ★ 新增：某些 webview／代理環境對第三方請求的攔截，
+            // 不會讓 fetch() 丟出例外，而是回傳一個 status 為 0 的
+            // opaque response（例如被瀏覽器擴充功能、企業網路代理
+            // 或部分 App 內建瀏覽器的內容過濾機制擋下時）。這種情況
+            // 用一般的 HTTP 狀態碼訊息無法說明原因，另外給提示。
+            this.showError('讀取失敗（收到無法辨識的空白回應）。這通常代表目前的瀏覽器環境攔截了這個請求，建議改用手機的 Chrome／Safari 等一般瀏覽器開啟此頁面後再試一次。');
           } else {
-            this.showError(`讀取失敗（HTTP ${res.status}），請確認連結是否正確。`);
+            this.showError(`讀取失敗（HTTP ${res.status} ${res.statusText || ''}），請確認連結是否正確。`);
           }
           return;
         }
@@ -1413,7 +1438,7 @@
         try {
           csvText = await res.text();
         } catch (e) {
-          this.showError('讀取表格內容時發生錯誤，請稍後再試一次。');
+          this.showError(`讀取表格內容時發生錯誤：${e.message || e.name || '未知錯誤'}，請稍後再試一次。`);
           return;
         }
 
