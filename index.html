@@ -35,6 +35,7 @@
     - static.line-scdn.net：載入 LIFF SDK
     - api.groq.com：Whisper 轉寫 API（透過 connect-src，因為是 fetch() 呼叫，不是載入 script）
     - generativelanguage.googleapis.com：Gemini 會議摘要 API（同樣是 fetch() 呼叫）
+    - docs.google.com：讀取共享 Google Sheet 筆記的 CSV 匯出端點（★ 本次新增）
     其餘一律擋掉。這樣就算未來哪裡不小心被注入了一段惡意 <script src="...">
     或想把資料 fetch 送到別的網域，瀏覽器會直接擋下，不會執行/送出。
   -->
@@ -43,7 +44,7 @@
     script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com;
     frame-src https://access.line.me;
     base-uri 'self';
     form-action 'none';
@@ -72,7 +73,6 @@
     header .sub { font-size: 12px; color: var(--ink-soft); }
     main { flex: 1; padding: 16px 16px 100px; }
 
-    /* API Key 設定卡片：簡約留白，綠色只用在需要引導動作的地方（申請教學、狀態勾號） */
     .key-panel {
       background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
       padding: 16px; margin-bottom: 16px;
@@ -85,7 +85,6 @@
     }
     .key-panel input:focus { outline: none; border-color: var(--line-green); background: var(--card-bg); }
 
-    /* Key 狀態列：整合共用裝置清除功能於此，平時只是一行安靜的小字，不用色塊、不用紅色 */
     .key-status-row {
       display: flex; align-items: center; justify-content: space-between;
       margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
@@ -113,20 +112,16 @@
     .key-panel .guide-body { margin-top: 8px; font-size: 12px; line-height: 1.7; color: var(--ink-soft); }
     .key-panel .guide-note { margin-top: 6px; color: var(--ink-faint); font-size: 11.5px; }
 
-    /* ★ 新增：存取閘門樣式 */
     .access-gate {
       position: fixed; inset: 0; background: var(--bg); z-index: 2000;
       display: flex; align-items: flex-start; justify-content: center;
       padding: 20px; overflow-y: auto;
-      /* 100dvh：行動瀏覽器會動態扣掉網址列／工具列高度，比 100vh 準確，
-         避免內容被網址列擋住卻無法捲動的問題。外層本身也設 overflow-y:auto
-         當作最後一道保險——就算某支手機不支援 dvh，使用者仍可整頁捲動找到按鈕。 */
       min-height: 100vh; min-height: 100dvh;
     }
     .gate-panel {
       max-width: 420px; width: 100%; background: var(--card-bg); border-radius: 18px;
       padding: 28px 22px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      margin: auto; /* 內容較短時，靠 margin:auto 在捲動容器內垂直置中 */
+      margin: auto;
     }
     .gate-spinner {
       width: 36px; height: 36px; border-radius: 50%; margin: 0 auto 16px;
@@ -146,10 +141,6 @@
       width: 100%; padding: 13px; font-size: 13.5px; font-weight: 600; border: 1px solid var(--border);
       border-radius: 12px; background: var(--card-bg); color: var(--ink-soft); cursor: pointer;
     }
-    /* 同意書卡片：拿掉外層 max-height 限制交由 .access-gate 統一處理捲動，
-       內文區塊 .gate-consent-body 保留自己的 overflow-y:auto 作為次要捲軸
-       （文字內容本身在小螢幕上可以先局部捲動看完，不用整頁一直滑）。
-       flex-shrink:0 確保勾選框跟按鈕不會被 flex:1 的內文區塊擠壓到消失。 */
     .gate-panel-consent {
       max-width: 440px; text-align: left; display: flex; flex-direction: column;
       max-height: none;
@@ -177,8 +168,6 @@
     .rec-status-text { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .rec-sub-text { font-size: 12.5px; opacity: 0.7; margin-bottom: 20px; line-height: 1.6; }
 
-    /* ★ 新增：辨識語言選單，樣式比照 mode-switch 的簡約風格，
-       放在錄音卡片外面獨立一列，錄音中會加上 disabled 樣式避免誤觸 */
     .lang-select-row {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
@@ -191,7 +180,6 @@
     }
     .lang-select-row select:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ★ 新增：自動模式下顯示目前偵測到的語言，低調小字，不搶眼 */
     .lang-detect-hint {
       font-size: 11.5px; color: rgba(255,255,255,0.6); margin-bottom: 14px;
       display: flex; align-items: center; justify-content: center; gap: 4px;
@@ -217,8 +205,6 @@
     .btn-record-toggle.stop { background: var(--danger); color: #fff; }
     .section-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px; }
 
-    /* ★ 新增：會議摘要模組樣式，比照既有卡片/按鈕視覺語言，先求外觀一致，
-       之後接上真正的 Gemini 呼叫時不需要再改樣式。 */
     .summary-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 4px; }
     .btn-summary-generate {
       width: 100%; padding: 12px; font-size: 13.5px; font-weight: 700; border: none;
@@ -307,7 +293,6 @@
     }
     .modal-footer label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-soft); margin-bottom: 10px; }
 
-    /* 聊天室預覽彈窗：模擬 LINE 對話氣泡，讓使用者送出前先看內容長怎樣 */
     .chat-preview-bg {
       background: #8dc63f url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%237fb838"/></svg>');
       background-size: 40px 40px;
@@ -330,8 +315,6 @@
     .chat-preview-actions .btn-cancel { border: 1px solid var(--border); background: var(--card-bg); color: var(--ink-soft); }
     .chat-preview-actions .btn-confirm { border: none; background: var(--line-green); color: #fff; }
 
-    /* ★ 新增：內容儲存提醒 toast。輕量、幾秒後自動消失，不需要使用者
-       手動關閉，只在關鍵時刻（第一次錄完/發送成功後）出現，平常不佔畫面。 */
     .storage-toast {
       position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(10px);
       max-width: 420px; width: calc(100% - 40px);
@@ -345,8 +328,6 @@
     .storage-toast .toast-icon { flex-shrink: 0; font-size: 14px; line-height: 1.6; }
     .storage-toast .toast-text b { color: #8de055; }
 
-    /* ★ 新增：上傳語音檔案區塊樣式，比照 lang-select-row 的簡約風格，
-       放在錄音卡片下方，用一條分隔線＋小標籤和錄音功能區隔開 */
     .upload-divider {
       display: flex; align-items: center; gap: 10px; margin: 16px 0 12px;
       font-size: 11.5px; color: var(--ink-faint);
@@ -381,8 +362,6 @@
       word-break: break-all;
     }
 
-    /* ★ 新增：會議摘要動作列（保存狀態、複製/分享/刪除），
-       比照 card-actions-inline 的按鈕視覺語言，維持風格一致 */
     .summary-actions-row {
       display: flex; align-items: center; justify-content: space-between;
       margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
@@ -398,29 +377,76 @@
     }
     .summary-actions-inline button.del:hover { background: #fdeaea; color: var(--danger); }
     .summary-actions-inline button.share:hover { background: var(--line-green-tint); color: var(--line-green-dark); }
-  </style>
-  <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
-       簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
-       的最後一道保險，確保呈現給使用者的內容穩定是繁體中文。
 
-       ★ 加上 SRI（Subresource Integrity）：CSP 只限制了「只能從
-       cdn.jsdelivr.net 載入 script」，但無法保證該網域回傳的內容
-       沒有被竄改（供應鏈攻擊風險）。integrity 屬性讓瀏覽器在執行前
-       先驗證下載回來的檔案雜湊值，不符就直接拒絕載入，不會執行。
-       這裡鎖定的是 npm 上 opencc-js@1.0.5 這個固定版本算出來的雜湊，
-       版本號已經釘死在網址上，之後升級版本需同步更新這裡的 hash。
-       crossorigin="anonymous" 是瀏覽器套用 SRI 檢查的必要條件。 -->
+    /* ★ 新增：共享 Google Sheet 筆記區塊樣式，比照 upload-panel 的
+       虛線邊框風格，用意在視覺上暗示「這是外部資料來源」，跟純本機
+       操作的卡片區塊做出區隔 */
+    .shared-notes-panel {
+      background: var(--card-bg); border: 1px dashed var(--border); border-radius: 14px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .shared-notes-panel-label { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .shared-notes-panel-desc { font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 12px; }
+    .shared-notes-input-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .shared-notes-input-row input {
+      flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 13px; box-sizing: border-box; background: var(--bg);
+    }
+    .shared-notes-input-row input:focus { outline: none; border-color: var(--line-green); background: var(--card-bg); }
+    .btn-shared-notes-load {
+      padding: 10px 16px; font-size: 12.5px; font-weight: 700; border: none;
+      border-radius: 10px; background: var(--line-green); color: #fff; cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-shared-notes-load:disabled { background: var(--border); color: var(--ink-faint); cursor: not-allowed; }
+    .shared-notes-error {
+      font-size: 11.5px; color: var(--danger); margin-bottom: 10px; line-height: 1.6;
+      display: none;
+    }
+    .shared-notes-error.show { display: block; }
+    .shared-notes-loading {
+      font-size: 12px; color: var(--ink-soft); display: none;
+      align-items: center; gap: 8px; margin-bottom: 10px;
+    }
+    .shared-notes-loading.show { display: flex; }
+    .shared-notes-loading .upload-progress-spinner { flex-shrink: 0; }
+    .shared-notes-select-row { display: none; margin-bottom: 10px; }
+    .shared-notes-select-row.show { display: block; }
+    .shared-notes-select-row label {
+      font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; display: block;
+    }
+    .shared-notes-select-row select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 13px; background: var(--bg); color: var(--ink); font-weight: 600;
+    }
+    .shared-notes-select-row select:focus { outline: none; border-color: var(--line-green); }
+    .shared-notes-output {
+      display: none; margin-top: 4px; padding: 12px; background: var(--bg);
+      border-radius: 10px; font-size: 13px; line-height: 1.7; color: var(--ink);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .shared-notes-output.show { display: block; }
+    .shared-notes-output-meta {
+      font-size: 11px; color: var(--ink-faint); margin-top: 8px;
+      padding-top: 8px; border-top: 1px dashed var(--border);
+    }
+    .shared-notes-warn-note {
+      font-size: 11px; color: var(--ink-faint); line-height: 1.6;
+      margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
+    }
+
+    /* ★ 新增：複製成 Sheet 貼上格式按鈕，放在卡片列表區塊上方 */
+    .copy-sheet-format-row {
+      display: flex; justify-content: flex-end; margin-bottom: 8px;
+    }
+    .btn-copy-sheet-format {
+      border: 1px solid var(--line-green); background: var(--line-green-tint); cursor: pointer;
+      font-size: 12px; padding: 6px 10px; border-radius: 8px; color: var(--line-green-dark); font-weight: 600;
+    }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"
           integrity="sha384-9JmxkgxoKE5gP14V/eBemUAwCKh8QSb5IFEJje/JNxxh8cn9hKsIs/q5Ho+mfVau"
           crossorigin="anonymous"></script>
-  <!-- LIFF SDK：用於呼叫 shareTargetPicker() 讓使用者選擇要把整理好的
-       文字發送給誰（例如你的官方帳號）。這個 API 在一般瀏覽器與 LINE App
-       內都能呼叫，不需要透過內嵌視窗，因此不會撞到麥克風權限那道牆。
-
-       ★ 這支「edge/2/sdk.js」官方會不定期原地更新內容（網址本身沒有
-       鎖定版號），加上 SRI 反而會導致 LINE 更新 SDK 後雜湊值對不上、
-       頁面直接載入失敗，因此刻意不對這支加 SRI，只靠上方 CSP 的
-       網域白名單限制來源。 -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
@@ -443,11 +469,20 @@
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
             <li><b>整理好的語音卡片會自動儲存在這台裝置的瀏覽器裡</b>，就算不小心切出去、誤觸上一頁或重新整理，回來也找得回來；但這也代表若為共用裝置，請務必在使用完畢後於 API Key 卡片內點「清除本機資料」，避免下一位使用者看到你的內容</li>
             <li>發送功能有三種：「送回聊天室」直接存回你打開此頁面時所在的聊天室（僅限從 LINE 聊天室進入時可用，最推薦）；「LINE 好友選單」需要先登入 LINE 才能選對象發送；「手機分享」在 LINE 內開啟時會自動改走好友選單（LINE 內建瀏覽器對系統分享有限制）</li>
+            <li>「查看共享筆記」是唯讀功能，只能讀取別人貼在共用 Google Sheet 裡的內容，不會寫回 Sheet；要把自己整理好的內容加進 Sheet，仍需自己手動複製貼上</li>
           </ul>
         </div>
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>讀取共享 Google Sheet 筆記（唯讀）</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「錄音內容編輯」分頁新增「📖 查看共享筆記」區塊，貼上共用 Google Sheet 的連結，即可用下拉選單選擇要查看哪一筆別人整理好的內容（例如另一組人的會議記錄）</li>
+              <li>這是唯讀功能，僅供查看，不會寫入或修改 Sheet；要把自己的內容加進共用表格，仍需自行複製後手動貼上</li>
+              <li>卡片列表上方新增「複製成 Sheet 貼上格式」按鈕，一鍵複製成可直接貼進 Sheet 儲存格的格式（Tab 分隔，貼上時會自動落在三個獨立欄位）</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>會議摘要保存分享、上傳語音檔轉文字</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>生成好的會議摘要現在會自動保存在這台裝置上，重新整理或切出頁面不會消失，摘要下方新增「複製／分享／刪除」三個按鈕，分享方式與語音卡片相同（送 LINE 好友或系統分享）</li>
@@ -532,7 +567,7 @@
     </div>
   </div>
 
-  <!-- ★ 新增：清除本機資料的確認彈窗 -->
+  <!-- ★ 清除本機資料的確認彈窗（已將共享筆記讀取的暫存來源網址一併納入清除說明） -->
   <div class="modal-overlay hidden" id="clearDataModal">
     <div class="modal-box" style="max-width:380px;">
       <div class="modal-tabs"><button class="active" style="cursor:default;">🧹 清除本機資料</button></div>
@@ -557,17 +592,6 @@
     </div>
   </div>
 
-  <!--
-    ★ 新增：存取閘門（Access Gate）
-    這是使用者打開頁面後第一個看到的東西，蓋住整個畫面，下方的 .app
-    主體預設是 display:none，要等 AccessGate 判定「已登入 + 是好友 +
-    已同意使用須知」三個條件都成立，才會顯示真正的工具內容。
-
-    三種畫面用同一個 overlay 容器，靠 JS 切換要顯示哪一個：
-    1. gateLoading：正在驗證登入/好友狀態，避免空白畫面
-    2. gateNotFriend：不是好友，導去加好友，不提供任何工具功能
-    3. gateConsent：是好友，顯示使用須知，同意才放行；不同意就關閉頁面
-  -->
   <div class="access-gate" id="accessGate">
     <!-- 1. 驗證中 -->
     <div class="gate-panel" id="gateLoading">
@@ -610,9 +634,7 @@
       </div>
     </div>
   </div>
-
   <div class="app" id="mainApp" style="display:none;">
-    <!-- ★ 新增：內容儲存提醒 toast 容器，平常隱藏，關鍵時刻由 StorageToast.show() 觸發 -->
     <div class="storage-toast" id="storageToast">
       <span class="toast-icon">💾</span>
       <span class="toast-text" id="storageToastText"></span>
@@ -622,8 +644,6 @@
       <div class="sub">MediaRecorder 前端錄音 ➔ Whisper API 雲端極速辨識</div>
     </header>
     <main>
-      <!-- API Key 設定卡片：共用裝置的清除功能整合成卡片內的一行小字連結，
-           平常安靜地待在那裡，不用色塊、不用紅色，只有真的需要時才點得到 -->
       <div class="key-panel">
         <div class="key-panel-label">🔑 設定 API Key</div>
         <div class="key-panel-desc">請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
@@ -655,9 +675,6 @@
         </details>
       </div>
 
-      <!-- ★ 新增：會議摘要模組的 Key 設定卡片，樣式比照上方 Groq Key 卡片。
-           選填——沒有這把 Key 也完全不影響錄音／轉寫／發送等既有功能，
-           只有點擊「生成會議摘要」時才會用到，未設定時按鈕會提示先去設定。 -->
       <div class="key-panel">
         <div class="key-panel-label">🧠 設定 Gemini API Key（會議摘要用，選填）</div>
         <div class="key-panel-desc">要使用「生成會議摘要」功能才需要填寫，金鑰同樣只存在你自己的手機瀏覽器裡。</div>
@@ -678,11 +695,6 @@
       <!-- 會議中 -->
       <div id="meetingView">
 
-        <!-- ★ 新增：辨識語言選擇。中文/英文/日文會鎖定對應的 language
-             參數與同語言 prompt；自動則不鎖定語言，改用每段轉寫結果
-             附帶的偵測語言動態調整接下來 60 秒要用的參數，見
-             LanguageManager 註解。錄音中鎖定，避免中途切換造成語言
-             參數與已錄製內容的邏輯狀態混亂。 -->
         <div class="lang-select-row">
           <label for="langSelect" class="lang-select-label">🌐 辨識語言</label>
           <select id="langSelect" onchange="LanguageManager.onUserSelect(this.value)">
@@ -697,7 +709,6 @@
           <div class="rec-orb" id="recOrb">🎙️</div>
           <div class="rec-status-text" id="recStatusText">尚未開始</div>
           <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始錄音（100% 支援 LIFF 內部）</div>
-          <!-- ★ 新增：自動模式下顯示目前偵測到的語言，固定語言模式下維持隱藏 -->
           <div class="lang-detect-hint" id="langDetectHint" style="display:none;"></div>
           <div class="live-preview-list" id="livePreviewList">
             <div class="live-preview-empty">尚未有轉寫內容</div>
@@ -705,9 +716,6 @@
           <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始錄音</button>
         </div>
 
-        <!-- ★ 新增：上傳既有語音檔案來轉寫。適合像長輩傳來的 LINE 語音訊息、
-             會議錄音 App 存下來的檔案等「已經錄好」的音檔，不需要即時錄音，
-             直接選檔案送去轉寫即可，走跟錄音完全相同的 Whisper 轉寫管線。 -->
         <div class="upload-divider">或</div>
         <div class="upload-panel">
           <div class="upload-panel-label">📁 上傳語音檔案轉文字</div>
@@ -725,18 +733,12 @@
       <!-- 會議後 -->
       <div id="reviewView" style="display:none;">
 
-        <!-- ★ 新增：會議摘要模組（框架階段）。
-             這是「入口」：按鈕觸發 SummaryModule.generate()。
-             這是「出口」：下方 summaryOutputBox 顯示產生的摘要內容。
-             中間實際呼叫 Gemini 的邏輯目前是佔位假資料，見下方 SummaryModule 註解。 -->
         <div class="section-label">會議摘要</div>
         <div class="summary-panel" id="summaryPanel">
           <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成會議摘要</button>
           <div class="summary-output empty" id="summaryOutputBox">
             尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。
           </div>
-          <!-- ★ 新增：摘要保存後的動作列（複製／分享／刪除），沒有已保存
-               的摘要時整列隱藏，不佔版面 -->
           <div class="summary-actions-row hidden" id="summaryActionsRow">
             <span class="summary-saved-hint">💾 已保存在本機</span>
             <div class="summary-actions-inline">
@@ -747,7 +749,42 @@
           </div>
         </div>
 
+        <!-- ★ 新增：查看共享 Google Sheet 筆記（唯讀＋多筆選擇）
+             流程：貼連結 → 讀取解析 CSV → 依 A 欄標籤列出下拉選單 →
+             選擇後顯示對應 B 欄內容（唯讀文字區塊，不可編輯/合併進卡片）。
+             本工具本次更版完全不寫入 Sheet，寫入交由使用者自行手動操作，
+             下方「複製成 Sheet 貼上格式」按鈕是為了那個手動步驟提供便利。 -->
+        <div class="section-label">📖 查看共享筆記</div>
+        <div class="shared-notes-panel" id="sharedNotesPanel">
+          <div class="shared-notes-panel-label">讀取共用 Google Sheet</div>
+          <div class="shared-notes-panel-desc">
+            貼上共用 Google Sheet 的分享連結，讀取後可從下拉選單選擇要查看誰整理的內容（例如「資料一 / A組」）。這裡只能「查看」，不會修改 Sheet 本身。
+          </div>
+          <div class="shared-notes-input-row">
+            <input type="text" id="sharedSheetUrlInput" placeholder="貼上 Google Sheet 分享連結">
+            <button class="btn-shared-notes-load" id="sharedNotesLoadBtn" onclick="SharedSheetNotes.load()">讀取</button>
+          </div>
+          <div class="shared-notes-error" id="sharedNotesError"></div>
+          <div class="shared-notes-loading" id="sharedNotesLoading">
+            <div class="upload-progress-spinner"></div>
+            <span>正在讀取共用表格...</span>
+          </div>
+          <div class="shared-notes-select-row" id="sharedNotesSelectRow">
+            <label for="sharedNotesSelect">選擇要查看的資料</label>
+            <select id="sharedNotesSelect" onchange="SharedSheetNotes.onSelect(this.value)"></select>
+          </div>
+          <div class="shared-notes-output" id="sharedNotesOutput"></div>
+          <div class="shared-notes-warn-note">
+            ⚠️ 對方表格需設為「知道連結的使用者可檢視」才讀得到；僅讀取第一個工作分頁；多人同時手動貼上時沒有鎖定機制，貼上前請先確認自己要貼在空白列，避免覆蓋他人資料。
+          </div>
+        </div>
+
         <div class="section-label">整理完成的語音卡片</div>
+        <div class="copy-sheet-format-row">
+          <button class="btn-copy-sheet-format" onclick="CopyToSheetFormat.copy()" title="把目前所有卡片內容組成一段用 Tab 分隔的文字，貼到 Google Sheet 儲存格時會自動分欄">
+            📋 複製成 Sheet 貼上格式
+          </button>
+        </div>
         <div class="edit-mode-bar">
           <button id="modeMergeBtn" onclick="EditModeManager.toggle('merge')">🔗 合併模式</button>
           <button id="modeReorderBtn" onclick="EditModeManager.toggle('reorder')">↕️ 改順序模式</button>
@@ -786,8 +823,7 @@
     </div>
   </div>
 
-  <!-- ★ 新增：摘要分享用的子選單彈窗，選項與樣式跟卡片的「分享出去」
-       完全對稱，只是分享的內容換成摘要文字、動作交給 SummaryModule -->
+  <!-- 摘要分享用的子選單彈窗 -->
   <div class="modal-overlay hidden" id="summaryShareMenuModal">
     <div class="modal-box" style="max-width:380px;">
       <div class="modal-tabs"><button class="active" style="cursor:default;">🔗 分享摘要</button></div>
@@ -806,12 +842,11 @@
       </div>
     </div>
   </div>
-
   <script>
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-summary-upload';
+    const APP_VERSION = '2026-09-shared-sheet-notes';
 
     const IntroModal = {
       switchTab(tab) {
@@ -840,11 +875,7 @@
     };
     IntroModal.initOnLoad();
 
-    // ---------- ★ 新增：清除本機資料工具 ----------
-    // 目的：因應「同一台裝置被多人共用」的場景（公用電腦、借用手機等）。
-    // localStorage / sessionStorage 是明碼存在裝置上的，前一個使用者
-    // 留下的 API Key、已讀記錄、暫存文字，下一個使用同一瀏覽器的人
-    // 有機會看到或誤用，所以提供一鍵清除、並在畫面最上方明顯提示。
+    // ---------- 清除本機資料工具 ----------
     const ClearLocalData = {
       open() {
         document.getElementById('clearDataModal').classList.remove('hidden');
@@ -854,37 +885,34 @@
       },
       confirm() {
         try {
-          // 只清這個工具自己寫入的幾個 key，不動用 localStorage.clear()，
-          // 避免誤刪同網域下未來可能新增、但與本工具無關的其他資料
           localStorage.removeItem('whisper_api_key');
-          localStorage.removeItem('gemini_api_key'); // ★ 新增：摘要模組的 Key 一併納入清除範圍
+          localStorage.removeItem('gemini_api_key');
           localStorage.removeItem('intro_modal_seen_version');
           localStorage.removeItem('record_notice_acknowledged');
-          localStorage.removeItem(SUMMARY_STORAGE_KEY); // ★ 新增：已保存的會議摘要一併納入清除範圍
+          localStorage.removeItem(SUMMARY_STORAGE_KEY);
           sessionStorage.removeItem('pending_send_text');
         } catch (e) {
           console.warn('清除本機資料時發生問題：', e);
         }
-        // ★ 卡片草稿現在也會自動持久化保存，屬於共用裝置需要清除的
-        // 機敏資料範圍，一併清掉，並立即重繪畫面讓卡片列表跟著清空
         CardSandbox.clearPersisted();
         CardSandbox.cards = [];
         CardSandbox.render();
         CardSandbox.renderLivePreview();
 
-        // ★ 新增：已保存的摘要一併從畫面上清掉
         SummaryModule.clearFromMemoryAndUI();
 
+        // ★ 新增：共享筆記讀取結果只存在記憶體（未寫入 localStorage），
+        // 但畫面上仍可能殘留上一位使用者讀到的別人資料內容，共用裝置
+        // 清除時一併重置畫面，避免留在螢幕上被下一位使用者看到
+        SharedSheetNotes.resetUI();
+
         document.getElementById('apiKeyInput').value = '';
-        document.getElementById('geminiApiKeyInput').value = ''; // ★ 新增
+        document.getElementById('geminiApiKeyInput').value = '';
         this.updateKeySavedIndicator();
-        this.updateGeminiKeySavedIndicator(); // ★ 新增
+        this.updateGeminiKeySavedIndicator();
         document.getElementById('clearDataModal').classList.add('hidden');
         alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容、已保存的摘要與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
       },
-      // 依目前是否存有 Key，更新狀態列的小圓點顏色與文字說明。
-      // 用低調的方式呈現狀態，不用色塊或警示語氣，符合平時安靜、
-      // 只有需要時才互動的設計方向。
       updateKeySavedIndicator() {
         let hasKey = false;
         try { hasKey = !!localStorage.getItem('whisper_api_key'); }
@@ -894,7 +922,6 @@
           ? '這台裝置已記住一把 Key'
           : '尚未設定 Key';
       },
-      // ★ 新增：Gemini Key 狀態列，邏輯與上面 Groq 版本對稱
       updateGeminiKeySavedIndicator() {
         let hasKey = false;
         try { hasKey = !!localStorage.getItem('gemini_api_key'); }
@@ -907,15 +934,6 @@
     };
 
     // ---------- 發送前的聊天室預覽 ----------
-    // 顯示模擬 LINE 對話氣泡的預覽彈窗，使用者按下彈窗裡的「確認發送」
-    // 才會真正呼叫傳入的 onConfirm callback（也就是 doSend / doWebShare）。
-    //
-    // 重要技術細節：Web Share API 的 navigator.share() 要求呼叫當下必須
-    // 處於「transient activation」狀態（使用者剛做了有效的互動動作），
-    // 這裡刻意讓 doWebShare 是在「確認發送」按鈕自己的 onclick 事件裡
-    // 直接被呼叫，而不是等某個計時器或非同步流程跑完才呼叫——按鈕本身
-    // 的點擊就是一次新的、有效的使用者激活，這樣才不會讓中間插入的預覽
-    // 步驟意外讓分享功能失效。
     const ChatPreview = {
       _pendingConfirm: null,
 
@@ -928,8 +946,6 @@
 
         this._pendingConfirm = onConfirm;
         const confirmBtn = document.getElementById('chatPreviewConfirmBtn');
-        // 每次都重新綁定 onclick（而非用 addEventListener 疊加），避免
-        // 連續開好幾次預覽時，舊的 callback 沒清掉、被重複觸發
         confirmBtn.onclick = () => {
           this.hide();
           if (this._pendingConfirm) this._pendingConfirm();
@@ -972,15 +988,14 @@
       localStorage.setItem('whisper_api_key', val.trim());
       ClearLocalData.updateKeySavedIndicator();
     }
-    ClearLocalData.updateKeySavedIndicator(); // 頁面載入時就先顯示目前狀態
+    ClearLocalData.updateKeySavedIndicator();
 
-    // ★ 新增：讀取/儲存 Gemini API Key（會議摘要模組用），寫法與上面 Groq Key 對稱
     document.getElementById('geminiApiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
     function saveGeminiApiKey(val) {
       localStorage.setItem('gemini_api_key', val.trim());
       ClearLocalData.updateGeminiKeySavedIndicator();
     }
-    ClearLocalData.updateGeminiKeySavedIndicator(); // 頁面載入時就先顯示目前狀態
+    ClearLocalData.updateGeminiKeySavedIndicator();
 
     // 頁面切換
     function switchTab(tab) {
@@ -991,10 +1006,9 @@
       document.getElementById('actionBar').style.display = tab === 'review' ? 'block' : 'none';
     }
 
-    // 卡片管理
     // ---------- 編輯模式管理（合併／改順序／編輯內容，三選一互斥）----------
     const EditModeManager = {
-      current: null, // null | 'merge' | 'reorder' | 'edit'
+      current: null,
 
       toggle(mode) {
         this.current = (this.current === mode) ? null : mode;
@@ -1028,18 +1042,6 @@
     };
 
     // 卡片管理
-    // ★ 卡片持久化：CardSandbox.cards 原本只存在記憶體裡，任何導致頁面
-    // 重新執行 JS 的動作（誤觸瀏覽器上一頁、切出去再切回來被系統回收、
-    // 不小心重新整理）都會讓辛苦錄好的內容整個消失、無法復原。
-    // 這裡改成每次卡片陣列有異動，就自動同步寫進 localStorage，頁面
-    // 載入時自動撈回來還原，跟 API Key 一樣可以撐過分頁關閉。
-    //
-    // 這也代表卡片內容現在跟 API Key 一樣，屬於「共用裝置需要清除」
-    // 的機敏資料範圍，ClearLocalData 那邊會一併處理。
-    // ★ 內容儲存提醒 toast：只在關鍵時刻出現（這次使用中第一次成功新增
-    // 卡片、以及每次發送成功後），平常不佔畫面，幾秒後自動淡出消失，
-    // 不需要使用者手動關閉。目的是讓使用者知道「內容有被留住」，同時
-    // 委婉提醒共用裝置要記得清除，但不用常駐的方式打擾操作。
     const StorageToast = {
       _timer: null,
       show(text) {
@@ -1055,13 +1057,10 @@
     const CARDS_STORAGE_KEY = 'voice_cards_draft';
 
     const CardSandbox = {
-      cards: [], // { id, text }
+      cards: [],
       nextId: 1,
-      _hasShownFirstSaveToast: false, // 這次瀏覽期間是否已經顯示過「首次儲存」提醒，避免每張卡片都跳一次
+      _hasShownFirstSaveToast: false,
 
-      // 簡轉繁轉換器。用 lazy init（第一次用到才建立），並做防呆：
-      // 若 opencc-js 因故未能從 CDN 載入成功，不能讓整個轉寫功能掛掉，
-      // 這種情況下直接跳過轉換、使用原文字。
       _s2tConverter: null,
       _s2tInitTried: false,
       getS2TConverter() {
@@ -1077,10 +1076,6 @@
         return this._s2tConverter;
       },
 
-      // 把目前的卡片陣列寫進 localStorage。用 try-catch 包起來是因為
-      // localStorage 可能因隱私模式、容量已滿等原因寫入失敗——寫入失敗
-      // 頂多是「這次异動沒被存到」，不應該讓卡片新增/編輯這些核心操作
-      // 因此直接掛掉，所以只記警告、不中斷流程。
       persist() {
         try {
           localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify({
@@ -1092,9 +1087,6 @@
         }
       },
 
-      // 頁面載入時呼叫一次，把上次留下的卡片內容還原回來。
-      // 對任何格式不符預期的舊資料都直接放棄還原、從空清單開始，
-      // 避免因為一筆壞資料讓整個工具連帶掛掉。
       restore() {
         let raw = null;
         try { raw = localStorage.getItem(CARDS_STORAGE_KEY); }
@@ -1133,16 +1125,12 @@
         this.render();
         this.renderLivePreview();
 
-        // ★ 這次瀏覽期間第一次成功新增卡片時，跳出一次性提醒，
-        // 之後同一次瀏覽不會再為了新卡片重複顯示
         if (!this._hasShownFirstSaveToast) {
           this._hasShownFirstSaveToast = true;
           StorageToast.show('內容已<b>自動儲存</b>在這個裝置上，切換分頁或不小心返回也不會消失。若為共用裝置，請於使用後至上方清除本機資料。');
         }
       },
 
-      // 即時錄音轉文字畫面的即時預覽：列出目前為止所有卡片（不只是最新一張），
-      // 每次新增都自動捲到底部，讓使用者不用手動滑就能看到最新內容
       renderLivePreview() {
         const container = document.getElementById('livePreviewList');
         if (!container) return;
@@ -1156,11 +1144,6 @@
         container.scrollTop = container.scrollHeight;
       },
 
-      // 修正說明：合併/改順序原本用拖曳（draggable + dragstart/drop），
-      // 但拖曳在手機觸控螢幕上手感不穩定、容易誤觸或拖不動，改成
-      // 明確的按鈕操作——合併模式給「↓ 與下一句合併」，改順序模式給
-      // 「↑ 上移」「↓ 下移」「⤒ 移至頂層」，每個動作都是一次確定的點擊，
-      // 不需要考驗手指的拖曳精準度。
       render() {
         const list = document.getElementById('cardsList');
         if (this.cards.length === 0) {
@@ -1168,7 +1151,7 @@
           return;
         }
 
-        const mode = EditModeManager.current; // null | 'merge' | 'reorder' | 'edit'
+        const mode = EditModeManager.current;
 
         list.innerHTML = this.cards.map((card, i) => {
           const modeClass = mode ? `mode-${mode}` : 'readonly';
@@ -1256,49 +1239,295 @@
       }
     };
 
-    // ---------- ★ 會議摘要模組 ----------
+    // ---------- ★ 新增：讀取共享 Google Sheet 筆記（唯讀＋多筆選擇）----------
     //
-    // 入口：SummaryModule.generate()，由「生成會議摘要」按鈕觸發
-    //   - 讀取 CardSandbox 目前所有卡片文字，組成一段完整逐字稿
-    //   - 讀取使用者存好的 Gemini API Key
-    //   - 沒有卡片內容 / 沒有 Key 時，直接擋下並提示，不會呼叫下一步
+    // 需求背景：多方人馬各自把整理好的逐字稿/摘要手動貼進同一份 Google
+    // Sheet 的不同列（A欄=標籤、B欄=內容、C欄=時間戳記選填），任何人
+    // 打開這個工具、貼上共用 Sheet 連結，就能選擇要看誰的內容。
     //
-    // 處理：_callGemini(fullText, apiKey) —— 已串接 Gemini API
-    //   - 組一段 prompt，請 Gemini 把逐字稿整理成條列式重點摘要
-    //   - 呼叫 generateContent 端點，帶上 apiKey（用 header 傳遞，不放在
-    //     URL query string，避免 Key 意外留在瀏覽器網路紀錄或伺服器日誌裡）
-    //   - 解析回傳的 JSON，取出摘要文字
-    //   - 涵蓋常見錯誤情況：Key 無效、額度用盡、內容被安全機制擋下、
-    //     網路錯誤、回應格式不如預期
+    // 範圍：只做讀取＋選擇顯示，完全不寫入。寫入交由使用者自己手動
+    // 複製貼上到 Sheet（下方 CopyToSheetFormat 模組是為了那個手動
+    // 步驟提供的輔助功能）。
     //
-    // 出口：render 出摘要文字到 #summaryOutputBox，或錯誤訊息
+    // 技術方案：沿用 CSV 匯出端點
+    //   https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv
+    // 只讀取第一個工作分頁，對方表格需設為「知道連結的使用者可檢視」。
+    const SharedSheetNotes = {
+      // 目前解析出來的資料列，每筆 { label, content, timestamp }
+      rows: [],
+
+      // 從使用者貼上的各種 Google Sheet 網址格式中擷取 SHEET_ID。
+      // 常見格式包含：
+      //   https://docs.google.com/spreadsheets/d/xxxxx/edit#gid=0
+      //   https://docs.google.com/spreadsheets/d/xxxxx/edit?usp=sharing
+      //   https://docs.google.com/spreadsheets/d/xxxxx
+      // 抓 /d/ 與下一個 / 之間的字串即為 SHEET_ID。
+      extractSheetId(url) {
+        if (!url) return null;
+        const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+        return match ? match[1] : null;
+      },
+
+      // ---------- 簡易 CSV Parser（處理雙引號跳脫）----------
+      // 一般的 split(',') 無法正確處理「儲存格內容本身包含逗號或換行，
+      // 因而被雙引號包起來」的情況（例如 "內容, 含逗號"），也無法處理
+      // 雙引號跳脫（Google Sheets CSV 匯出時，儲存格內的雙引號會被
+      // 轉成兩個連續雙引號 ""）。這裡實作一個逐字元掃描的簡易 parser，
+      // 足以應付常見情境，不追求完整 RFC 4180 規格。
+      //
+      // 輸入：完整 CSV 文字字串
+      // 輸出：二維陣列，每個內層陣列代表一列的各欄位值
+      parseCSV(csvText) {
+        const rows = [];
+        let row = [];
+        let field = '';
+        let insideQuotes = false;
+        let i = 0;
+        const len = csvText.length;
+
+        while (i < len) {
+          const char = csvText[i];
+
+          if (insideQuotes) {
+            if (char === '"') {
+              // 連續兩個雙引號代表跳脫成一個字面雙引號
+              if (csvText[i + 1] === '"') {
+                field += '"';
+                i += 2;
+                continue;
+              }
+              // 單一雙引號代表結束引號區段
+              insideQuotes = false;
+              i++;
+              continue;
+            }
+            field += char;
+            i++;
+            continue;
+          }
+
+          if (char === '"') {
+            insideQuotes = true;
+            i++;
+            continue;
+          }
+          if (char === ',') {
+            row.push(field);
+            field = '';
+            i++;
+            continue;
+          }
+          if (char === '\r') {
+            // \r\n 或單獨 \r 都當作行結束的一部分，實際換行交給 \n 或
+            // 這裡直接處理單獨 \r（少數舊格式）
+            if (csvText[i + 1] === '\n') { i++; continue; }
+            row.push(field);
+            field = '';
+            rows.push(row);
+            row = [];
+            i++;
+            continue;
+          }
+          if (char === '\n') {
+            row.push(field);
+            field = '';
+            rows.push(row);
+            row = [];
+            i++;
+            continue;
+          }
+          field += char;
+          i++;
+        }
+
+        // 收尾：最後一欄／最後一列（檔案結尾不一定有換行）
+        if (field.length > 0 || row.length > 0) {
+          row.push(field);
+          rows.push(row);
+        }
+
+        // 過濾掉完全空白的列（常見於檔案結尾多一個換行）
+        return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+      },
+
+      showError(msg) {
+        const el = document.getElementById('sharedNotesError');
+        el.textContent = msg;
+        el.classList.add('show');
+      },
+      hideError() {
+        document.getElementById('sharedNotesError').classList.remove('show');
+      },
+
+      setLoading(loading) {
+        document.getElementById('sharedNotesLoading').classList.toggle('show', loading);
+        document.getElementById('sharedNotesLoadBtn').disabled = loading;
+      },
+
+      async load() {
+        this.hideError();
+        const urlInput = document.getElementById('sharedSheetUrlInput');
+        const url = urlInput.value.trim();
+
+        if (!url) {
+          this.showError('請先貼上 Google Sheet 的分享連結。');
+          return;
+        }
+
+        const sheetId = this.extractSheetId(url);
+        if (!sheetId) {
+          this.showError('看起來不是有效的 Google Sheet 連結，請確認網址格式（應包含 /spreadsheets/d/...）。');
+          return;
+        }
+
+        // 讀取前先清掉上一次的選單與內容顯示，避免舊資料殘留造成混淆
+        this.rows = [];
+        document.getElementById('sharedNotesSelectRow').classList.remove('show');
+        document.getElementById('sharedNotesOutput').classList.remove('show');
+
+        this.setLoading(true);
+
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+
+        let res;
+        try {
+          res = await fetch(exportUrl);
+        } catch (networkErr) {
+          this.setLoading(false);
+          this.showError('無法連線讀取這份表格，請檢查網路連線後再試一次。');
+          return;
+        }
+
+        this.setLoading(false);
+
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            this.showError('無法讀取這份表格，請確認共用設定已改為「知道連結的使用者可檢視」。');
+          } else {
+            this.showError(`讀取失敗（HTTP ${res.status}），請確認連結是否正確。`);
+          }
+          return;
+        }
+
+        let csvText;
+        try {
+          csvText = await res.text();
+        } catch (e) {
+          this.showError('讀取表格內容時發生錯誤，請稍後再試一次。');
+          return;
+        }
+
+        const parsedRows = this.parseCSV(csvText);
+
+        // 第一列視為標題列，直接跳過；從第二列開始才是實際資料
+        const dataRows = parsedRows.slice(1);
+
+        // A 欄（標籤）、B 欄（內容）、C 欄（時間戳記，選填）
+        this.rows = dataRows
+          .map(r => ({
+            label: (r[0] || '').trim(),
+            content: (r[1] || '').trim(),
+            timestamp: (r[2] || '').trim()
+          }))
+          // 忽略「A、B 兩欄都是空的」這種完全空白列
+          .filter(r => r.label || r.content);
+
+        if (this.rows.length === 0) {
+          this.showError('這份表格目前沒有可顯示的資料（第 2 列開始都是空的）。請確認資料已貼在正確的欄位。');
+          return;
+        }
+
+        this.renderSelect();
+      },
+
+      renderSelect() {
+        const select = document.getElementById('sharedNotesSelect');
+        select.innerHTML = '<option value="" disabled selected>請選擇...</option>' +
+          this.rows.map((r, idx) => {
+            const label = r.label || `（未命名 - 第 ${idx + 2} 列）`;
+            return `<option value="${idx}">${CardSandbox.escapeHtml(label)}</option>`;
+          }).join('');
+        document.getElementById('sharedNotesSelectRow').classList.add('show');
+      },
+
+      onSelect(idxStr) {
+        if (idxStr === '') return;
+        const idx = parseInt(idxStr, 10);
+        const row = this.rows[idx];
+        if (!row) return;
+
+        const output = document.getElementById('sharedNotesOutput');
+        // 唯讀文字區塊呈現，刻意不做成卡片樣式：這是別人的資料，
+        // 不應該讓使用者誤以為能編輯或直接合併進自己的卡片列表
+        let html = CardSandbox.escapeHtml(row.content || '（這筆資料沒有內容）').replace(/\n/g, '<br>');
+        if (row.timestamp) {
+          html += `<div class="shared-notes-output-meta">🕒 ${CardSandbox.escapeHtml(row.timestamp)}</div>`;
+        }
+        output.innerHTML = html;
+        output.classList.add('show');
+      },
+
+      // 共用裝置清除本機資料時呼叫，把畫面重置回初始狀態，避免上一位
+      // 使用者讀到的別人資料內容殘留在螢幕上。這裡只清畫面與記憶體，
+      // 讀取結果本來就沒有寫進 localStorage，所以不需要額外移除儲存項目。
+      resetUI() {
+        this.rows = [];
+        this.hideError();
+        this.setLoading(false);
+        document.getElementById('sharedSheetUrlInput').value = '';
+        document.getElementById('sharedNotesSelectRow').classList.remove('show');
+        document.getElementById('sharedNotesSelect').innerHTML = '';
+        document.getElementById('sharedNotesOutput').classList.remove('show');
+        document.getElementById('sharedNotesOutput').innerHTML = '';
+      }
+    };
+
+    // ---------- ★ 新增：複製成 Sheet 貼上格式 ----------
     //
-    // ★ 新增：摘要保存／複製／分享／刪除
-    //   - 摘要一旦成功生成，就自動寫進 localStorage（跟卡片草稿走
-    //     同一套「自動持久化」邏輯），頁面重整或誤觸返回都不會消失
-    //   - 保存後在摘要下方顯示「已保存在本機」提示列，附複製／分享／
-    //     刪除三個按鈕；分享沿用既有的 ChatPreview + LIFF 發送管道，
-    //     跟卡片的「送回聊天室／分享出去」是同一套邏輯，只是內容換成
-    //     摘要文字，不會混用或覆蓋掉卡片本身的發送流程
-    //   - 刪除只清「已保存的摘要」，不影響語音卡片本身
+    // 目的：方便使用者手動把自己整理好的卡片內容貼進共用 Google Sheet
+    // 的下一個空列。組成一段用 Tab 字元（\t）分隔的文字：
+    //   標籤（自動帶入目前日期時間）\t內容（所有卡片合併成一段文字）\tC欄留空
+    // Tab 是關鍵：貼到 Excel/Google Sheets 儲存格時會被自動辨識成分欄，
+    // 貼上後直接落在 A、B（、C）三個獨立儲存格，不需要使用者手動拆分。
+    //
+    // A 欄標籤直接自動帶入「目前日期時間」，不彈窗詢問使用者輸入——
+    // 若使用者想要更有意義的名稱（例如「A組」），貼到 Sheet 後自行
+    // 到儲存格上修改即可，這裡優先求「一鍵複製」的操作速度。
+    const CopyToSheetFormat = {
+      formatTimestamp(date) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      },
+
+      copy() {
+        if (CardSandbox.cards.length === 0) {
+          alert('目前沒有任何卡片內容可以複製，請先錄音或編輯出至少一張卡片。');
+          return;
+        }
+
+        const label = this.formatTimestamp(new Date());
+        const content = CardSandbox.cards.map(c => c.text).join('\n');
+        // C 欄（時間戳記）留空，讓使用者自行決定是否填寫；用 Tab 分隔
+        // 三欄，即使 C 欄留空也保留這個 Tab，貼上時才會正確落在三個
+        // 獨立儲存格，而不是把 C 欄內容誤併入 B 欄
+        const pasteText = `${label}\t${content}\t`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pasteText)
+            .then(() => alert(`已複製成可直接貼上 Google Sheet 的格式（標籤：${label}）。\n\n請開啟共用 Sheet，點選下一個空白列的 A 欄儲存格，直接貼上即可自動分欄。`))
+            .catch(() => alert('複製失敗，請改用其他方式手動整理內容。'));
+        } else {
+          alert('這個瀏覽器不支援自動複製，請手動選取以下內容：\n\n' + pasteText);
+        }
+      }
+    };
+
+    // ---------- 會議摘要模組 ----------
     const SUMMARY_STORAGE_KEY = 'meeting_summary_draft';
 
     const SummaryModule = {
-
-      // ★ Gemini 模型名稱集中寫在這裡，方便之後更新。
-      // Google 的 Flash 系列模型疊代很快，寫死的版本號可能在幾個月後
-      // 被下架或有更新版本可用。若之後發現這個模型無法呼叫（錯誤訊息
-      // 通常會是 404 not found），到 https://ai.google.dev/gemini-api/docs/models
-      // 查目前可用的模型名稱，把下面這行改掉即可，不需要動其他任何程式碼。
-      // 注意：官方也提供 'gemini-flash-latest' 這種浮動別名，會自動指向
-      // 目前最新版本，但曾發生過官方悄悄把它切換到非預期版本的案例，
-      // 這裡選擇寫死明確版本號，行為更可預期、可控。
       GEMINI_MODEL: 'gemini-3.5-flash',
-
-      // 目前執行狀態，避免使用者連續點擊按鈕重複觸發
       isGenerating: false,
-
-      // 目前保存在記憶體中的摘要文字；null 代表尚未生成/已被刪除
       currentSummary: null,
 
       async generate() {
@@ -1322,7 +1551,7 @@
         try {
           const summaryText = await this._callGemini(fullText, apiKey);
           this._renderSummary(summaryText);
-          this._persist(summaryText); // ★ 新增：生成成功即自動保存
+          this._persist(summaryText);
         } catch (err) {
           console.error('生成會議摘要失敗：', err);
           this._renderError('生成摘要失敗：' + err.message);
@@ -1332,19 +1561,10 @@
         }
       },
 
-           // ---------- 處理：實際呼叫 Gemini 的地方 ----------
-      // 輸入：fullText（整段會議逐字稿文字）、apiKey（使用者填入的 Gemini Key）
-      // 輸出：Promise<string>，resolve 一段摘要文字；失敗時 throw 一個
-      // 帶有清楚訊息的 Error，讓上層 generate() 的 catch 顯示給使用者看
       async _callGemini(fullText, apiKey) {
-        // ★ 關鍵 1：請確保 class 內的 GEMINI_MODEL 設定為 'gemini-2.5-flash'
-        // 如果原本是 'gemini-pro' 或舊版模型，會因為舊版輸入上限較小且不支援最新 API 結構而報錯
         const modelName = this.GEMINI_MODEL || 'gemini-2.5-flash';
-
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
-        // ★ 關鍵 2：將系統指令 (systemInstruction) 與使用者逐字稿內容 (contents) 拆開
-        // 並在 contents 中使用 Markdown 標籤化的結構包裹 fullText
         const payload = {
           systemInstruction: {
             parts: [{
@@ -1359,8 +1579,8 @@
           },
           contents: [{
             role: 'user',
-            parts: [{ 
-              text: `<meeting_log>\n${fullText}\n</meeting_log>` 
+            parts: [{
+              text: `<meeting_log>\n${fullText}\n</meeting_log>`
             }]
           }]
         };
@@ -1410,8 +1630,7 @@
         if (candidate.finishReason === 'SAFETY') {
           throw new Error('這段內容被 Gemini 的安全機制擋下，無法生成摘要。');
         }
-        
-        // 修正取值邏輯：確保多個 parts 時能正確組合文字
+
         const parts = candidate.content && candidate.content.parts;
         const text = parts ? parts.map(p => p.text).join('') : '';
 
@@ -1422,7 +1641,6 @@
         return text.trim();
       },
 
-      // ---------- 出口：把結果畫到畫面上 ----------
       _renderSummary(text) {
         const box = document.getElementById('summaryOutputBox');
         box.classList.remove('empty', 'loading');
@@ -1436,9 +1654,6 @@
         box.classList.remove('loading');
         box.classList.add('empty');
         box.textContent = text;
-        // 生成失敗不動之前已保存的摘要（如果有的話），錯誤訊息只是
-        // 暫時蓋在畫面上；若使用者想找回舊摘要，重新整理頁面會從
-        // localStorage 還原回上一次成功保存的內容
       },
 
       _setLoadingUI(loading) {
@@ -1449,17 +1664,10 @@
         if (loading) {
           box.classList.remove('empty');
           box.classList.add('loading');
-          // 逐字稿較長時（例如長會議），Gemini 生成可能需要十幾秒到
-          // 更久，這裡先說明清楚，避免使用者以為卡住而重複點擊
           box.textContent = '正在生成摘要，請稍候...（逐字稿較長時可能需要一些時間）';
         }
       },
 
-      // ---------- ★ 新增：保存／還原／複製／分享／刪除 ----------
-
-      // 寫入 localStorage，做法與 CardSandbox.persist() 對稱：
-      // try-catch 包起來，寫入失敗（隱私模式、容量已滿等）只記警告，
-      // 不中斷「生成摘要」這個核心操作本身。
       _persist(text) {
         try {
           localStorage.setItem(SUMMARY_STORAGE_KEY, text);
@@ -1468,8 +1676,6 @@
         }
       },
 
-      // 頁面載入、進入工具主畫面時呼叫一次，把上次保存的摘要還原到
-      // 記憶體與畫面上；沒有保存過或讀取失敗就維持空白，不影響其他功能。
       restore() {
         let raw = null;
         try { raw = localStorage.getItem(SUMMARY_STORAGE_KEY); }
@@ -1482,7 +1688,6 @@
         this._updateActionsRowVisibility();
       },
 
-      // 依 currentSummary 是否有內容，切換保存狀態列的顯示/隱藏
       _updateActionsRowVisibility() {
         const row = document.getElementById('summaryActionsRow');
         if (!row) return;
@@ -1500,8 +1705,6 @@
         }
       },
 
-      // 刪除只清「已保存的摘要」，不影響語音卡片本身；刪除前先跟使用者
-      // 確認一次，避免手滑點掉辛苦生成的摘要
       remove() {
         if (!this.currentSummary) return;
         if (!confirm('確定要刪除已保存的會議摘要嗎？此動作無法復原（語音卡片不受影響）。')) return;
@@ -1510,8 +1713,6 @@
         catch (e) { /* 忽略 */ }
       },
 
-      // 只清記憶體與畫面顯示，不動 localStorage——給 ClearLocalData
-      // 共用裝置清除流程呼叫，因為那邊會自己統一處理 localStorage 的移除
       clearFromMemoryAndUI() {
         this.currentSummary = null;
         const box = document.getElementById('summaryOutputBox');
@@ -1521,9 +1722,6 @@
         this._updateActionsRowVisibility();
       },
 
-      // ---------- 分享：沿用卡片既有的 ChatPreview + LIFF 發送管道 ----------
-      // 跟「分享出去」子選單（ShareMenu）走同一套視覺與技術邏輯，只是
-      // 分享的內容換成 currentSummary，不會動到卡片本身的發送流程。
       share() {
         if (!this.currentSummary) return;
         document.getElementById('summaryShareMenuModal').classList.remove('hidden');
@@ -1542,8 +1740,6 @@
       shareViaWebShare() {
         this.closeShareMenu();
         if (!this.currentSummary) return;
-        // 跟 handleWebShare 相同的邏輯：LIFF 內嵌視窗裡系統分享幾乎必定
-        // 被擋下，直接改用 shareTargetPicker，不多跑一次注定失敗的嘗試
         if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
           ChatPreview.show(this.currentSummary, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(this.currentSummary));
           return;
@@ -1552,31 +1748,9 @@
       }
     };
 
-    // ---------- ★ 新增：上傳既有語音檔案轉文字 ----------
-    //
-    // 目的：不是每個人都習慣「打開這個頁面、按下錄音」，很多長輩更習慣
-    // 直接在 LINE 對話裡按住麥克風錄一段語音訊息，把那個訊息的音檔存
-    // 下來（或轉傳），再回到這個工具上傳，跟即時錄音一樣送去 Whisper
-    // 轉寫、進到同一批語音卡片裡，後續合併/編輯/發送都是同一套流程。
-    //
-    // 跟即時錄音（DictationEngine）不同的地方：
-    // 1. 不需要 MediaRecorder / 麥克風權限，使用者選好檔案後直接把
-    //    File 物件當成 audioBlob 送出去，其餘（Whisper 呼叫、簡繁轉換、
-    //    加入卡片）完全共用同一套邏輯，沒有另外重寫一份
-    // 2. 不做「靜音偵測」——那是為了處理「錄音時剛好沒人講話」的情境，
-    //    使用者主動選擇上傳的檔案沒有這個問題，直接送去轉寫即可
-    // 3. 不做「切成 15 秒一段」的分段——那是即時錄音為了讓卡片「陸續
-    //    出現」而做的設計。上傳的檔案本身就是完整的一段，直接整檔送出，
-    //    轉寫完成後一次性加入一張（或依 Whisper 回傳內容自然斷句的）卡片
-    // 4. 有基本的檔案大小提醒：Groq Whisper API 的檔案大小上限通常在
-    //    25MB 左右（依方案可能調整），這裡只做前端提醒與確認，實際
-    //    上限仍以 Groq 官方文件與 API 回應為準；若上傳失敗，錯誤訊息
-    //    會照實顯示 Groq 回傳的原因，不在前端自行假設或誇大限制
+    // ---------- 上傳既有語音檔案轉文字 ----------
     const FileUploadTranscribe = {
-      // 保守估計的建議上限，僅用於上傳前的提醒，不是強制擋下；
-      // 就算超過，仍讓使用者選擇繼續嘗試上傳，真正是否成功以 API 回應為準
       SUGGESTED_MAX_MB: 25,
-
       isUploading: false,
 
       onFileSelected(fileList) {
@@ -1645,9 +1819,6 @@
         }
       },
 
-      // 跟 DictationEngine.transcribeAudio 共用同一支 Groq Whisper 端點
-      // 與參數邏輯（語言/prompt 交給 LanguageManager 決定），差別只在
-      // 這裡的輸入是使用者選的 File，不是錄音產生的 Blob 片段。
       async _transcribeFile(file) {
         const apiKey = localStorage.getItem('whisper_api_key');
         const formData = new FormData();
@@ -1688,8 +1859,6 @@
           throw new Error(apiMessage);
         }
 
-        // 自動模式下，讓這次上傳的偵測結果也回饋給 LanguageManager，
-        // 邏輯與即時錄音一致，不特別區分來源
         LanguageManager.onDetectedLanguage(data.language);
 
         return data.text || '';
@@ -1701,45 +1870,7 @@
       }
     };
 
-    // 音訊錄製與 Groq Whisper API 轉寫引擎
-    //
-    // 分段錄音說明：Whisper API 本質上是「傳一段完整音檔進去，換一段完整
-    // 文字回來」的批次設計，沒有逐字即時串流這回事，這是 API 本身的限制，
-    // 不是我們程式碼能力不夠。
-    // 改為每 SEGMENT_MS 毫秒（目前設 15 秒）就結束目前這段錄音、送出去轉寫，
-    // 同時立刻開一個新的 MediaRecorder 接續錄下一段，讓卡片能陸續冒出來，
-    // 而不是整場會議錄完才一次出現。
-    //
-    // 已知代價（誠實記錄，這是分段方案本身的取捨，不是 bug）：
-    // 1. 不是真正逐字即時，卡片是「一段一段」冒出來，最長會有接近
-    //    SEGMENT_MS 的延遲才看到最新內容。
-    // 2. 每段切換的瞬間，如果剛好有一句話橫跨兩段的邊界，這句話可能被
-    //    攔腰切斷、分別出現在兩張卡片的頭尾，這是分段代替串流的固有限制。
-    // 3. 段數變多代表 API 呼叫次數變多，如果之後接的是需要計費的方案
-    //    （非免費額度），會直接影響費用。
-    // ---------- ★ 新增：辨識語言管理（固定語言 / 自動偵測）----------
-    //
-    // 使用者可在錄音前選「中文／英文／日文」其中一種固定語言，或選
-    // 「自動」讓系統動態判斷。三種固定語言各自對應一組 (languageCode,
-    // prompt) 組合，prompt 特意用該語言本身書寫（中文用中文prompt、
-    // 英文用英文prompt、日文用日文prompt），讓 Whisper 的文字延續預測
-    // 機制更貼合目標語言的語感與字體慣例。
-    //
-    // 自動模式的運作方式：
-    // 1. 每段轉寫送出時，不鎖定 language（除非前一次偵測還在 60 秒
-    //    有效期內，見下方 getParamsForSegment）
-    // 2. 改用 response_format=verbose_json 呼叫 Groq，這樣轉寫結果會
-    //    附帶 Whisper 自己偵測到的語言代碼，不需要另外花一次 API 呼叫
-    //    專門偵測語言
-    // 3. 拿到偵測結果後，記錄下來並設定 60 秒的有效期。在這 60 秒內，
-    //    接下來的分段轉寫會鎖定該語言的 (languageCode, prompt)，
-    //    提高這段時間內轉寫的準確度
-    // 4. 60 秒一到，自動失效、退回不鎖定語言的純自動偵測狀態，直到
-    //    下一次轉寫結果帶回新的偵測語言，重新鎖定 60 秒
-    //
-    // 這個機制不會額外增加 API 呼叫次數（偵測搭順風車，不用獨立呼叫），
-    // 但能在自動模式下也享有「鎖定語言」的準確度優勢，同時仍保有中途
-    // 切換語言的彈性（不會像固定語言模式那樣整場錄音卡死在一種語言）。
+    // ---------- 辨識語言管理（固定語言 / 自動偵測）----------
     const LanguageManager = {
       FIXED_LANG_CONFIG: {
         zh: { languageCode: 'zh', prompt: '這是一段會議錄音，內容關於工作討論與進度回報。' },
@@ -1747,16 +1878,11 @@
         ja: { languageCode: 'ja', prompt: 'これは仕事の進捗報告や打ち合わせに関する会議の録音です。' }
       },
 
-      AUTO_LOCK_MS: 60000, // 偵測到語言後，鎖定該語言的有效期
-
-      selectedMode: 'zh', // 使用者下拉選單目前選的值：'zh' | 'en' | 'ja' | 'auto'
-
-      // 自動模式下，目前鎖定的語言與到期時間（非自動模式下不使用這兩個欄位）
+      AUTO_LOCK_MS: 60000,
+      selectedMode: 'zh',
       autoDetectedLang: null,
       autoLockExpiresAt: 0,
 
-      // 下拉選單 onchange 時呼叫，錄音中選單本身會被 disable，
-      // 這裡多一層防呆，避免萬一被繞過 UI 限制直接觸發變更
       onUserSelect(value) {
         if (DictationEngine.isRecording) return;
         this.selectedMode = value;
@@ -1764,37 +1890,26 @@
         this.updateDetectHintVisibility();
       },
 
-      // 開始新一場錄音時重置自動偵測狀態，避免延續到上一場錄音的判斷結果
       resetAutoState() {
         this.autoDetectedLang = null;
         this.autoLockExpiresAt = 0;
         this.hideDetectHint();
       },
 
-      // 根據目前模式，決定「這一段」轉寫要用的 language 參數與 prompt。
-      // 回傳 null 代表不鎖定語言（純自動偵測，交給 Whisper 自行判斷）。
       getParamsForSegment() {
         if (this.selectedMode !== 'auto') {
           return this.FIXED_LANG_CONFIG[this.selectedMode] || null;
         }
-        // 自動模式：檢查目前是否還在上一次偵測結果的鎖定有效期內
         if (this.autoDetectedLang && Date.now() < this.autoLockExpiresAt) {
           const config = this.FIXED_LANG_CONFIG[this.autoDetectedLang];
           if (config) return config;
         }
-        return null; // 尚未有偵測結果，或已過期，回到純自動偵測
+        return null;
       },
 
-      // 轉寫結果回來後呼叫，帶入 verbose_json 回傳的 language 欄位。
-      // 只有自動模式才需要處理這個回呼；固定語言模式下即使拿到偵測結果
-      // 也不使用，因為使用者已經明確指定語言。
       onDetectedLanguage(detectedLangRaw) {
         if (this.selectedMode !== 'auto' || !detectedLangRaw) return;
 
-        // Whisper 回傳的 language 欄位是完整語言名稱（如 "english"、
-        // "japanese"、"chinese"）而不是 ISO 代碼，這裡做對應轉換；
-        // 只認得中/英/日三種，其餘語言目前不特別處理、維持純自動偵測，
-        // 避免誤鎖定成不支援的 prompt 組合
         const map = { chinese: 'zh', english: 'en', japanese: 'ja' };
         const langCode = map[detectedLangRaw.toLowerCase()];
         if (!langCode) return;
@@ -1817,13 +1932,10 @@
         if (hint) hint.style.display = 'none';
       },
 
-      // 只有自動模式才需要顯示偵測提示欄位，固定語言模式下維持隱藏
       updateDetectHintVisibility() {
         if (this.selectedMode !== 'auto') this.hideDetectHint();
       },
 
-      // 錄音中鎖住選單，避免中途切換造成語言參數與已錄製內容邏輯混亂；
-      // 停止後解鎖，恢復可選擇狀態
       setSelectLocked(locked) {
         const select = document.getElementById('langSelect');
         if (select) select.disabled = locked;
@@ -1835,25 +1947,9 @@
       audioChunks: [],
       isRecording: false,
       segmentTimer: null,
-      SEGMENT_MS: 15000, // 每段錄音長度，可依實測體驗調整
-      SILENCE_RMS_THRESHOLD: 0.01, // 靜音判定門檻，可依實測環境雜訊調整，見 isSegmentSilent 說明
+      SEGMENT_MS: 15000,
+      SILENCE_RMS_THRESHOLD: 0.01,
 
-      // ★ 新增：靜音片段偵測，避免把幾乎沒聲音的 15 秒送去 Whisper。
-      // 背景：Whisper 類模型對「靜音或極低音量音檔」有已知的幻覺
-      // （hallucination）傾向——沒有真正語音輸入時，模型仍會被迫產生
-      // 一段文字輸出，常見的就是流行歌詞、片頭字幕、頻道結尾語這類
-      // 內容，因為訓練資料裡大量靜音片段常搭配這類文字（歌曲間奏、
-      // 影片片尾）。原本的邏輯是每段錄音結束後無條件送出轉寫，即使
-      // 那 15 秒完全沒人說話也照送，這是奇怪生成文字冒出來的主因。
-      //
-      // 做法：用 Web Audio API 把這段音訊解碼、計算均方根音量（RMS），
-      // 低於門檻視為靜音，直接跳過、不呼叫 API，同時也省下一次
-      // 不必要的付費 API 呼叫。
-      //
-      // 門檻值 0.01 是經驗值，不是理論算出來的精確數字：安靜室內的
-      // 環境雜訊通常在這個值以下，正常說話音量會明顯超過。如果實測
-      // 發現「小聲說話」被誤判成靜音而漏掉，可以把這個值調低；如果
-      // 反而「有雜訊但沒人說話」的片段還是被送出去轉寫，可以調高。
       async isSegmentSilent(audioBlob) {
         try {
           const arrayBuffer = await audioBlob.arrayBuffer();
@@ -1867,9 +1963,6 @@
           audioCtx.close();
           return rms < this.SILENCE_RMS_THRESHOLD;
         } catch (e) {
-          // 解碼失敗時（例如格式不支援、瀏覽器相容性問題），保守起見
-          // 視為「非靜音」，照原本邏輯送去轉寫，避免因為偵測工具本身
-          // 出錯而漏掉真正有內容的片段
           console.warn('靜音偵測失敗，改為照常送出轉寫：', e);
           return false;
         }
@@ -1882,45 +1975,20 @@
           return;
         }
 
-        // ★ 新增：開始新一場錄音時，重置自動語言偵測狀態（避免延續
-        // 到上一場錄音的判斷結果），並鎖住語言選單避免錄音中被更改
         LanguageManager.resetAutoState();
         LanguageManager.setSelectLocked(true);
 
         try {
-          // stream 只在整場錄音開始時取得一次，之後每段重建 MediaRecorder
-          // 時重複使用同一個 stream，避免每 15 秒重新跳出麥克風權限詢問
-          //
-          // ★ 修正：原本只傳 { audio: true }，等於完全用瀏覽器預設值開
-          // 麥克風。手機瀏覽器預設會開 echoCancellation（回音消除）和
-          // noiseSuppression（降噪），這兩個是為了「講電話/視訊通話」
-          // 設計的，會積極壓低背景音，容易連帶把稍遠、稍小聲的說話內容
-          // 一起壓掉（例如會議室裡離手機較遠的人）。改成明確指定
-          // constraints，關掉會議場景不需要的通話優化，並開自動增益，
-          // 讓忽大忽小的音量自動拉到合理範圍。
-          //
-          // 注意：這些是「建議值」不是「保證值」——瀏覽器會盡量遵守，
-          // 但如果裝置硬體或作業系統不支援某個設定，會自動忽略、退回
-          // 預設值，不會拋出錯誤。
           this.stream = await navigator.mediaDevices.getUserMedia({
             audio: {
-              echoCancellation: false, // 關閉回音消除：會議室沒有喇叭外放對講的
-                                        // 問題，但這功能有時會誤判、削弱正常人聲
-              noiseSuppression: false, // 關閉降噪：降噪演算法容易連同小聲/遠處
-                                        // 人聲一起壓掉，Whisper 本身對背景雜訊
-                                        // 有一定容忍度，不需要瀏覽器先處理過
-              autoGainControl: true,   // 開啟自動增益：讓忽大忽小的音量自動拉到
-                                        // 合理範圍，對「離手機較遠的人聲」有幫助
-              channelCount: 1,         // 單聲道：語音辨識用不到立體聲，也能減少
-                                        // 檔案大小、加快上傳轉寫速度
-              sampleRate: 48000        // 提高取樣率上限（部分裝置預設較低），
-                                        // 錄到更多高頻細節
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: true,
+              channelCount: 1,
+              sampleRate: 48000
             }
           });
 
-          // 記錄實際套用的音訊設定，方便日後排查「某些裝置聽起來還是
-          // 不清楚」時，能先確認是不是硬體/系統沒有支援上面要求的設定，
-          // 而不是程式碼沒生效
           const track = this.stream.getAudioTracks()[0];
           if (track && track.getSettings) {
             console.log('麥克風實際套用的音訊設定：', track.getSettings());
@@ -1931,19 +1999,13 @@
           this.startNewSegment();
         } catch (err) {
           alert('無法存取麥克風：' + err.message);
-          // ★ 新增：取得麥克風失敗，錄音實際上沒有開始，選單應解鎖
-          // 讓使用者能重新選擇語言後再試一次
           LanguageManager.setSelectLocked(false);
         }
       },
 
-      // 開始錄製新的一段（不是整場錄音的第一段，就是每 15 秒重啟一次）
       startNewSegment() {
         if (!this.isRecording || !this.stream) return;
 
-        // ★ 新增：明確指定 audioBitsPerSecond，避免部分裝置給到過低
-        // 的預設值（通常落在 96kbps 上下）。語音其實 64-128kbps 就很
-        // 夠用，這裡設 128kbps 確保音質足夠、同時檔案不會過大。
         this.mediaRecorder = new MediaRecorder(this.stream, { audioBitsPerSecond: 128000 });
         this.audioChunks = [];
 
@@ -1953,12 +2015,8 @@
 
         this.mediaRecorder.onstop = async () => {
           const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-          // 送出轉寫是非同步的，不等它完成就繼續錄下一段，
-          // 這樣多段轉寫可以並行進行，不會因為等 API 回應而漏錄
           this.transcribeAudio(audioBlob);
 
-          // 如果整場錄音還在進行中，立刻開下一段；
-          // 若使用者已經按停止，這裡就不再開新的一段
           if (this.isRecording) {
             this.startNewSegment();
           }
@@ -1966,7 +2024,6 @@
 
         this.mediaRecorder.start();
 
-        // 設定計時器，時間到就結束這一段（觸發 onstop，裡面會自動接續下一段）
         this.segmentTimer = setTimeout(() => {
           if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
@@ -1975,7 +2032,7 @@
       },
 
       stop() {
-        this.isRecording = false; // 先標記，讓 onstop 裡的邏輯知道不用再開新段
+        this.isRecording = false;
         clearTimeout(this.segmentTimer);
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
           this.mediaRecorder.stop();
@@ -1985,19 +2042,12 @@
           this.stream = null;
         }
         this.updateUI(false);
-        // ★ 新增：錄音結束，解鎖語言選單，讓使用者可以為下一場錄音
-        // 重新選擇語言。偵測提示（自動模式）仍保留顯示，讓使用者能
-        // 看到最後一次偵測到的語言是什麼，直到下次開始新錄音才重置
         LanguageManager.setSelectLocked(false);
       },
 
       async transcribeAudio(audioBlob) {
         const statusText = document.getElementById('recSubText');
 
-        // ★ 新增：送出前先判斷這段是否幾乎靜音，是的話直接跳過，
-        // 不佔用一次 API 呼叫，也避免 Whisper 對靜音片段產生幻覺文字
-        // （見上方 isSegmentSilent 註解）。這裡刻意放在 _pendingCount
-        // 計數之前判斷，靜音片段完全不會進入「背景轉寫中」的狀態顯示。
         const silent = await this.isSegmentSilent(audioBlob);
         if (silent) {
           if (this.isRecording && !this._pendingCount) {
@@ -2007,7 +2057,6 @@
         }
 
         const apiKey = localStorage.getItem('whisper_api_key');
-        // 用計數器避免多段並行轉寫時，狀態文字互相覆蓋顯示不一致
         this._pendingCount = (this._pendingCount || 0) + 1;
         if (this.isRecording) {
           statusText.textContent = `⏳ 背景轉寫中（${this._pendingCount} 段處理中）...`;
@@ -2017,23 +2066,14 @@
         formData.append('file', audioBlob, 'recording.webm');
         formData.append('model', 'whisper-large-v3-turbo');
 
-        // ★ 修改：語言參數與 prompt 改由 LanguageManager 統一決定，
-        // 不再寫死。固定語言模式（中/英/日）回傳對應的 (languageCode,
-        // prompt)；自動模式視目前是否在 60 秒鎖定期內，回傳鎖定語言
-        // 的組合、或 null（純自動偵測，不傳 language 參數）。
         const langParams = LanguageManager.getParamsForSegment();
         if (langParams) {
           formData.append('language', langParams.languageCode);
           formData.append('prompt', langParams.prompt);
         } else {
-          // 純自動偵測：不傳 language，prompt 也不帶語言/字體傾向，
-          // 避免用單一語言的文字前綴把模型拉向某個方向
           formData.append('prompt', 'This is a recording of a meeting.');
         }
 
-        // ★ 修改：改用 verbose_json 格式，讓回傳結果附帶 Whisper 自己
-        // 偵測到的語言（data.language），自動模式靠這個欄位動態調整
-        // 接下來的語言鎖定，不需要另外呼叫一次 API 專門偵測語言。
         formData.append('response_format', 'verbose_json');
 
         const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
@@ -2048,9 +2088,6 @@
           const data = await res.json();
           this._pendingCount = Math.max(0, this._pendingCount - 1);
 
-          // ★ 新增：自動模式下，用這段的偵測結果更新接下來 60 秒要
-          // 鎖定的語言。固定語言模式下 onDetectedLanguage 內部會直接
-          // 略過，不影響行為。
           LanguageManager.onDetectedLanguage(data.language);
 
           if (data.text && data.text.trim()) {
@@ -2098,9 +2135,6 @@
         DictationEngine.stop();
         return;
       }
-      // 第一次點「開始錄音」（或使用者未曾勾選「下次不用再提醒」）時，
-      // 先跳出產品定位提醒，確認後才真正開始錄音；已確認過的情況下
-      // 直接開始，不會每次錄音都被打斷。
       if (RecordNotice.shouldShow()) {
         RecordNotice.show();
       } else {
@@ -2113,7 +2147,7 @@
         try {
           return localStorage.getItem('record_notice_acknowledged') !== 'true';
         } catch (e) {
-          return true; // localStorage 不可用時，保守起見每次都提醒
+          return true;
         }
       },
       show() {
@@ -2130,40 +2164,11 @@
       }
     };
 
-    // ---------- ★ 存取閘門（Access Gate）----------
-    // 說明：原本的設計是「先顯示畫面，需要發送時才要求登入」，避免
-    // 打斷使用者。但既然現在要求「先加好友、同意使用須知才能用」，
-    // 存取邏輯整個反過來：先驗證、後顯示，主體工具（.app／#mainApp）
-    // 在驗證通過前完全是 display:none，使用者連錄音按鈕都碰不到。
-    //
-    // 流程：
-    // 1. liff.init() 完成後，若未登入 → liff.login()（因為後台
-    //    Add friend option 是 aggressive，登入流程中會自動插入一次
-    //    加好友確認畫面；但這只對「第一次登入這個 channel 的新使用者」
-    //    有效，舊使用者不會重複看到，所以不能只靠這個，一定要下面
-    //    第 2 步主動查詢才可靠）
-    // 2. 登入完成後呼叫 liff.getFriendship() 主動查詢好友狀態
-    //    （這支 API 需要 profile scope，已於後台開通）
-    // 3. friendFlag 為 false → 顯示「請先加好友」畫面，並提供
-    //    「重新檢查」按鈕（使用者離開去加好友後，回來不需要重新整理
-    //    網址，按這顆鈕會重新呼叫 getFriendship 就好）
-    // 4. friendFlag 為 true → 檢查 localStorage 是否已同意過使用須知
-    //    （同意記錄跟 APP_VERSION 綁定，未來使用須知內容更新時，把
-    //    CONSENT_VERSION 一起改掉，使用者就會重新看到同意書）
-    // 5. 尚未同意 → 顯示同意書，勾選確認框後「我已閱讀並同意」按鈕
-    //    才會從 disabled 變成可點擊，避免使用者沒看內容就手滑同意
-    // 6. 「不同意」→ 呼叫 liff.closeWindow()（僅在 LIFF 內嵌視窗有效）
-    //    並同時嘗試 window.close()（外部瀏覽器分頁），兩者都不保證
-    //    100% 成功關閉分頁是瀏覽器安全限制，因此同時顯示文字告知
-    //    使用者可以自行關閉分頁
-    // ★ LIFF ID 安全性說明：這串 ID 本質上是公開的識別碼（如同網址），
-    // 設計上就是要讓使用者能透過它開啟這個頁面，公開它本身不構成資安
-    // 風險。真正需要保護的邊界在 LINE Developers Console 後台幫這個
-    // channel 開通的權限範圍（scope），應定期檢查是否設得過寬。
+    // ---------- 存取閘門（Access Gate）----------
     const LIFF_ID = '2011273067-abYzT84Y';
     let liffReady = false;
 
-    const CONSENT_VERSION = '2026-08-v2'; // 使用須知內容有實質變更時更新此版號，會讓所有人重新看到同意書
+    const CONSENT_VERSION = '2026-08-v2';
 
     const AccessGate = {
       _friendCheckInProgress: false,
@@ -2180,8 +2185,6 @@
           await liff.init({ liffId: LIFF_ID });
           liffReady = true;
         } catch (err) {
-          // LIFF 初始化本身失敗（網址跟後台 Endpoint URL 對不上、liffId 有誤等），
-          // 這種情況無法驗證身份，保守起見直接擋下，不放行任何功能
           console.error('LIFF 初始化失敗：', err);
           document.getElementById('gateLoading').innerHTML =
             '<div class="gate-title">無法載入</div><div class="gate-desc">初始化失敗，請確認網路連線後重新整理頁面。若持續發生，請透過官方帳號回報。</div>';
@@ -2189,10 +2192,8 @@
         }
 
         if (!liff.isLoggedIn()) {
-          // aggressive 模式下，這一步系統會視情況自動插入加好友確認畫面
-          // （僅對第一次登入這個 channel 的使用者），登入完成後會導回本頁
           liff.login({ redirectUri: window.location.href });
-          return; // 頁面即將導向登入頁，不用再往下執行
+          return;
         }
 
         await this.checkFriendshipAndProceed();
@@ -2211,8 +2212,6 @@
           }
           this.checkConsentAndProceed();
         } catch (err) {
-          // getFriendship 失敗（例如 profile scope 未授權、access token 問題），
-          // 保守起見視為「無法確認好友狀態」，不放行，並給出可重試的路徑
           console.error('好友狀態查詢失敗：', err);
           document.getElementById('gateNotFriend').querySelector('.gate-desc').textContent =
             '無法確認好友狀態，請確認已加好友並允許權限後，點下方按鈕重新檢查。';
@@ -2223,9 +2222,7 @@
       },
 
       goAddFriend() {
-        // 導去加好友，用 liff.openWindow 開外部連結（LIFF 內嵌視窗與
-        // 外部瀏覽器都適用），實際好友加取連結請替換成你官方帳號的網址
-        const addFriendUrl = 'https://line.me/R/ti/p/@165tgzzz'; // TODO: 換成你的官方帳號好友加取連結
+        const addFriendUrl = 'https://line.me/R/ti/p/@165tgzzz';
         if (typeof liff.openWindow === 'function') {
           liff.openWindow({ url: addFriendUrl, external: true });
         } else {
@@ -2260,9 +2257,6 @@
       },
 
       declineAndLeave() {
-        // 兩種關閉方式都嘗試，但都不保證一定成功（瀏覽器基於安全性
-        // 限制 window.close() 只能關閉由 script 開啟的分頁），因此
-        // 同時保留畫面上的文字說明，讓使用者知道可以自行關閉
         if (liffReady && liff.isInClient() && typeof liff.closeWindow === 'function') {
           liff.closeWindow();
         }
@@ -2276,19 +2270,18 @@
         document.getElementById('accessGate').style.display = 'none';
         document.getElementById('mainApp').style.display = 'flex';
 
-        // 還原上次留下的卡片內容（若有），讓誤觸上一頁、切出去被系統
-        // 回收分頁等情境下辛苦錄的內容不會憑空消失
         CardSandbox.restore();
         CardSandbox.render();
         CardSandbox.renderLivePreview();
 
-        // ★ 新增：還原上次保存的會議摘要（若有），跟卡片一樣經得起
-        // 誤觸上一頁、切出去被系統回收、重新整理等情境
         SummaryModule.restore();
 
-        // 若還原後發現有內容，直接切到「錄音內容編輯」分頁並顯示發送
-        // 按鈕列，讓使用者第一時間就看到救回來的卡片，而不是還要自己
-        // 想到要點分頁切換才發現內容還在
+        // ★ 新增：每次進站時，共享筆記查看區塊重置回初始狀態（沒有
+        // 讀取結果、輸入框空白），避免顯示上一次瀏覽期間殘留的畫面
+        // 狀態；讀取結果本來就只存在記憶體，重新整理頁面本來就會消失，
+        // 這裡只是確保 UI 顯示與資料狀態一致
+        SharedSheetNotes.resetUI();
+
         if (CardSandbox.cards.length > 0) {
           switchTab('review');
         }
@@ -2296,30 +2289,9 @@
     };
 
     // ---------- LIFF 發送邏輯 ----------
-    // 說明：這裡用 shareTargetPicker() 而非 sendMessages()，因為前者
-    // 在一般瀏覽器（非 LINE App 內嵌視窗）也能呼叫，不需要使用者困在
-    // 拿不到麥克風的 LIFF 內嵌視窗裡；代價是訊息以使用者自己的名義送出，
-    // 不是以你的機器人名義（這是產品決定過的取捨，見程式碼外的討論）。
-
-    // 頁面一載入就啟動存取閘門驗證流程，取代原本「先顯示畫面、
-    // 發送時才登入」的延後式做法
     AccessGate.run();
 
     // ---------- 送回聊天室（sendMessages）----------
-    // 說明：這是查證 LINE 官方文件後找到、最貼近「文字倉庫」需求的做法。
-    // liff.sendMessages() 會把訊息以使用者身份，送到「使用者打開這個
-    // LIFF 頁面時所在的那個聊天室」——不需要選擇對象，因為對象從一開始
-    // 就是固定的（使用者是從跟機器人的對話裡點連結進來的）。
-    //
-    // 官方文件列出的硬性限制：
-    // 1. 只能在 LIFF 瀏覽器裡用，外部瀏覽器（liff.isInClient() 為 false）
-    //    一定會失敗，這裡會直接偵測並提前告知，不會讓使用者白等錯誤訊息。
-    // 2. 這個 LIFF app 所在的 channel，後台要有開通訊息傳送（message write）
-    //    相關權限，沒開通時會拋出「The permission is not in LIFF app scope」
-    //    這則錯誤——真機實測過，開通後端 message write 權限即解決此問題。
-    //    這則錯誤訊息本身措辭含糊，官方案例也提過同一句錯誤在其他情境
-    //    （如從「最近使用列表」重新載入頁面）也可能出現，無法單從文字
-    //    本身判斷真正原因，錯誤提示裡會把已驗證過的原因列在最前面。
     async function handleSendToRoom() {
       const fullText = CardSandbox.cards
         .map(c => c.text)
@@ -2337,18 +2309,9 @@
       ChatPreview.show(fullText, '目前這個聊天室（原對話）', () => doSendToRoom(fullText));
     }
 
-    // ★ 新增：LINE 文字訊息單則有 5000 字元上限，超過會直接被拒絕或
-    // 失敗。長會議（例如兩小時）逐字稿累積起來輕鬆破萬字，必須先切段
-    // 才能送出。LINE_MAX_CHARS 刻意設得比 5000 略保守一點，留一點餘裕
-    // 給加在每則訊息前面的「(n/總數)」標記文字；
-    // LINE_MAX_MESSAGES_PER_CALL 則是 liff.sendMessages() 官方文件規定
-    // 單次呼叫最多帶 5 則訊息，超過要拆成多次呼叫依序送出。
     const LINE_MAX_CHARS = 4800;
     const LINE_MAX_MESSAGES_PER_CALL = 5;
 
-    // 把長文字切成多段，每段不超過 maxChars。盡量在換行處切斷，
-    // 避免把同一句話從中間攔腰切開、拆到兩則訊息裡；找不到適合的換行
-    // 位置（例如整段幾乎沒有換行）時才退而求其次直接依字數硬切。
     function splitTextForLine(text, maxChars) {
       const segments = [];
       let remaining = text;
@@ -2358,7 +2321,7 @@
           break;
         }
         let cutAt = remaining.lastIndexOf('\n', maxChars);
-        if (cutAt <= 0) cutAt = maxChars; // 找不到換行點就直接依字數切
+        if (cutAt <= 0) cutAt = maxChars;
         segments.push(remaining.slice(0, cutAt));
         remaining = remaining.slice(cutAt).replace(/^\n/, '');
       }
@@ -2366,8 +2329,6 @@
     }
 
     async function doSendToRoom(fullText) {
-      // 先切成不超過單則上限的段落；只有一段時不加編號標記，
-      // 維持原本單則訊息的呈現方式，不干擾短內容的使用體驗
       const segments = splitTextForLine(fullText, LINE_MAX_CHARS);
       const messages = segments.map((text, idx) => ({
         type: 'text',
@@ -2375,8 +2336,6 @@
       }));
 
       try {
-        // sendMessages 單次最多帶 5 則訊息，超過就拆成多次呼叫依序送出，
-        // 用 for 迴圈依序 await，確保訊息送達聊天室的順序跟逐字稿順序一致
         for (let i = 0; i < messages.length; i += LINE_MAX_MESSAGES_PER_CALL) {
           const batch = messages.slice(i, i + LINE_MAX_MESSAGES_PER_CALL);
           await liff.sendMessages(batch);
@@ -2387,9 +2346,6 @@
         StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
       } catch (err) {
         console.error('sendMessages 發送失敗：', err);
-        // 這裡列出的排查順序是依實測驗證過的可能性排的：後台權限設定
-        // 是已確認會導致此錯誤的原因，「最近使用列表」是官方文件提過、
-        // 但尚未實測驗證的次要可能性
         alert(
           '發送失敗：' + err.message +
           '\n\n可能原因（請依序檢查）：\n' +
@@ -2415,15 +2371,10 @@
 
     async function doSend(fullText) {
       if (!liffReady) {
-        // LIFF 初始化本身失敗（可能是網址跟後台登記的 Endpoint URL 對不上、
-        // 或 liffId 有誤），這種情況無法救，直接降級
         copyToClipboardFallback(fullText);
         return;
       }
 
-      // 尚未登入時，shareTargetPicker 一定無法使用（官方文件明確要求登入
-      // 為前提條件）。這裡用使用者主動點擊「發送」觸發的登入，把整理好的
-      // 卡片內容暫存起來，登入完成、頁面導回來後可以繼續發送流程。
       if (typeof liff.isLoggedIn === 'function' && !liff.isLoggedIn()) {
         try {
           sessionStorage.setItem('pending_send_text', fullText);
@@ -2433,18 +2384,16 @@
         return;
       }
 
-      // 情境一：已登入，且 shareTargetPicker 在目前環境可用
       if (typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker')) {
         try {
           const res = await liff.shareTargetPicker(
             [{ type: 'text', text: fullText }],
-            { isMultiple: false } // 限定只能選一個對象，避免整理好的筆記一次發給多人
+            { isMultiple: false }
           );
           if (res) {
             alert('已送出，請確認對方（例如你的官方帳號）是否收到。');
             StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
           } else {
-            // res 為 falsy 但沒有拋錯，代表使用者可能在選擇畫面中途取消
             alert('已取消發送。');
           }
         } catch (err) {
@@ -2455,27 +2404,19 @@
         return;
       }
 
-      // 情境二：已登入，但 shareTargetPicker 仍不可用（例如後台同意條款未開通）
       copyToClipboardFallback(fullText);
     }
 
-    // 頁面載入時，若偵測到剛完成登入導回、且先前有暫存待發送的文字，
-    // 提示使用者可以直接再按一次發送（此時 liff.isLoggedIn() 應已為 true）
     window.addEventListener('load', () => {
       try {
         const pending = sessionStorage.getItem('pending_send_text');
         if (pending) {
           sessionStorage.removeItem('pending_send_text');
-          // 只提示、不自動重送，避免使用者還沒看清楚內容就被送出
           console.log('偵測到登入前暫存的卡片內容，請重新確認卡片並再次點擊發送。');
         }
       } catch (e) { /* 忽略 */ }
     });
 
-    // ★ 剪貼簿殘留提醒：navigator.clipboard.writeText() 寫入的內容會停留
-    // 在作業系統的剪貼簿裡，直到被下一次複製動作覆蓋掉。這是共用裝置
-    // 情境下另一個容易被忽略的資料殘留點——跟 localStorage 不同，
-    // 網頁端沒有標準 API 能主動清空系統剪貼簿，只能提醒使用者留意。
     function copyToClipboardFallback(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text)
@@ -2487,13 +2428,6 @@
     }
 
     // ---------- 手機系統分享 ----------
-    // 說明：查證後發現 navigator.share()（Web Share API）在 LIFF 內嵌
-    // 視窗裡幾乎必定失敗——這是 LINE 官方文件自己承認的已知限制
-    // （LIFF 瀏覽器不支援外部瀏覽器才有的部分網頁技術），也在 LINE
-    // 官方案例集裡看到對應寫法：用 liff.isInClient() 先判斷環境，
-    // 在 LIFF 裡直接改走 shareTargetPicker，只有外部瀏覽器才用
-    // navigator.share。這裡照這個方向調整，不再讓使用者在 LIFF 裡
-    // 白等一次注定失敗的嘗試。
     async function handleWebShare() {
       const fullText = CardSandbox.cards
         .map(c => c.text)
@@ -2503,9 +2437,6 @@
         return;
       }
 
-      // 在 LIFF 內嵌視窗裡：navigator.share 幾乎必定被容器擋下，
-      // 直接改用跟「LINE 好友選單」相同的 shareTargetPicker 邏輯，
-      // 不多跑一次注定失敗的嘗試
       if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
         ChatPreview.show(fullText, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(fullText));
         return;
@@ -2524,19 +2455,15 @@
       const shareData = { text: fullText };
 
       try {
-        // 有 canShare 就先驗證一次，避免呼叫 share() 時才發現資料格式不被接受
         if (navigator.canShare && !navigator.canShare(shareData)) {
           alert('此瀏覽器不支援分享這種內容，改為複製到剪貼簿。');
           copyToClipboardFallback(fullText);
           return;
         }
         await navigator.share(shareData);
-        // 規格上 Android 的 Promise 在資料成功交給分享目標時 resolve，
-        // 不代表訊息一定送達對方，這裡的提示措辭刻意保守
         console.log('已交給系統分享機制，請自行確認對方是否收到。');
         StorageToast.show('已交給系統分享。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
       } catch (err) {
-        // AbortError：使用者自己取消了分享選單，是正常操作，不用當成錯誤處理
         if (err.name === 'AbortError') {
           return;
         }
