@@ -687,6 +687,13 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>修正「複製成 Sheet 貼上格式」偶爾複製失敗的問題</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>部分瀏覽器環境（尤其 iPhone／iOS 上的 Safari 與 LINE 內建瀏覽器）點擊「複製成 Sheet 貼上格式」輸入完主題名稱後，會出現「複製失敗」——這是瀏覽器對彈出輸入框之後緊接著呼叫剪貼簿功能的時序限制所致，跟輸入的內容無關</li>
+              <li>已修正：複製功能改為在現代瀏覽器複製方式失敗時，自動改用另一種較舊但更可靠的備援方式重試，大幅降低複製失敗的機率；「複製摘要」「發送失敗改複製」等其他複製功能也一併套用同樣的強化</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>共享表格圖文教學、資安提醒強化</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>「共享」分頁的「讀取共用 Google Sheet」標題旁新增❓圖示，點擊可看完整圖文教學：如何建立共用表格、複製貼上的位置示意圖（A1、A2、A3...）、共用權限該選哪一種</li>
@@ -1277,7 +1284,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-sheet-guide-security';
+    const APP_VERSION = '2026-09-clipboard-fix';
 
     const IntroModal = {
       switchTab(tab) {
@@ -2628,13 +2635,24 @@
           type: type
         });
 
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(pasteText)
-            .then(() => alert(`已複製成可直接貼上 Google Sheet 的格式（主題：${label}，類型：${typeLabel}）。\n\n請開啟共用 Sheet，點選下一個空白儲存格，直接貼上即可（會落在單一格，不會自動分欄）。`))
-            .catch(() => alert('複製失敗，請改用其他方式手動整理內容。'));
-        } else {
-          alert('這個瀏覽器不支援自動複製，請手動選取以下內容：\n\n' + pasteText);
-        }
+        // ★ 修正：原本直接呼叫 navigator.clipboard.writeText()，在
+        // prompt() 詢問主題名稱之後緊接著呼叫會在部分瀏覽器（尤其
+        // Safari／WebKit，包含 LINE 內建瀏覽器在 iOS 上）因為使用者
+        // 互動有效期已過而被拒絕，導致複製失敗——這跟輸入內容或格式
+        // 完全無關，是瀏覽器對 prompt() 之後呼叫剪貼簿 API 的時序
+        // 限制。改用 copyTextRobust()，會在現代 Clipboard API 失敗時
+        // 自動退回 execCommand('copy') 這個不受同樣限制影響的方式，
+        // 大幅降低複製失敗的機率（詳見 copyTextRobust 的完整說明）。
+        copyTextRobust(pasteText).then(success => {
+          if (success) {
+            alert(`已複製成可直接貼上 Google Sheet 的格式（主題：${label}，類型：${typeLabel}）。\n\n請開啟共用 Sheet，點選下一個空白儲存格，直接貼上即可（會落在單一格，不會自動分欄）。`);
+          } else {
+            // 兩種複製方式都失敗的最終回退：直接把內容顯示在提示框
+            // 裡，讓使用者自己手動選取複製，確保無論如何都不會讓
+            // 使用者卡在「什麼都做不了」的狀態
+            alert('自動複製失敗，請手動選取以下內容複製：\n\n' + pasteText);
+          }
+        });
       },
 
       // 卡片複製的入口，維持原本按鈕呼叫的方法名稱與呼叫方式不變，
@@ -2913,13 +2931,16 @@
 
       copy() {
         if (!this.currentSummary) return;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(this.currentSummary)
-            .then(() => alert('已複製摘要到剪貼簿。'))
-            .catch(() => alert('複製失敗，請手動選取摘要內容複製。'));
-        } else {
-          alert('請手動選取摘要內容複製。');
-        }
+        // ★ 修正：改用 copyTextRobust()，跟其他複製功能統一標準，
+        // 即使這裡沒有前置 prompt() 造成的時序問題，仍一併強化以防
+        // 其他瀏覽器環境下的邊角情況
+        copyTextRobust(this.currentSummary).then(success => {
+          if (success) {
+            alert('已複製摘要到剪貼簿。');
+          } else {
+            alert('複製失敗，請手動選取摘要內容複製。');
+          }
+        });
       },
 
       // ★ 新增：把已生成的摘要複製成可貼進共用 Sheet 的格式，標記
@@ -3855,14 +3876,77 @@
       } catch (e) { /* 忽略 */ }
     });
 
-    function copyToClipboardFallback(text) {
+    // ---------- ★ 新增：健壯的剪貼簿複製工具（copyTextRobust）----------
+    //
+    // 背景：「複製成 Sheet 貼上格式」在改版加入 prompt() 詢問主題名稱
+    // 之後，開始出現複製失敗的回報。根本原因是瀏覽器的
+    // navigator.clipboard.writeText() 要求呼叫當下必須處於「使用者
+    // 剛做了有效互動」的時間窗內（transient user activation），而
+    // prompt() 是一個阻塞式對話框——在 Safari／WebKit（LINE 內建
+    // 瀏覽器在 iOS 上底層也是 WebKit）上，prompt() 關閉後這個互動
+    // 有效性經常已經消失，導致緊接著呼叫的 writeText() 被瀏覽器直接
+    // 拒絕、跳進 catch，跟輸入的內容或格式完全無關，是純粹的瀏覽器
+    // 時序限制問題。這個現象在 Chrome 上通常不會發生（判定較寬鬆），
+    // 因此原本測試時沒有注意到，只有在較嚴格的瀏覽器環境才會現形。
+    //
+    // 解法：加上 document.execCommand('copy') 作為 fallback——這是
+    // 較舊、但仍被所有主流瀏覽器支援的複製方式，透過建立一個暫時的
+    // <textarea>、選取內容、觸發瀏覽器的複製指令來完成，不依賴
+    // navigator.clipboard 的非同步權限檢查，因此不受同樣的時序限制
+    // 影響。這個 API 雖然已被官方標示為「過時」，但目前仍是解決這類
+    // 時序問題最可靠的手段，Chrome/Firefox/Safari 現行版本都還支援。
+    //
+    // 使用方式：優先嘗試 navigator.clipboard.writeText()（現代 API，
+    // 通常更快、不需要操作 DOM），失敗時自動退回 execCommand 方式，
+    // 兩者都失敗才真正回報複製失敗給使用者。呼叫端不需要關心用了
+    // 哪一種方式，只需要處理最終的成功/失敗結果。
+    async function copyTextRobust(text) {
+      // 優先嘗試現代 Clipboard API
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text)
-          .then(() => alert('已複製全文到剪貼簿，請手動貼到 LINE 聊天室。\n\n提醒：內容會留在系統剪貼簿裡，若這是共用裝置，貼上後建議複製一段無關的文字覆蓋掉，避免下一位使用者貼上時看到你的筆記內容。'))
-          .catch(() => alert('複製失敗，請手動選取以下內容複製：\n\n' + text));
-      } else {
-        alert('請手動選取以下內容複製：\n\n' + text);
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (e) {
+          // 不在這裡直接放棄，繼續往下嘗試 execCommand fallback
+          console.warn('navigator.clipboard.writeText 失敗，改用 execCommand 備援：', e);
+        }
       }
+
+      // Fallback：建立暫時的 textarea，選取內容後呼叫瀏覽器的複製指令
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        // 固定定位到畫面外，避免使用者看到這個暫時元素閃現，也避免
+        // 觸發頁面捲動（例如手機鍵盤彈出）
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        // iOS Safari 額外需要設定 selection range，否則 select() 在
+        // 部分版本可能選不到完整內容
+        textarea.setSelectionRange(0, text.length);
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return success;
+      } catch (e) {
+        console.warn('execCommand 備援複製也失敗：', e);
+        return false;
+      }
+    }
+
+    function copyToClipboardFallback(text) {
+      // ★ 修正：改用 copyTextRobust()，跟上面 CopyToSheetFormat 的
+      // 修正邏輯一致，遇到 Clipboard API 被拒絕時自動退回
+      // execCommand 方式，而不是直接判定失敗
+      copyTextRobust(text).then(success => {
+        if (success) {
+          alert('已複製全文到剪貼簿，請手動貼到 LINE 聊天室。\n\n提醒：內容會留在系統剪貼簿裡，若這是共用裝置，貼上後建議複製一段無關的文字覆蓋掉，避免下一位使用者貼上時看到你的筆記內容。');
+        } else {
+          alert('複製失敗，請手動選取以下內容複製：\n\n' + text);
+        }
+      });
     }
 
     // ---------- 手機系統分享 ----------
