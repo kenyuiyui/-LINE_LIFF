@@ -480,7 +480,31 @@
       background: var(--card-bg); border: 1px dashed var(--border); border-radius: 14px;
       padding: 16px; margin-bottom: 16px;
     }
-    .shared-notes-panel-label { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .shared-notes-panel-label { font-size: 13px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    /* ★ 新增：教學彈窗的❓觸發圖示，放在標題旁邊，樣式低調（灰底圓形）
+       避免搶走標題本身的視覺重點，但足夠明顯讓使用者知道可以點擊 */
+    .btn-help-icon {
+      width: 18px; height: 18px; border-radius: 50%; border: none;
+      background: var(--border); color: var(--ink-soft); cursor: pointer;
+      font-size: 11px; line-height: 1; display: inline-flex; align-items: center;
+      justify-content: center; padding: 0; flex-shrink: 0;
+    }
+    .btn-help-icon:hover { background: var(--line-green-tint); color: var(--line-green-dark); }
+
+    /* ★ 新增：教學彈窗裡「正確／錯誤權限設定」的提示框，用綠/紅框線
+       明確做出視覺區分，避免使用者選錯權限 */
+    .guide-permission-box {
+      border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+      font-size: 13px; line-height: 1.6;
+    }
+    .guide-permission-correct {
+      background: var(--line-green-tint); border: 1px solid var(--line-green);
+      color: var(--line-green-dark);
+    }
+    .guide-permission-wrong {
+      background: #fdeaea; border: 1px solid var(--danger);
+      color: var(--danger);
+    }
     .shared-notes-panel-desc { font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 12px; }
     .shared-notes-input-row { display: flex; gap: 6px; margin-bottom: 10px; }
     .shared-notes-input-row input {
@@ -663,6 +687,13 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>共享表格圖文教學、資安提醒強化</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「共享」分頁的「讀取共用 Google Sheet」標題旁新增❓圖示，點擊可看完整圖文教學：如何建立共用表格、複製貼上的位置示意圖（A1、A2、A3...）、共用權限該選哪一種</li>
+              <li>教學內加入明確的<b>資安提醒</b>：本工具只會讀取資料，完全沒有寫入 Google Sheets 的功能；但「連結可編輯」是 Google Sheets 本身的權限設定，一旦選用，任何拿到連結的人都能修改或刪除整份表格，這個風險與本工具無關、是使用者在 Google 那端的設定選擇，建議一律選「檢視者」權限</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>介面改版：分頁式導覽，API Key 移至設定頁</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>整體介面改為 5 個分頁：<b>🎙️錄音／🗂️筆記／📖共享／📝摘要／⚙️設定</b>，同一時間只顯示一個分頁內容，畫面更聚焦，尤其在手機小螢幕上更容易看清楚目前在做什麼</li>
@@ -833,6 +864,72 @@
     </div>
   </div>
 
+  <!-- ★ 新增：共享 Google Sheet 建立教學彈窗（圖文步驟＋資安提醒）。
+       點擊「讀取共用 Google Sheet」標題旁的❓圖示觸發，手動開啟，
+       不會自動彈出。內容分兩部分：1) 怎麼建立一份可共用的表格、
+       複製貼上流程（含 SVG 簡化示意圖標註 A1/A2 位置）；2) 權限
+       設定該選哪個，以及「連結可編輯」這個常見設定的風險提醒——
+       這個工具本身只會讀取資料、不會寫入，但使用者自己在 Google
+       Sheets 那邊選錯權限（設成可編輯而非僅檢視）的話，任何拿到
+       連結的人都能修改或刪除整份表格，這跟這個工具無關，是使用者
+       自己在 Google 那端的設定選擇，必須講清楚避免誤解。 -->
+  <div class="modal-overlay hidden" id="sharedSheetGuideModal">
+    <div class="modal-box" style="max-width:460px; max-height:85vh;">
+      <div class="modal-tabs"><button class="active" style="cursor:default;">📖 建立共用表格教學</button></div>
+      <div class="modal-body">
+        <h4 style="margin-top:0;">① 建立一份新的 Google Sheet</h4>
+        <p style="margin:4px 0 10px; line-height:1.7;">
+          打開 <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> 直接建立一份空白表格（或用現有的既有表格也可以）。這份表格不需要任何標題列，<b>每一格都直接存放一筆完整資料</b>，從 A1 開始，往下一格一格填。
+        </p>
+
+        <div id="sheetGuideSvgSlot" style="margin:10px 0; border-radius:10px; overflow:hidden; border:1px solid #e5e7eb; line-height:0;"></div>
+
+        <h4>② 把整理好的內容複製貼上</h4>
+        <p style="margin:4px 0 10px; line-height:1.7;">
+          在「筆記」或「摘要」分頁點<b>「複製成 Sheet 貼上格式」</b>（或摘要那邊的「存回 Sheet」），系統會問你要取什麼主題名稱，接著自動複製成一整包資料到剪貼簿。回到 Google Sheet：
+        </p>
+        <ol style="padding-left:20px; line-height:1.9; margin:0 0 10px;">
+          <li>點選 <b>A1</b> 儲存格</li>
+          <li>直接貼上（Ctrl+V 或長按貼上）</li>
+          <li>下一個人要貼，就點 <b>A2</b>；再下一筆就 <b>A3</b>，依此類推，永遠貼在<b>下一個空白格</b></li>
+        </ol>
+        <p style="margin:4px 0 10px; line-height:1.7; color:var(--ink-soft); font-size:12.5px;">
+          每一格看起來會是一長串英數字夾雜符號的文字（例如 <code>{"label":"上半場逐字稿",...}</code>），這是正常的——這份表格是設計給程式讀取的資料庫，不是給人閱讀的表格，不需要、也請不要手動整理成別的格式。
+        </p>
+
+        <h4>③ 設定分享權限，並取得連結</h4>
+        <p style="margin:4px 0 10px; line-height:1.7;">
+          點右上角<b>「共用」</b>按鈕 → 「取得連結」，把權限改成：
+        </p>
+        <div class="guide-permission-box guide-permission-correct">
+          ✅ <b>「知道連結的使用者」→「檢視者」</b><br>
+          <span style="font-weight:400; font-size:11.5px;">這是本工具唯一需要的權限。任何拿到連結的人都能「讀取」內容，但沒有人（包括本工具）能修改或刪除表格。</span>
+        </div>
+        <div class="guide-permission-box guide-permission-wrong">
+          ❌ <b>請不要選「編輯者」</b><br>
+          <span style="font-weight:400; font-size:11.5px;">見下方「資安提醒」。</span>
+        </div>
+        <p style="margin:10px 0; line-height:1.7;">
+          複製這個連結，貼到本工具的「共享」分頁輸入框，點「讀取」即可。
+        </p>
+
+        <h4 style="color:var(--danger);">⚠️ 資安提醒：關於「連結可編輯」</h4>
+        <p style="margin:4px 0 10px; line-height:1.75; font-size:12.5px;">
+          <b>本工具只會讀取資料，程式碼裡完全沒有寫入 Google Sheets 的功能</b>，就算你把權限設成「編輯者」，本工具本身也不會、也沒有能力去修改你的表格。
+        </p>
+        <p style="margin:4px 0 10px; line-height:1.75; font-size:12.5px;">
+          但「連結可編輯」這個設定本身的風險，跟這個工具無關，而是 <b>Google Sheets 本身的機制</b>：一旦設成「知道連結的使用者」＋「編輯者」，代表<b>任何拿到這個連結的人</b>（不限於你邀請的協作者，只要連結被轉傳出去、被搜尋引擎索引到、或不小心分享錯地方）都能<b>修改、刪除、甚至清空整份表格</b>，不需要登入、不需要驗證身份。
+        </p>
+        <p style="margin:4px 0 0; line-height:1.75; font-size:12.5px;">
+          這個工具的用途只需要「檢視」權限就足夠，<b>強烈建議一律選「檢視者」，不要選「編輯者」</b>，把表格的編輯權限留給真正需要寫入的協作者，用 Email 邀請的方式個別授權，而不是整個對外開放編輯。
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button onclick="SharedSheetGuide.close()">我知道了</button>
+      </div>
+    </div>
+  </div>
+
   <div class="access-gate" id="accessGate">
     <!-- 1. 驗證中 -->
     <div class="gate-panel" id="gateLoading">
@@ -983,9 +1080,12 @@
              這裡仍然完全不寫入 Sheet，寫入交由使用者自行手動操作，
              下方「複製成 Sheet 貼上格式」按鈕是為了那個手動步驟提供便利。 -->
         <div class="shared-notes-panel" id="sharedNotesPanel">
-          <div class="shared-notes-panel-label">讀取共用 Google Sheet</div>
+          <div class="shared-notes-panel-label">
+            讀取共用 Google Sheet
+            <button class="btn-help-icon" onclick="SharedSheetGuide.open()" title="怎麼建立共用表格？點這裡看圖文教學">❓</button>
+          </div>
           <div class="shared-notes-panel-desc">
-            貼上共用 Google Sheet 的分享連結，讀取後可勾選要查看（或用來生成摘要）的資料，可複選，勾選順序即為送去生成摘要時的順序。這裡只能「查看」，不會修改 Sheet 本身。
+            貼上共用 Google Sheet 的分享連結，讀取後可勾選要查看（或用來生成摘要）的資料，可複選，勾選順序即為送去生成摘要時的順序。這裡只能「查看」，不會修改 Sheet 本身。還沒建立共用表格？點上面的❓看圖文教學。
           </div>
           <div class="shared-notes-input-row">
             <input type="text" id="sharedSheetUrlInput" placeholder="貼上 Google Sheet 分享連結">
@@ -1177,7 +1277,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-gemini-key-guide';
+    const APP_VERSION = '2026-09-sheet-guide-security';
 
     const IntroModal = {
       switchTab(tab) {
@@ -1919,6 +2019,91 @@
         this.cards.unshift(moved);
         this.persist();
         this.render();
+      }
+    };
+
+    // ---------- ★ 新增：共享 Sheet 建立教學彈窗（SharedSheetGuide）----------
+    //
+    // 目的：使用者第一次要用「共享」分頁時，常見的困惑是「我要怎麼
+    // 生一份大家都能貼、都能讀的表格」，以及「Google Sheets 的共用
+    // 權限要選哪一種」。這個彈窗把完整流程（建表→複製貼上→設定
+    // 權限）搭配一張簡化的 SVG 示意圖講清楚，並在最後強調一次資安
+    // 提醒——「連結可編輯」是使用者自己在 Google 那端做的選擇，
+    // 這個工具本身無法、也不會寫入 Sheet，但如果使用者選錯權限，
+    // 風險是任何拿到連結的人都能改寫或刪除整份表格，這件事必須
+    // 講清楚，避免使用者誤以為「反正這個工具說要分享連結，設可
+    // 編輯應該比較方便」而忽略了背後的風險。
+    //
+    // 彈窗手動觸發（點擊❓圖示），不會在使用者第一次打開共享分頁時
+    // 自動彈出——教學內容較長，自動彈出容易造成干擾，交由使用者自行
+    // 決定何時需要查看。
+    const SharedSheetGuide = {
+      // SVG 示意圖：簡化的試算表界面，標示 A1／A2 已有資料、A3 是
+      // 下一個該貼上的空白格。直接以字串寫在 JS 裡（而非另外掛外部
+      // .svg 檔案），單一 HTML 檔案沒有額外檔案管理負擔，符合這個
+      // 專案「整個工具就是一份 HTML」的既有設計原則。
+      SVG_CONTENT: `<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" width="100%">
+  <rect width="400" height="260" fill="#ffffff" stroke="#e5e7eb" stroke-width="1"/>
+  <rect x="0" y="0" width="400" height="22" fill="#f5f6f8"/>
+  <text x="10" y="15" font-family="-apple-system,sans-serif" font-size="10" fill="#6b7280">📊 共用試算表.xlsx</text>
+  <rect x="0" y="22" width="40" height="20" fill="#eef1f4"/>
+  <rect x="40" y="22" width="90" height="20" fill="#eef1f4"/>
+  <rect x="130" y="22" width="90" height="20" fill="#eef1f4"/>
+  <rect x="220" y="22" width="90" height="20" fill="#eef1f4"/>
+  <text x="82" y="36" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#6b7280" text-anchor="middle">A</text>
+  <text x="172" y="36" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#9ca3af" text-anchor="middle">B</text>
+  <text x="262" y="36" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#9ca3af" text-anchor="middle">C</text>
+  <rect x="0" y="42" width="20" height="44" fill="#eef1f4"/>
+  <rect x="0" y="86" width="20" height="44" fill="#eef1f4"/>
+  <rect x="0" y="130" width="20" height="44" fill="#eef1f4"/>
+  <rect x="0" y="174" width="20" height="44" fill="#eef1f4"/>
+  <text x="10" y="68" font-family="-apple-system,sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">1</text>
+  <text x="10" y="112" font-family="-apple-system,sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">2</text>
+  <text x="10" y="156" font-family="-apple-system,sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">3</text>
+  <text x="10" y="200" font-family="-apple-system,sans-serif" font-size="10" fill="#9ca3af" text-anchor="middle">4</text>
+  <g stroke="#e5e7eb" stroke-width="1">
+    <line x1="20" y1="42" x2="400" y2="42"/>
+    <line x1="20" y1="86" x2="400" y2="86"/>
+    <line x1="20" y1="130" x2="400" y2="130"/>
+    <line x1="20" y1="174" x2="400" y2="174"/>
+    <line x1="20" y1="218" x2="400" y2="218"/>
+    <line x1="20" y1="42" x2="20" y2="218"/>
+    <line x1="130" y1="42" x2="130" y2="218"/>
+    <line x1="220" y1="42" x2="220" y2="218"/>
+    <line x1="310" y1="42" x2="310" y2="218"/>
+  </g>
+  <rect x="20" y="42" width="110" height="44" fill="#e8f9ee" stroke="#06c755" stroke-width="2"/>
+  <text x="27" y="58" font-family="-apple-system,sans-serif" font-size="8" fill="#04a047">{"label":"上半場",</text>
+  <text x="27" y="69" font-family="-apple-system,sans-serif" font-size="8" fill="#04a047">"content":"...",</text>
+  <text x="27" y="80" font-family="-apple-system,sans-serif" font-size="8" fill="#04a047">"type":"raw"}</text>
+  <rect x="20" y="86" width="110" height="44" fill="#e8f9ee" stroke="#06c755" stroke-width="2"/>
+  <text x="27" y="102" font-family="-apple-system,sans-serif" font-size="8" fill="#04a047">{"label":"下半場",</text>
+  <text x="27" y="113" font-family="-apple-system,sans-serif" font-size="8" fill="#04a047">"content":"...",</text>
+  <text x="27" y="124" font-family="-apple-system,sans-serif" font-size="8" fill="#04a047">"type":"raw"}</text>
+  <rect x="20" y="130" width="110" height="44" fill="#fff8e6" stroke="#d99a2b" stroke-width="2" stroke-dasharray="4,3"/>
+  <text x="75" y="156" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#a06800" text-anchor="middle">👉 貼這裡</text>
+  <text x="140" y="65" font-family="-apple-system,sans-serif" font-size="9" fill="#6b7280">← 第 1 筆資料</text>
+  <text x="140" y="109" font-family="-apple-system,sans-serif" font-size="9" fill="#6b7280">← 第 2 筆資料</text>
+  <text x="140" y="153" font-family="-apple-system,sans-serif" font-size="9" fill="#a06800" font-weight="600">← 下一筆貼在這裡（A3）</text>
+  <text x="200" y="240" font-family="-apple-system,sans-serif" font-size="10" fill="#6b7280" text-anchor="middle">每一格＝一筆完整資料，永遠貼在「下一個空白格」，B/C 欄不使用</text>
+</svg>`,
+
+      _svgInjected: false,
+
+      open() {
+        // SVG 只在第一次開啟時注入 DOM（用 innerHTML 插入字串），
+        // 避免每次開關彈窗都重新解析一次 SVG 字串，是小小的效能
+        // 考量，雖然這裡的量體完全不構成效能問題，純粹是習慣寫法
+        if (!this._svgInjected) {
+          const slot = document.getElementById('sheetGuideSvgSlot');
+          if (slot) slot.innerHTML = this.SVG_CONTENT;
+          this._svgInjected = true;
+        }
+        document.getElementById('sharedSheetGuideModal').classList.remove('hidden');
+      },
+
+      close() {
+        document.getElementById('sharedSheetGuideModal').classList.add('hidden');
       }
     };
 
