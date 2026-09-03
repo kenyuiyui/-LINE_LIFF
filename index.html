@@ -1081,6 +1081,22 @@
             </span>
             <button class="btn-clear-link" onclick="ClearLocalData.forgetGeminiKey()" title="只清除 Gemini Key，其他資料不受影響">🗑️ 忘記這把 Key</button>
           </div>
+          <!-- ★ 新增：Gemini Key 申請教學，比照上方 Groq Key 的
+               <details> 展開區塊，補齊原本缺漏的步驟說明 -->
+          <details>
+            <summary>還沒有 Gemini API Key？點這裡看申請教學</summary>
+            <div class="guide-body">
+              <ol style="margin:0; padding-left:18px;">
+                <li>打開 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a>（Google AI Studio 的 API Key 頁面）</li>
+                <li>用你的 Google 帳號登入（跟平常登入 Gmail／Google Drive 用同一組帳號即可），第一次使用可能需要先同意條款</li>
+                <li>點畫面上的「<b>Create API key</b>」按鈕</li>
+                <li>如果系統詢問要建立在哪個 Google Cloud 專案底下，選「Create API key in new project」（建立新專案）最簡單，不需要額外設定</li>
+                <li>畫面會顯示一串以 <code>AIza</code> 開頭的金鑰，點旁邊的複製圖示整串複製起來（這個頁面之後還能回來查看，不像 Groq 只顯示一次，但還是建議先複製好）</li>
+                <li>回到這裡，把整串貼進上面的輸入框即可</li>
+              </ol>
+              <div class="guide-note">免費額度足夠日常使用，不需要信用卡；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。這個 Key 是選填的，只有要用「AI 摘要」功能時才需要設定，不影響錄音轉文字等其他功能。</div>
+            </div>
+          </details>
         </div>
 
         <!-- ★ 新增：逐項刪除區塊。原本「清除本機資料」是單一顆按鈕
@@ -1161,7 +1177,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-tab-redesign';
+    const APP_VERSION = '2026-09-gemini-key-guide';
 
     const IntroModal = {
       switchTab(tab) {
