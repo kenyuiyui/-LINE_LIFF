@@ -35,7 +35,20 @@
     - static.line-scdn.net：載入 LIFF SDK
     - api.groq.com：Whisper 轉寫 API（透過 connect-src，因為是 fetch() 呼叫，不是載入 script）
     - generativelanguage.googleapis.com：Gemini 會議摘要 API（同樣是 fetch() 呼叫）
-    - docs.google.com：讀取共享 Google Sheet 筆記的 CSV 匯出端點（★ 本次新增）
+    - docs.google.com：讀取共享 Google Sheet 筆記時，最初送出請求的網域
+    - *.googleusercontent.com：★ 修正（原本漏掉）。docs.google.com 的
+      CSV 匯出端點實際上會回傳一個 302 轉址，真正吐出檔案內容的是像
+      doc-XX-bg-sheets.googleusercontent.com 這樣的網域（XX 是隨機
+      伺服器代號，每次請求可能不同）。原本只放行 docs.google.com，
+      瀏覽器在跟隨轉址那一步會被 CSP 擋下，導致 fetch() 直接失敗、
+      丟出 TypeError: Failed to fetch，實測在一般瀏覽器與 LIFF 內
+      皆會發生，並非 LIFF 內嵌瀏覽器特有的限制。因為代號是隨機的，
+      無法只列出固定子網域，改用萬用字元涵蓋整個 googleusercontent.com。
+    - liffsdk.line-scdn.net：★ 順手修正。LIFF SDK 初始化時會自動抓取
+      多語系翻譯檔（manifest.json），這個網域原本沒放行，導致每次
+      liff.init() 都會在 console 噴出一段紅色錯誤（不影響功能，因為
+      本頁面固定使用繁體中文文案，用不到 SDK 內建的多語系翻譯，但錯誤
+      訊息容易讓人誤以為是本次修改造成的新問題，一併放行清乾淨。
     其餘一律擋掉。這樣就算未來哪裡不小心被注入了一段惡意 <script src="...">
     或想把資料 fetch 送到別的網域，瀏覽器會直接擋下，不會執行/送出。
   -->
@@ -44,7 +57,7 @@
     script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net;
     frame-src https://access.line.me;
     base-uri 'self';
     form-action 'none';
@@ -846,7 +859,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-shared-sheet-notes';
+    const APP_VERSION = '2026-09-shared-sheet-notes-csp-fix';
 
     const IntroModal = {
       switchTab(tab) {
@@ -1394,23 +1407,26 @@
           res = await fetch(exportUrl);
         } catch (networkErr) {
           this.setLoading(false);
-          // ★ 修正：原本這裡不分青紅皂白都顯示「請檢查網路連線」，但
-          // fetch() 在這裡失敗的常見原因其實有好幾種，籠統的訊息讓人
-          // 沒辦法判斷該怎麼排除。改成把瀏覽器實際回報的錯誤內容
-          // （networkErr.message／name）一併顯示出來，並針對「在 LINE
-          // App 內建瀏覽器（LIFF webview）」這個已知會擋第三方網域
-          // fetch 的情境，額外給一條明確提示——這是實測過會出現的
-          // 情況：CSP 已經放行 docs.google.com、Sheet 共用設定也正確，
-          // 但某些 Android LINE 版本的 webview 仍會在系統網路層直接
-          // 擋下對 docs.google.com 的請求，導致 fetch 丟出
-          // TypeError: Failed to fetch，此時單靠「檢查網路連線」這句
-          // 話完全無助於使用者判斷問題出在哪。
-          const isInLiffClient = liffReady && typeof liff.isInClient === 'function' && liff.isInClient();
+          // ★ 修正：原本這裡的訊息把矛頭指向「LIFF 內建瀏覽器限制」，
+          // 但實測後發現真正原因不是 webview 限制，而是本頁面自己的
+          // CSP 設定不完整：docs.google.com 的 CSV 匯出端點會回傳一個
+          // 302 轉址，真正吐出檔案內容的是像
+          // doc-XX-bg-sheets.googleusercontent.com 這樣的隨機子網域，
+          // 原本 CSP 只放行了 docs.google.com、沒放行轉址目的地，導致
+          // 瀏覽器在跟隨轉址時直接擋下請求——這在一般瀏覽器與 LIFF 內
+          // 都會發生，不是 LIFF 特有問題，之前的判斷方向錯了。
+          //
+          // 現在 CSP 已經加上 https://*.googleusercontent.com，正常
+          // 情況下不應該再遇到這個錯誤。這裡保留 CSP 相關提示是為了
+          // 保護未來維護這份程式碼的人：如果之後有人調整過 CSP 卻不小心
+          // 漏掉這條規則，這裡的錯誤訊息能直接點出問題所在，不需要重新
+          // 一輪除錯。
+          const cspMightBeBlocking = /Failed to fetch/i.test(networkErr.message || '');
           let msg = `讀取失敗，瀏覽器回報：${networkErr.name || 'Error'}${networkErr.message ? '：' + networkErr.message : ''}`;
-          if (isInLiffClient) {
-            msg += '\n\n你目前是在 LINE App 內建瀏覽器開啟這個頁面。部分手機的 LINE 內建瀏覽器會擋下讀取 Google 表格的連線，就算網路正常、表格共用設定也正確，仍可能出現這個錯誤。建議點右上角「⋮」選擇「用瀏覽器開啟」，改用手機的 Chrome／Safari 開啟這個頁面後再試一次。';
+          if (cspMightBeBlocking) {
+            msg += '\n\n這通常是頁面的 Content-Security-Policy（CSP）設定沒有放行 Google 表格實際回傳資料的網域（*.googleusercontent.com，docs.google.com 的匯出連結會轉址到這裡）所導致，屬於網站設定問題，不是你這邊操作上的問題。若你是網站維護者，請確認 CSP 的 connect-src 是否包含 https://*.googleusercontent.com。';
           } else {
-            msg += '\n\n請確認網路連線正常後再試一次；若持續發生，可能是這個瀏覽器環境的限制，可嘗試換一般瀏覽器（如 Chrome、Safari）開啟後再試。';
+            msg += '\n\n請確認網路連線正常後再試一次。';
           }
           this.showError(msg);
           return;
