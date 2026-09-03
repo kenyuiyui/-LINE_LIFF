@@ -344,6 +344,60 @@
     .storage-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
     .storage-toast .toast-icon { flex-shrink: 0; font-size: 14px; line-height: 1.6; }
     .storage-toast .toast-text b { color: #8de055; }
+
+    /* ★ 新增：上傳語音檔案區塊樣式，比照 lang-select-row 的簡約風格，
+       放在錄音卡片下方，用一條分隔線＋小標籤和錄音功能區隔開 */
+    .upload-divider {
+      display: flex; align-items: center; gap: 10px; margin: 16px 0 12px;
+      font-size: 11.5px; color: var(--ink-faint);
+    }
+    .upload-divider::before, .upload-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .upload-panel {
+      background: var(--card-bg); border: 1px dashed var(--border); border-radius: 14px;
+      padding: 16px; text-align: center;
+    }
+    .upload-panel-label { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .upload-panel-desc { font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 12px; }
+    .btn-upload-choose {
+      display: inline-block; padding: 10px 20px; font-size: 13px; font-weight: 700;
+      border: 1px solid var(--line-green); border-radius: 10px; background: var(--line-green-tint);
+      color: var(--line-green-dark); cursor: pointer;
+    }
+    .upload-panel input[type="file"] { display: none; }
+    .upload-progress-row {
+      display: none; align-items: center; gap: 8px; margin-top: 12px;
+      font-size: 12px; color: var(--ink-soft); text-align: left;
+    }
+    .upload-progress-row.show { display: flex; }
+    .upload-progress-spinner {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid var(--line-green-tint); border-top-color: var(--line-green);
+      animation: gateSpin 0.8s linear infinite;
+    }
+    .upload-file-name {
+      margin-top: 10px; font-size: 11.5px; color: var(--ink-faint);
+      word-break: break-all;
+    }
+
+    /* ★ 新增：會議摘要動作列（保存狀態、複製/分享/刪除），
+       比照 card-actions-inline 的按鈕視覺語言，維持風格一致 */
+    .summary-actions-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+    }
+    .summary-actions-row.hidden { display: none; }
+    .summary-saved-hint {
+      font-size: 11px; color: var(--ink-faint); display: flex; align-items: center; gap: 4px;
+    }
+    .summary-actions-inline { display: flex; gap: 4px; }
+    .summary-actions-inline button {
+      border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 12.5px;
+      padding: 5px 9px; border-radius: 8px; color: var(--ink-soft); font-weight: 600;
+    }
+    .summary-actions-inline button.del:hover { background: #fdeaea; color: var(--danger); }
+    .summary-actions-inline button.share:hover { background: var(--line-green-tint); color: var(--line-green-dark); }
   </style>
   <!-- opencc-js：簡體轉繁體轉換套件。Whisper 模型的中文輸出偶爾會跳成
        簡體（模型本身已知限制，見程式碼內註解），這裡作為文字進卡片前
@@ -394,6 +448,14 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>會議摘要保存分享、上傳語音檔轉文字</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>生成好的會議摘要現在會自動保存在這台裝置上，重新整理或切出頁面不會消失，摘要下方新增「複製／分享／刪除」三個按鈕，分享方式與語音卡片相同（送 LINE 好友或系統分享）</li>
+              <li>新增「上傳語音檔案轉文字」功能，適合長輩傳來的 LINE 語音訊息或既有的錄音檔，不需要即時錄音，選好檔案即可送出轉寫，完成後直接加入語音卡片</li>
+              <li>清除本機資料時，已保存的會議摘要也會一併清除</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>資安強化：CSP、共用裝置資料清除</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>加入 Content-Security-Policy，限制頁面只能連到必要的網域，降低被注入惡意程式碼的風險</li>
@@ -642,6 +704,22 @@
           </div>
           <button class="btn-record-toggle start" id="recordToggleBtn" onclick="toggleMeetingRecording()">開始錄音</button>
         </div>
+
+        <!-- ★ 新增：上傳既有語音檔案來轉寫。適合像長輩傳來的 LINE 語音訊息、
+             會議錄音 App 存下來的檔案等「已經錄好」的音檔，不需要即時錄音，
+             直接選檔案送去轉寫即可，走跟錄音完全相同的 Whisper 轉寫管線。 -->
+        <div class="upload-divider">或</div>
+        <div class="upload-panel">
+          <div class="upload-panel-label">📁 上傳語音檔案轉文字</div>
+          <div class="upload-panel-desc">適合長輩傳來的語音訊息、既有錄音檔。支援 mp3／m4a／wav／ogg 等常見格式，單檔建議在 25MB 以內。</div>
+          <label class="btn-upload-choose" for="audioFileInput" id="audioFileChooseLabel">選擇語音檔案</label>
+          <input type="file" id="audioFileInput" accept="audio/*" onchange="FileUploadTranscribe.onFileSelected(this.files)">
+          <div class="upload-file-name" id="uploadFileName"></div>
+          <div class="upload-progress-row" id="uploadProgressRow">
+            <div class="upload-progress-spinner"></div>
+            <span id="uploadProgressText">上傳並轉寫中...</span>
+          </div>
+        </div>
       </div>
 
       <!-- 會議後 -->
@@ -656,6 +734,16 @@
           <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成會議摘要</button>
           <div class="summary-output empty" id="summaryOutputBox">
             尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。
+          </div>
+          <!-- ★ 新增：摘要保存後的動作列（複製／分享／刪除），沒有已保存
+               的摘要時整列隱藏，不佔版面 -->
+          <div class="summary-actions-row hidden" id="summaryActionsRow">
+            <span class="summary-saved-hint">💾 已保存在本機</span>
+            <div class="summary-actions-inline">
+              <button class="copy" onclick="SummaryModule.copy()" title="複製摘要文字">📋 複製</button>
+              <button class="share" onclick="SummaryModule.share()" title="分享摘要">🔗 分享</button>
+              <button class="del" onclick="SummaryModule.remove()" title="刪除已保存的摘要">✕ 刪除</button>
+            </div>
           </div>
         </div>
 
@@ -698,11 +786,32 @@
     </div>
   </div>
 
+  <!-- ★ 新增：摘要分享用的子選單彈窗，選項與樣式跟卡片的「分享出去」
+       完全對稱，只是分享的內容換成摘要文字、動作交給 SummaryModule -->
+  <div class="modal-overlay hidden" id="summaryShareMenuModal">
+    <div class="modal-box" style="max-width:380px;">
+      <div class="modal-tabs"><button class="active" style="cursor:default;">🔗 分享摘要</button></div>
+      <div class="modal-body" style="padding:12px;">
+        <div class="share-option" onclick="SummaryModule.shareViaLineFriend()">
+          <div class="share-option-title">📤 LINE 好友分享</div>
+          <div class="share-option-desc">跳出 LINE 好友／群組清單，挑一個對象發送摘要文字。<b>需要先登入 LINE</b>。</div>
+        </div>
+        <div class="share-option" onclick="SummaryModule.shareViaWebShare()">
+          <div class="share-option-title">📲 分享至其他應用程式</div>
+          <div class="share-option-desc">跳出手機系統的分享選單。<b>在 LINE 內開啟此頁面時無法使用</b>，會自動改用「LINE 好友分享」。</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--card-bg); color:var(--ink-soft); cursor:pointer;" onclick="SummaryModule.closeShareMenu()">取消</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-08-security-hardening';
+    const APP_VERSION = '2026-09-summary-upload';
 
     const IntroModal = {
       switchTab(tab) {
@@ -751,6 +860,7 @@
           localStorage.removeItem('gemini_api_key'); // ★ 新增：摘要模組的 Key 一併納入清除範圍
           localStorage.removeItem('intro_modal_seen_version');
           localStorage.removeItem('record_notice_acknowledged');
+          localStorage.removeItem(SUMMARY_STORAGE_KEY); // ★ 新增：已保存的會議摘要一併納入清除範圍
           sessionStorage.removeItem('pending_send_text');
         } catch (e) {
           console.warn('清除本機資料時發生問題：', e);
@@ -762,12 +872,15 @@
         CardSandbox.render();
         CardSandbox.renderLivePreview();
 
+        // ★ 新增：已保存的摘要一併從畫面上清掉
+        SummaryModule.clearFromMemoryAndUI();
+
         document.getElementById('apiKeyInput').value = '';
         document.getElementById('geminiApiKeyInput').value = ''; // ★ 新增
         this.updateKeySavedIndicator();
         this.updateGeminiKeySavedIndicator(); // ★ 新增
         document.getElementById('clearDataModal').classList.add('hidden');
-        alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
+        alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容、已保存的摘要與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
       },
       // 依目前是否存有 Key，更新狀態列的小圓點顏色與文字說明。
       // 用低調的方式呈現狀態，不用色塊或警示語氣，符合平時安靜、
@@ -1159,6 +1272,17 @@
     //     網路錯誤、回應格式不如預期
     //
     // 出口：render 出摘要文字到 #summaryOutputBox，或錯誤訊息
+    //
+    // ★ 新增：摘要保存／複製／分享／刪除
+    //   - 摘要一旦成功生成，就自動寫進 localStorage（跟卡片草稿走
+    //     同一套「自動持久化」邏輯），頁面重整或誤觸返回都不會消失
+    //   - 保存後在摘要下方顯示「已保存在本機」提示列，附複製／分享／
+    //     刪除三個按鈕；分享沿用既有的 ChatPreview + LIFF 發送管道，
+    //     跟卡片的「送回聊天室／分享出去」是同一套邏輯，只是內容換成
+    //     摘要文字，不會混用或覆蓋掉卡片本身的發送流程
+    //   - 刪除只清「已保存的摘要」，不影響語音卡片本身
+    const SUMMARY_STORAGE_KEY = 'meeting_summary_draft';
+
     const SummaryModule = {
 
       // ★ Gemini 模型名稱集中寫在這裡，方便之後更新。
@@ -1173,6 +1297,9 @@
 
       // 目前執行狀態，避免使用者連續點擊按鈕重複觸發
       isGenerating: false,
+
+      // 目前保存在記憶體中的摘要文字；null 代表尚未生成/已被刪除
+      currentSummary: null,
 
       async generate() {
         if (this.isGenerating) return;
@@ -1195,6 +1322,7 @@
         try {
           const summaryText = await this._callGemini(fullText, apiKey);
           this._renderSummary(summaryText);
+          this._persist(summaryText); // ★ 新增：生成成功即自動保存
         } catch (err) {
           console.error('生成會議摘要失敗：', err);
           this._renderError('生成摘要失敗：' + err.message);
@@ -1299,6 +1427,8 @@
         const box = document.getElementById('summaryOutputBox');
         box.classList.remove('empty', 'loading');
         box.textContent = text;
+        this.currentSummary = text;
+        this._updateActionsRowVisibility();
       },
 
       _renderError(text) {
@@ -1306,6 +1436,9 @@
         box.classList.remove('loading');
         box.classList.add('empty');
         box.textContent = text;
+        // 生成失敗不動之前已保存的摘要（如果有的話），錯誤訊息只是
+        // 暫時蓋在畫面上；若使用者想找回舊摘要，重新整理頁面會從
+        // localStorage 還原回上一次成功保存的內容
       },
 
       _setLoadingUI(loading) {
@@ -1320,6 +1453,251 @@
           // 更久，這裡先說明清楚，避免使用者以為卡住而重複點擊
           box.textContent = '正在生成摘要，請稍候...（逐字稿較長時可能需要一些時間）';
         }
+      },
+
+      // ---------- ★ 新增：保存／還原／複製／分享／刪除 ----------
+
+      // 寫入 localStorage，做法與 CardSandbox.persist() 對稱：
+      // try-catch 包起來，寫入失敗（隱私模式、容量已滿等）只記警告，
+      // 不中斷「生成摘要」這個核心操作本身。
+      _persist(text) {
+        try {
+          localStorage.setItem(SUMMARY_STORAGE_KEY, text);
+        } catch (e) {
+          console.warn('摘要自動儲存失敗（可能是儲存空間已滿或隱私模式）：', e);
+        }
+      },
+
+      // 頁面載入、進入工具主畫面時呼叫一次，把上次保存的摘要還原到
+      // 記憶體與畫面上；沒有保存過或讀取失敗就維持空白，不影響其他功能。
+      restore() {
+        let raw = null;
+        try { raw = localStorage.getItem(SUMMARY_STORAGE_KEY); }
+        catch (e) { return; }
+        if (!raw) return;
+        this.currentSummary = raw;
+        const box = document.getElementById('summaryOutputBox');
+        box.classList.remove('empty', 'loading');
+        box.textContent = raw;
+        this._updateActionsRowVisibility();
+      },
+
+      // 依 currentSummary 是否有內容，切換保存狀態列的顯示/隱藏
+      _updateActionsRowVisibility() {
+        const row = document.getElementById('summaryActionsRow');
+        if (!row) return;
+        row.classList.toggle('hidden', !this.currentSummary);
+      },
+
+      copy() {
+        if (!this.currentSummary) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(this.currentSummary)
+            .then(() => alert('已複製摘要到剪貼簿。'))
+            .catch(() => alert('複製失敗，請手動選取摘要內容複製。'));
+        } else {
+          alert('請手動選取摘要內容複製。');
+        }
+      },
+
+      // 刪除只清「已保存的摘要」，不影響語音卡片本身；刪除前先跟使用者
+      // 確認一次，避免手滑點掉辛苦生成的摘要
+      remove() {
+        if (!this.currentSummary) return;
+        if (!confirm('確定要刪除已保存的會議摘要嗎？此動作無法復原（語音卡片不受影響）。')) return;
+        this.clearFromMemoryAndUI();
+        try { localStorage.removeItem(SUMMARY_STORAGE_KEY); }
+        catch (e) { /* 忽略 */ }
+      },
+
+      // 只清記憶體與畫面顯示，不動 localStorage——給 ClearLocalData
+      // 共用裝置清除流程呼叫，因為那邊會自己統一處理 localStorage 的移除
+      clearFromMemoryAndUI() {
+        this.currentSummary = null;
+        const box = document.getElementById('summaryOutputBox');
+        box.classList.remove('loading');
+        box.classList.add('empty');
+        box.textContent = '尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。';
+        this._updateActionsRowVisibility();
+      },
+
+      // ---------- 分享：沿用卡片既有的 ChatPreview + LIFF 發送管道 ----------
+      // 跟「分享出去」子選單（ShareMenu）走同一套視覺與技術邏輯，只是
+      // 分享的內容換成 currentSummary，不會動到卡片本身的發送流程。
+      share() {
+        if (!this.currentSummary) return;
+        document.getElementById('summaryShareMenuModal').classList.remove('hidden');
+      },
+
+      closeShareMenu() {
+        document.getElementById('summaryShareMenuModal').classList.add('hidden');
+      },
+
+      shareViaLineFriend() {
+        this.closeShareMenu();
+        if (!this.currentSummary) return;
+        ChatPreview.show(this.currentSummary, 'LINE 好友選單', () => doSend(this.currentSummary));
+      },
+
+      shareViaWebShare() {
+        this.closeShareMenu();
+        if (!this.currentSummary) return;
+        // 跟 handleWebShare 相同的邏輯：LIFF 內嵌視窗裡系統分享幾乎必定
+        // 被擋下，直接改用 shareTargetPicker，不多跑一次注定失敗的嘗試
+        if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
+          ChatPreview.show(this.currentSummary, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(this.currentSummary));
+          return;
+        }
+        ChatPreview.show(this.currentSummary, '手機系統分享', () => doWebShare(this.currentSummary));
+      }
+    };
+
+    // ---------- ★ 新增：上傳既有語音檔案轉文字 ----------
+    //
+    // 目的：不是每個人都習慣「打開這個頁面、按下錄音」，很多長輩更習慣
+    // 直接在 LINE 對話裡按住麥克風錄一段語音訊息，把那個訊息的音檔存
+    // 下來（或轉傳），再回到這個工具上傳，跟即時錄音一樣送去 Whisper
+    // 轉寫、進到同一批語音卡片裡，後續合併/編輯/發送都是同一套流程。
+    //
+    // 跟即時錄音（DictationEngine）不同的地方：
+    // 1. 不需要 MediaRecorder / 麥克風權限，使用者選好檔案後直接把
+    //    File 物件當成 audioBlob 送出去，其餘（Whisper 呼叫、簡繁轉換、
+    //    加入卡片）完全共用同一套邏輯，沒有另外重寫一份
+    // 2. 不做「靜音偵測」——那是為了處理「錄音時剛好沒人講話」的情境，
+    //    使用者主動選擇上傳的檔案沒有這個問題，直接送去轉寫即可
+    // 3. 不做「切成 15 秒一段」的分段——那是即時錄音為了讓卡片「陸續
+    //    出現」而做的設計。上傳的檔案本身就是完整的一段，直接整檔送出，
+    //    轉寫完成後一次性加入一張（或依 Whisper 回傳內容自然斷句的）卡片
+    // 4. 有基本的檔案大小提醒：Groq Whisper API 的檔案大小上限通常在
+    //    25MB 左右（依方案可能調整），這裡只做前端提醒與確認，實際
+    //    上限仍以 Groq 官方文件與 API 回應為準；若上傳失敗，錯誤訊息
+    //    會照實顯示 Groq 回傳的原因，不在前端自行假設或誇大限制
+    const FileUploadTranscribe = {
+      // 保守估計的建議上限，僅用於上傳前的提醒，不是強制擋下；
+      // 就算超過，仍讓使用者選擇繼續嘗試上傳，真正是否成功以 API 回應為準
+      SUGGESTED_MAX_MB: 25,
+
+      isUploading: false,
+
+      onFileSelected(fileList) {
+        if (!fileList || fileList.length === 0) return;
+        const file = fileList[0];
+
+        const apiKey = localStorage.getItem('whisper_api_key');
+        if (!apiKey) {
+          alert('請先在上方輸入你的 Groq API Key，才能上傳語音檔案轉寫。');
+          this._resetInput();
+          return;
+        }
+
+        if (this.isUploading) {
+          alert('目前已有一個檔案正在上傳轉寫中，請稍候完成後再上傳下一個。');
+          this._resetInput();
+          return;
+        }
+
+        const sizeMB = file.size / (1024 * 1024);
+        document.getElementById('uploadFileName').textContent =
+          `已選擇：${file.name}（約 ${sizeMB.toFixed(1)} MB）`;
+
+        if (sizeMB > this.SUGGESTED_MAX_MB) {
+          const proceed = confirm(
+            `這個檔案約 ${sizeMB.toFixed(1)} MB，超過建議的 ${this.SUGGESTED_MAX_MB}MB，` +
+            `Groq Whisper API 對單檔大小有上限，太大的檔案可能會上傳失敗。\n\n` +
+            `仍要嘗試上傳嗎？（若失敗，可考慮先用其他工具壓縮或剪短音檔後再試）`
+          );
+          if (!proceed) {
+            this._resetInput();
+            return;
+          }
+        }
+
+        this.upload(file);
+      },
+
+      async upload(file) {
+        this.isUploading = true;
+        const progressRow = document.getElementById('uploadProgressRow');
+        const progressText = document.getElementById('uploadProgressText');
+        const chooseLabel = document.getElementById('audioFileChooseLabel');
+        progressRow.classList.add('show');
+        progressText.textContent = '上傳並轉寫中...';
+        chooseLabel.style.opacity = '0.5';
+        chooseLabel.style.pointerEvents = 'none';
+
+        try {
+          const text = await this._transcribeFile(file);
+          if (text && text.trim()) {
+            CardSandbox.add(text.trim());
+            alert('轉寫完成，內容已加入語音卡片，可以到「錄音內容編輯」分頁查看。');
+          } else {
+            alert('轉寫完成，但沒有偵測到任何文字內容（可能是檔案本身沒有語音，或音量過小）。');
+          }
+        } catch (err) {
+          console.error('上傳語音檔轉寫失敗：', err);
+          alert('轉寫失敗：' + err.message);
+        } finally {
+          this.isUploading = false;
+          progressRow.classList.remove('show');
+          chooseLabel.style.opacity = '';
+          chooseLabel.style.pointerEvents = '';
+          this._resetInput();
+        }
+      },
+
+      // 跟 DictationEngine.transcribeAudio 共用同一支 Groq Whisper 端點
+      // 與參數邏輯（語言/prompt 交給 LanguageManager 決定），差別只在
+      // 這裡的輸入是使用者選的 File，不是錄音產生的 Blob 片段。
+      async _transcribeFile(file) {
+        const apiKey = localStorage.getItem('whisper_api_key');
+        const formData = new FormData();
+        formData.append('file', file, file.name || 'upload.audio');
+        formData.append('model', 'whisper-large-v3-turbo');
+
+        const langParams = LanguageManager.getParamsForSegment();
+        if (langParams) {
+          formData.append('language', langParams.languageCode);
+          formData.append('prompt', langParams.prompt);
+        } else {
+          formData.append('prompt', 'This is a recording of a meeting.');
+        }
+        formData.append('response_format', 'verbose_json');
+
+        const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
+
+        let res;
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            body: formData
+          });
+        } catch (networkErr) {
+          throw new Error('無法連線到 Groq 伺服器，請檢查網路連線：' + networkErr.message);
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          throw new Error('Groq 回應格式異常，無法解析（HTTP ' + res.status + '）');
+        }
+
+        if (!res.ok) {
+          const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          throw new Error(apiMessage);
+        }
+
+        // 自動模式下，讓這次上傳的偵測結果也回饋給 LanguageManager，
+        // 邏輯與即時錄音一致，不特別區分來源
+        LanguageManager.onDetectedLanguage(data.language);
+
+        return data.text || '';
+      },
+
+      _resetInput() {
+        const input = document.getElementById('audioFileInput');
+        if (input) input.value = '';
       }
     };
 
@@ -1903,6 +2281,10 @@
         CardSandbox.restore();
         CardSandbox.render();
         CardSandbox.renderLivePreview();
+
+        // ★ 新增：還原上次保存的會議摘要（若有），跟卡片一樣經得起
+        // 誤觸上一頁、切出去被系統回收、重新整理等情境
+        SummaryModule.restore();
 
         // 若還原後發現有內容，直接切到「錄音內容編輯」分頁並顯示發送
         // 按鈕列，讓使用者第一時間就看到救回來的卡片，而不是還要自己
