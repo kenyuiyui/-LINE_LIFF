@@ -247,6 +247,10 @@
     .card.mode-merge { border-color: var(--line-green); }
     .card.mode-reorder { border-color: #7aa8ff; }
     .card.mode-edit .card-text { outline: none; background: #fafbfc; border-radius: 6px; padding: 2px 4px; }
+    /* ★ 新增：勾選模式（納入摘要）樣式，比照其他編輯模式的邊框變色
+       語言，用琥珀色跟合併(綠)/排序(藍)/編輯(無邊框變化)做出區隔 */
+    .card.mode-select { border-color: #d99a2b; cursor: pointer; }
+    .card.mode-select.card-selected { background: #fff8e6; border-color: #d99a2b; border-width: 2px; }
     .card-actions-inline { display: flex; gap: 4px; flex-wrap: wrap; }
     .card-actions-inline button {
       border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 13px;
@@ -276,6 +280,84 @@
     .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; }
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+    /* ★ 新增：主導覽 Tab 列（5個分頁：錄音／筆記／共享／摘要／設定）
+       固定在 header 下方，橫向排列 5 個緊湊按鈕。手機窄螢幕下每個
+       按鈕空間有限，圖示+極短文字的組合比純文字更省空間，也更快
+       辨識。用 sticky 固定在頂部，切分頁時不需要每次捲回最上方。 */
+    .main-tabs {
+      display: flex; position: sticky; top: 0; z-index: 9;
+      background: var(--card-bg); border-bottom: 1px solid var(--border);
+    }
+    .main-tabs button {
+      flex: 1; padding: 10px 2px 8px; border: none; background: none; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      color: var(--ink-faint); border-bottom: 2px solid transparent;
+    }
+    .main-tabs button .tab-icon { font-size: 17px; line-height: 1; }
+    .main-tabs button .tab-label { font-size: 10px; font-weight: 600; line-height: 1; }
+    .main-tabs button.active { color: var(--line-green-dark); border-bottom-color: var(--line-green); }
+    /* 摘要／共享分頁在有內容時顯示小紅點提醒（例如摘要池已有勾選但
+       還沒點開摘要分頁查看），純粹是視覺提示，不影響功能 */
+    .main-tabs button .tab-badge {
+      position: absolute; margin-left: 14px; margin-top: -14px;
+      width: 7px; height: 7px; border-radius: 50%; background: var(--danger);
+      display: none;
+    }
+    .main-tabs button .tab-badge.show { display: block; }
+
+    /* ★ 新增：設定頁樣式。每個可刪除項目一行，左邊狀態燈號＋名稱，
+       右邊獨立的刪除按鈕；最下方紅字「刪除全部本機資料」區塊獨立
+       出來，用明確的警示邊框與紅字強調這是不可逆的操作。 */
+    .settings-section-label {
+      font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px;
+    }
+    .settings-section-label:first-child { margin-top: 0; }
+    .settings-item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; margin-bottom: 8px;
+    }
+    .settings-item-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .settings-item-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--line-green);
+    }
+    .settings-item-dot.empty { background: var(--border); }
+    .settings-item-text { min-width: 0; }
+    .settings-item-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+    .settings-item-status { font-size: 11px; color: var(--ink-faint); margin-top: 1px; }
+    .settings-item-del {
+      border: 1px solid var(--border); background: var(--card-bg); cursor: pointer;
+      font-size: 11.5px; padding: 6px 10px; border-radius: 8px; color: var(--ink-soft);
+      font-weight: 600; flex-shrink: 0;
+    }
+    .settings-item-del:hover { background: #fdeaea; color: var(--danger); border-color: var(--danger); }
+    .settings-item-del:disabled { opacity: 0.35; cursor: not-allowed; }
+    .settings-danger-zone {
+      margin-top: 24px; padding: 16px; border: 1px solid #f5c2c2; border-radius: 14px;
+      background: #fff8f8;
+    }
+    .settings-danger-zone .danger-label {
+      font-size: 12.5px; font-weight: 700; color: var(--danger); margin-bottom: 4px;
+    }
+    .settings-danger-zone .danger-desc {
+      font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 12px;
+    }
+    .btn-danger-full {
+      width: 100%; padding: 12px; font-size: 13.5px; font-weight: 700; border: none;
+      border-radius: 10px; background: var(--danger); color: #fff; cursor: pointer;
+    }
+    .settings-app-info {
+      margin-top: 24px; text-align: center; font-size: 11px; color: var(--ink-faint); line-height: 1.8;
+    }
+    /* ★ 新增：分頁容器顯示/隱藏，以及 API Key 缺漏時的行內提示條 */
+    .nav-panel.hidden { display: none; }
+    .key-missing-hint {
+      background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px;
+      padding: 10px 14px; font-size: 12.5px; color: #8a6a1f; font-weight: 600;
+      margin-bottom: 14px; cursor: pointer;
+    }
+    .key-missing-hint.hidden { display: none; }
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
       display: flex; align-items: center; justify-content: center;
@@ -439,10 +521,13 @@
       border: 1px solid var(--border); background: var(--card-bg); cursor: pointer;
       font-size: 11px; padding: 3px 8px; border-radius: 6px; color: var(--ink-soft); font-weight: 600;
     }
-    /* ★ 新增：共享筆記改為 checkbox 多選清單（取代原本的單選
+    /* ★ 修正：共享筆記改為 checkbox 多選清單（取代原本的單選
        <select>），依 Sheet 列順序排列，方便多人接力錄音的情境下
        一次勾選多筆資料合併使用。每個項目附上字數，方便使用者在
-       勾選時就能大致掌握總量，不用等到生成摘要才發現內容過長。 */
+       勾選時就能大致掌握總量，不用等到生成摘要才發現內容過長。
+       ★ 新增：順序標號（顯示這是第幾個被勾選的）與 type 標籤
+       （逐字稿／摘要，用不同顏色區分，避免誤把別人的摘要當逐字稿
+       疊加使用）。 */
     .shared-notes-checkbox-list {
       max-height: 260px; overflow-y: auto; border: 1px solid var(--border);
       border-radius: 10px; background: var(--bg);
@@ -458,9 +543,30 @@
     .shared-notes-checkbox-item-body { flex: 1; min-width: 0; }
     .shared-notes-checkbox-item-label {
       font-size: 13px; font-weight: 600; color: var(--ink);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     }
     .shared-notes-checkbox-item-meta {
       font-size: 11px; color: var(--ink-faint); margin-top: 2px;
+    }
+    /* ★ 新增：type 標籤（逐字稿／摘要），用顏色區分，讓使用者一眼
+       看出這筆是原始逐字稿還是別人已經生成好的摘要，避免不小心把
+       摘要當逐字稿疊加進另一次摘要生成 */
+    .type-tag {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 8px; flex-shrink: 0;
+    }
+    .type-tag.raw { background: #eef3ff; color: #4a72d6; }
+    .type-tag.summary { background: var(--line-green-tint); color: var(--line-green-dark); }
+    /* ★ 新增：勾選順序標號，顯示在項目最前面，只有已勾選的項目才會
+       顯示數字（未勾選則是空的圓圈佔位，維持排版一致不跳動） */
+    .selection-order-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+      font-size: 11px; font-weight: 700; margin-top: 1px;
+      background: var(--border); color: var(--ink-faint);
+    }
+    .selection-order-badge.selected {
+      background: var(--line-green); color: #fff;
     }
     .shared-notes-total-count {
       font-size: 11.5px; color: var(--ink-soft); margin-top: 8px; text-align: right;
@@ -488,18 +594,34 @@
       margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
     }
 
-    /* ★ 新增：會議摘要來源切換（語音卡片／共享筆記），樣式比照
-       mode-switch 的簡約風格，放在生成按鈕上方 */
-    .summary-source-switch { display: flex; gap: 6px; margin-bottom: 8px; }
-    .summary-source-switch button {
-      flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border);
-      background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft);
+    /* ★ 修正：原本的「摘要來源切換」（語音卡片／共享筆記兩個分頁）
+       已改為統一勾選池，這裡改成顯示「目前已勾選的摘要來源清單」，
+       列出所有勾選項目的順序、標籤、來源（卡片或共享筆記） */
+    .summary-pool-hint {
+      font-size: 11.5px; color: var(--ink-faint); line-height: 1.6; margin-bottom: 10px;
     }
-    .summary-source-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-    .summary-source-hint {
-      font-size: 11px; color: var(--ink-faint); line-height: 1.6; margin-bottom: 10px;
+    .summary-pool-list {
+      display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
     }
-    .summary-source-hint b { color: var(--ink-soft); }
+    .summary-pool-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      background: var(--bg); border-radius: 8px; font-size: 12.5px;
+    }
+    .summary-pool-item .pool-order {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+      font-size: 11px; font-weight: 700; background: var(--line-green); color: #fff;
+    }
+    .summary-pool-item .pool-label { flex: 1; min-width: 0; color: var(--ink); font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .summary-pool-item .pool-source {
+      font-size: 10px; color: var(--ink-faint); flex-shrink: 0;
+    }
+    .summary-pool-item .pool-remove {
+      border: none; background: none; color: var(--ink-faint); cursor: pointer;
+      font-size: 13px; padding: 2px 4px; flex-shrink: 0;
+    }
+    .summary-pool-item .pool-remove:hover { color: var(--danger); }
 
     /* ★ 新增：複製成 Sheet 貼上格式按鈕，放在卡片列表區塊上方 */
     .copy-sheet-format-row {
@@ -535,12 +657,33 @@
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
             <li><b>整理好的語音卡片會自動儲存在這台裝置的瀏覽器裡</b>，就算不小心切出去、誤觸上一頁或重新整理，回來也找得回來；但這也代表若為共用裝置，請務必在使用完畢後於 API Key 卡片內點「清除本機資料」，避免下一位使用者看到你的內容</li>
             <li>發送功能有三種：「送回聊天室」直接存回你打開此頁面時所在的聊天室（僅限從 LINE 聊天室進入時可用，最推薦）；「LINE 好友選單」需要先登入 LINE 才能選對象發送；「手機分享」在 LINE 內開啟時會自動改走好友選單（LINE 內建瀏覽器對系統分享有限制）</li>
-            <li>「查看共享筆記」是唯讀功能，只能讀取別人貼在共用 Google Sheet 裡的內容（可勾選多筆一起查看或合併生成摘要），不會寫回 Sheet；要把自己整理好的內容加進 Sheet，仍需自己手動複製貼上</li>
+            <li>「查看共享筆記」是唯讀功能，只能讀取別人貼在共用 Google Sheet 裡的內容（可勾選多筆、與自己的語音卡片混合，一起生成摘要），不會寫回 Sheet；要把自己整理好的內容或生成好的摘要加進 Sheet，需使用「複製成 Sheet 貼上格式」／「存回 Sheet」按鈕複製後自行手動貼上</li>
           </ul>
         </div>
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>介面改版：分頁式導覽，API Key 移至設定頁</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>整體介面改為 5 個分頁：<b>🎙️錄音／🗂️筆記／📖共享／📝摘要／⚙️設定</b>，同一時間只顯示一個分頁內容，畫面更聚焦，尤其在手機小螢幕上更容易看清楚目前在做什麼</li>
+              <li>Groq／Gemini API Key 輸入區從主畫面移到獨立的「設定」分頁，不再佔用「錄音」「筆記」分頁的版面；若對應 Key 尚未設定，「錄音」與「摘要」分頁會顯示精簡提示，點擊可直接前往設定分頁</li>
+              <li>設定頁新增「個別資料管理」：語音卡片草稿、AI 摘要、分享中斷續傳記錄、已讀提示記錄，各自獨立顯示狀態燈號（綠點=有資料／灰點=無資料）與刪除按鈕，不需要每次都整批清除，也可以只清單一項目</li>
+              <li>兩把 API Key 也各自新增「忘記這把 Key」按鈕，只清除單一把 Key，不影響其他已保存的資料</li>
+              <li>原本的「清除本機資料」整合進設定頁最下方的「危險區域」，改名為「刪除全部本機資料」，維持一次性清空所有資料的功能，僅樣式上加強警示（紅框、紅字）避免誤觸</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>會議摘要改為自由勾選＋自訂順序，卡片與共享筆記可混合</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>會議摘要不再是「語音卡片」或「共享筆記」二選一：現在可以<b>同時勾選兩邊的資料混合使用</b>，例如自己的卡片加上共享筆記裡別人整理的內容，一起生成同一份摘要</li>
+              <li>送去生成摘要的<b>順序改為使用者勾選的先後順序</b>（不是固定依原始順序排列），勾選項目旁會顯示「順序1」「順序2」...的標號，方便確認排列是否正確；共享筆記清單上方也提供「全選」快速鍵</li>
+              <li>「整理完成的語音卡片」新增「✅ 勾選模式」，切換後點擊整張卡片即可勾選／取消，加入摘要來源池，跟合併／改順序／編輯內容一樣是可切換的操作模式</li>
+              <li>共享筆記清單新增「📝 摘要」／「🎤 逐字稿」標籤區分資料類型，避免不小心把別人已經生成好的摘要當成逐字稿疊加使用（勾選到摘要類型資料時仍會額外提醒一次，但不強制阻擋）</li>
+              <li>「複製成 Sheet 貼上格式」改為<b>先詢問主題名稱</b>（例如「上半場逐字稿」），不再只是自動帶入日期時間；同時新增資料的 <code>type</code> 標記（逐字稿為 raw），讓共用表格裡的每筆資料都能被清楚辨識類型</li>
+              <li>已生成的摘要新增「📤 存回 Sheet」按鈕，可直接複製成 <code>type: summary</code> 格式貼回共用表格，讓其他協作者也能讀到這份摘要</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>共享筆記改為單欄 JSON 格式（⚠️ 不相容舊表格）</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>「查看共享筆記」的資料格式改版：原本用 A/B/C 三欄分別存標籤、內容、時間戳記，需要理解欄位定義、貼上時容易貼錯欄；現在改成<b>每一格存一整包完整資料</b>，人類只需要負責複製、貼到下一個空白儲存格，不需要理解或維護欄位格式</li>
@@ -741,57 +884,42 @@
       <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
       <div class="sub">MediaRecorder 前端錄音 ➔ Whisper API 雲端極速辨識</div>
     </header>
+
+    <!-- ★ 新增：主導覽 Tab 列，取代原本「API Key 卡片常駐畫面最上方
+         + 即時錄音／錄音內容編輯 兩頁籤」的結構。原本的問題是 API Key
+         輸入區塊（含申請教學的展開區）不管使用者在做什麼都佔用畫面
+         最上方一大塊空間，在窄螢幕手機上特別浪費；現在 API Key 移到
+         獨立的「設定」分頁，主畫面只在真正需要時（例如尚未設定 Key
+         就要錄音）才用提示告知使用者去設定分頁填寫，不再常駐佔版面。
+         5 個分頁：🎙️錄音／🗂️筆記／📖共享／📝摘要／⚙️設定，同一時間
+         只顯示一個分頁的內容，畫面更聚焦、單頁功能更清晰。 -->
+    <div class="main-tabs">
+      <button id="navTabRecord" class="active" onclick="MainNav.switchTo('record')">
+        <span class="tab-icon">🎙️</span><span class="tab-label">錄音</span>
+      </button>
+      <button id="navTabCards" onclick="MainNav.switchTo('cards')">
+        <span class="tab-icon">🗂️</span><span class="tab-label">筆記</span>
+      </button>
+      <button id="navTabShared" onclick="MainNav.switchTo('shared')">
+        <span class="tab-icon">📖</span><span class="tab-label">共享</span>
+      </button>
+      <button id="navTabSummary" onclick="MainNav.switchTo('summary')">
+        <span class="tab-icon">📝</span><span class="tab-label">摘要</span>
+      </button>
+      <button id="navTabSettings" onclick="MainNav.switchTo('settings')">
+        <span class="tab-icon">⚙️</span><span class="tab-label">設定</span>
+      </button>
+    </div>
+
     <main>
-      <div class="key-panel">
-        <div class="key-panel-label">🔑 設定 API Key</div>
-        <div class="key-panel-desc">請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
-        <input type="password" id="apiKeyInput" placeholder="gsk_..." onchange="saveApiKey(this.value)">
-
-        <div class="key-status-row">
-          <span class="status-left">
-            <span class="status-dot" id="keyStatusDot"></span>
-            <span id="keyStatusText">尚未設定 Key</span>
-          </span>
-          <button class="btn-clear-link" onclick="ClearLocalData.open()" title="共用裝置用完請清除，避免下一位使用者看到你的資料">
-            🧹 清除本機資料
-          </button>
+      <!-- ============ Tab 1／5：錄音 ============ -->
+      <div id="navPanelRecord" class="nav-panel">
+        <!-- ★ 新增：API Key 未設定時的精簡提示，取代原本常駐畫面的
+             整個 key-panel 卡片。只在真的需要時才出現，點擊直接帶去
+             設定分頁，不需要使用者自己找路 -->
+        <div class="key-missing-hint hidden" id="recordKeyMissingHint" onclick="MainNav.switchTo('settings')">
+          🔑 尚未設定 Groq API Key，點此前往設定
         </div>
-
-        <details>
-          <summary>還沒有 Groq API Key？點這裡看申請教學</summary>
-          <div class="guide-body">
-            <ol style="margin:0; padding-left:18px;">
-              <li>打開 <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>（會直接跳到 API Keys 頁面）</li>
-              <li>用 Google／GitHub／Email 任一種方式註冊登入（Email 註冊需要驗證信箱）</li>
-              <li>登入後點畫面上的「<b>Create API Key</b>」按鈕</li>
-              <li>隨便輸入一個名稱（例如「我的筆記」），送出</li>
-              <li>畫面會顯示一串以 <code>gsk_</code> 開頭的金鑰——<b>這串只會顯示這一次</b>，記得先複製起來，離開頁面後就看不到了</li>
-              <li>回到這裡，把整串貼進上面的輸入框即可</li>
-            </ol>
-            <div class="guide-note">免費額度不需要信用卡，日常筆記用量通常足夠；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。</div>
-          </div>
-        </details>
-      </div>
-
-      <div class="key-panel">
-        <div class="key-panel-label">🧠 設定 Gemini API Key（會議摘要用，選填）</div>
-        <div class="key-panel-desc">要使用「生成會議摘要」功能才需要填寫，金鑰同樣只存在你自己的手機瀏覽器裡。</div>
-        <input type="password" id="geminiApiKeyInput" placeholder="AIza..." onchange="saveGeminiApiKey(this.value)">
-        <div class="key-status-row">
-          <span class="status-left">
-            <span class="status-dot" id="geminiKeyStatusDot"></span>
-            <span id="geminiKeyStatusText">尚未設定 Key</span>
-          </span>
-        </div>
-      </div>
-
-      <div class="mode-switch">
-        <button id="tabMeeting" class="active" onclick="switchTab('meeting')">即時錄音轉文字</button>
-        <button id="tabReview" onclick="switchTab('review')">錄音內容編輯</button>
-      </div>
-
-      <!-- 會議中 -->
-      <div id="meetingView">
 
         <div class="lang-select-row">
           <label for="langSelect" class="lang-select-label">🌐 辨識語言</label>
@@ -828,22 +956,36 @@
         </div>
       </div>
 
-      <!-- 會議後 -->
-      <div id="reviewView" style="display:none;">
+      <!-- ============ Tab 2／5：筆記（語音卡片） ============ -->
+      <div id="navPanelCards" class="nav-panel hidden">
+        <div class="copy-sheet-format-row">
+          <button class="btn-copy-sheet-format" onclick="CopyToSheetFormat.copy()" title="把目前所有卡片內容整理成一包資料，貼到 Google Sheet 空白儲存格即可">
+            📋 複製成 Sheet 貼上格式
+          </button>
+        </div>
+        <div class="edit-mode-bar">
+          <button id="modeMergeBtn" onclick="EditModeManager.toggle('merge')">🔗 合併模式</button>
+          <button id="modeReorderBtn" onclick="EditModeManager.toggle('reorder')">↕️ 改順序模式</button>
+          <button id="modeEditBtn" onclick="EditModeManager.toggle('edit')">✏️ 編輯內容模式</button>
+          <button id="modeSelectBtn" onclick="EditModeManager.toggle('select')">✅ 勾選模式（納入摘要）</button>
+        </div>
+        <div class="edit-mode-hint" id="editModeHint"></div>
+        <div class="cards" id="cardsList"></div>
+      </div>
 
-        <div class="section-label">會議摘要</div>
-        <!-- ★ 新增：查看共享 Google Sheet 筆記（唯讀＋多筆選擇）
-             流程：貼連結 → 讀取解析每一格的 JSON 資料 → 依標籤列出勾選清單 →
-             勾選後的內容可作為下方會議摘要的來源之一（多人接力錄音，
-             各自整理後貼進同一份 Sheet，任何人都能讀取全部內容一起
-             生成摘要，不需要透過 LINE 傳遞逐字稿原文）。
+      <!-- ============ Tab 3／5：共享筆記 ============ -->
+      <div id="navPanelShared" class="nav-panel hidden">
+        <!-- ★ 查看共享 Google Sheet 筆記（唯讀＋多筆選擇＋自訂順序）
+             流程：貼連結 → 讀取解析每一格的 JSON 資料 → 依標籤與類型
+             （逐字稿／摘要）列出勾選清單 → 勾選後的內容可與「筆記」
+             分頁的語音卡片混合，一起送去「摘要」分頁生成，且順序由
+             使用者勾選的先後順序決定（不是固定依表格順序）。
              這裡仍然完全不寫入 Sheet，寫入交由使用者自行手動操作，
              下方「複製成 Sheet 貼上格式」按鈕是為了那個手動步驟提供便利。 -->
-        <div class="section-label">📖 查看共享筆記</div>
         <div class="shared-notes-panel" id="sharedNotesPanel">
           <div class="shared-notes-panel-label">讀取共用 Google Sheet</div>
           <div class="shared-notes-panel-desc">
-            貼上共用 Google Sheet 的分享連結，讀取後可勾選要查看（或用來生成摘要）的資料，可複選。這裡只能「查看」，不會修改 Sheet 本身。
+            貼上共用 Google Sheet 的分享連結，讀取後可勾選要查看（或用來生成摘要）的資料，可複選，勾選順序即為送去生成摘要時的順序。這裡只能「查看」，不會修改 Sheet 本身。
           </div>
           <div class="shared-notes-input-row">
             <input type="text" id="sharedSheetUrlInput" placeholder="貼上 Google Sheet 分享連結">
@@ -856,7 +998,7 @@
           </div>
           <div class="shared-notes-select-row" id="sharedNotesSelectRow">
             <div class="shared-notes-select-header">
-              <label>勾選要查看的資料（依表格順序，可複選）</label>
+              <label>勾選要查看（或納入摘要）的資料，順序即點選順序</label>
               <button class="shared-notes-select-all-btn" onclick="SharedSheetNotes.toggleSelectAll()" id="sharedNotesSelectAllBtn">全選</button>
             </div>
             <div class="shared-notes-checkbox-list" id="sharedNotesCheckboxList"></div>
@@ -867,48 +1009,106 @@
             ⚠️ 這份表格每一格存放一整包資料，請不要手動編輯格式或自行輸入內容，一律使用「複製成 Sheet 貼上格式」按鈕產生內容，貼到下一個空白儲存格即可；對方表格需設為「知道連結的使用者可檢視」才讀得到；僅讀取第一個工作分頁；多人同時手動貼上時沒有鎖定機制，貼上前請先確認自己要貼在空白儲存格，避免覆蓋他人資料。
           </div>
         </div>
+      </div>
 
-        <div class="section-label">會議摘要</div>
+      <!-- ============ Tab 4／5：AI 摘要 ============ -->
+      <div id="navPanelSummary" class="nav-panel hidden">
+        <!-- ★ 統一勾選池——不再分「語音卡片」／「共享筆記」兩個分頁
+             來源，而是直接讀取「筆記」分頁的卡片勾選模式 + 「共享」
+             分頁的勾選清單，目前勾選的全部項目依使用者點選的先後
+             順序合併送去生成，可以自由混合兩邊的資料。 -->
+        <div class="key-missing-hint hidden" id="summaryKeyMissingHint" onclick="MainNav.switchTo('settings')">
+          🔑 尚未設定 Gemini API Key，點此前往設定（選填功能）
+        </div>
         <div class="summary-panel" id="summaryPanel">
-          <!-- ★ 新增：摘要來源切換（卡片 / 共享筆記），兩種來源各自
-               生成獨立的摘要結果，互不覆蓋，因此下方顯示區塊也會依
-               目前選擇的來源切換內容，並各自有自己的保存/複製/分享/
-               刪除狀態 -->
-          <div class="summary-source-switch">
-            <button id="summarySourceCardsBtn" class="active" onclick="SummaryModule.switchSource('cards')">🗂️ 語音卡片</button>
-            <button id="summarySourceSharedBtn" onclick="SummaryModule.switchSource('shared')">📖 共享筆記</button>
-          </div>
-          <div class="summary-source-hint" id="summarySourceHint"></div>
-          <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成會議摘要</button>
+          <div class="summary-pool-hint" id="summaryPoolHint">尚未勾選任何資料。到「共享」分頁勾選共享筆記項目，或在「筆記」分頁切到「✅ 勾選模式」勾選卡片，即可納入摘要來源。</div>
+          <div class="summary-pool-list" id="summaryPoolList"></div>
+          <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成 AI 摘要</button>
           <div class="summary-output empty" id="summaryOutputBox">
-            尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。
+            尚未生成摘要。勾選好要納入的資料後，點上方按鈕即可生成重點摘要。
           </div>
           <div class="summary-actions-row hidden" id="summaryActionsRow">
             <span class="summary-saved-hint">💾 已保存在本機</span>
             <div class="summary-actions-inline">
               <button class="copy" onclick="SummaryModule.copy()" title="複製摘要文字">📋 複製</button>
               <button class="share" onclick="SummaryModule.share()" title="分享摘要">🔗 分享</button>
+              <button class="copysheet" onclick="SummaryModule.copyToSheet()" title="複製成可貼進共用 Sheet 的格式">📤 存回 Sheet</button>
               <button class="del" onclick="SummaryModule.remove()" title="刪除已保存的摘要">✕ 刪除</button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="section-label">整理完成的語音卡片</div>
-        <div class="copy-sheet-format-row">
-          <button class="btn-copy-sheet-format" onclick="CopyToSheetFormat.copy()" title="把目前所有卡片內容組成一段用 Tab 分隔的文字，貼到 Google Sheet 儲存格時會自動分欄">
-            📋 複製成 Sheet 貼上格式
-          </button>
+      <!-- ============ Tab 5／5：設定 ============ -->
+      <div id="navPanelSettings" class="nav-panel hidden">
+        <div class="settings-section-label">🔑 API Key</div>
+
+        <div class="key-panel">
+          <div class="key-panel-label">Groq API Key（錄音轉文字用，必填）</div>
+          <div class="key-panel-desc">請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
+          <input type="password" id="apiKeyInput" placeholder="gsk_..." onchange="saveApiKey(this.value)">
+          <div class="key-status-row">
+            <span class="status-left">
+              <span class="status-dot" id="keyStatusDot"></span>
+              <span id="keyStatusText">尚未設定 Key</span>
+            </span>
+            <button class="btn-clear-link" onclick="ClearLocalData.forgetGroqKey()" title="只清除 Groq Key，其他資料不受影響">🗑️ 忘記這把 Key</button>
+          </div>
+          <details>
+            <summary>還沒有 Groq API Key？點這裡看申請教學</summary>
+            <div class="guide-body">
+              <ol style="margin:0; padding-left:18px;">
+                <li>打開 <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>（會直接跳到 API Keys 頁面）</li>
+                <li>用 Google／GitHub／Email 任一種方式註冊登入（Email 註冊需要驗證信箱）</li>
+                <li>登入後點畫面上的「<b>Create API Key</b>」按鈕</li>
+                <li>隨便輸入一個名稱（例如「我的筆記」），送出</li>
+                <li>畫面會顯示一串以 <code>gsk_</code> 開頭的金鑰——<b>這串只會顯示這一次</b>，記得先複製起來，離開頁面後就看不到了</li>
+                <li>回到這裡，把整串貼進上面的輸入框即可</li>
+              </ol>
+              <div class="guide-note">免費額度不需要信用卡，日常筆記用量通常足夠；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。</div>
+            </div>
+          </details>
         </div>
-        <div class="edit-mode-bar">
-          <button id="modeMergeBtn" onclick="EditModeManager.toggle('merge')">🔗 合併模式</button>
-          <button id="modeReorderBtn" onclick="EditModeManager.toggle('reorder')">↕️ 改順序模式</button>
-          <button id="modeEditBtn" onclick="EditModeManager.toggle('edit')">✏️ 編輯內容模式</button>
+
+        <div class="key-panel">
+          <div class="key-panel-label">Gemini API Key（AI 摘要用，選填）</div>
+          <div class="key-panel-desc">要使用「AI 摘要」功能才需要填寫，金鑰同樣只存在你自己的手機瀏覽器裡。</div>
+          <input type="password" id="geminiApiKeyInput" placeholder="AIza..." onchange="saveGeminiApiKey(this.value)">
+          <div class="key-status-row">
+            <span class="status-left">
+              <span class="status-dot" id="geminiKeyStatusDot"></span>
+              <span id="geminiKeyStatusText">尚未設定 Key</span>
+            </span>
+            <button class="btn-clear-link" onclick="ClearLocalData.forgetGeminiKey()" title="只清除 Gemini Key，其他資料不受影響">🗑️ 忘記這把 Key</button>
+          </div>
         </div>
-        <div class="edit-mode-hint" id="editModeHint"></div>
-        <div class="cards" id="cardsList"></div>
+
+        <!-- ★ 新增：逐項刪除區塊。原本「清除本機資料」是單一顆按鈕
+             一次清光所有東西，現在拆成每一項各自獨立的刪除按鈕，
+             讓使用者可以只刪除想刪的部分（例如只刪 Gemini Key，
+             保留 Groq Key 跟卡片草稿），狀態燈號（綠=已設定／
+             灰=無資料）讓使用者不用猜哪些項目目前有內容。 -->
+        <div class="settings-section-label">🗂️ 個別資料管理</div>
+        <div id="settingsItemsList"></div>
+
+        <div class="settings-danger-zone">
+          <div class="danger-label">⚠️ 危險區域</div>
+          <div class="danger-desc">
+            一次清除這台裝置上的所有 API Key、卡片草稿、摘要、分享中斷記錄與已讀提示記錄。<b>此動作無法復原</b>，適合在共用裝置使用完畢後執行。
+          </div>
+          <button class="btn-danger-full" onclick="ClearLocalData.open()">🗑️ 刪除全部本機資料</button>
+        </div>
+
+        <div class="settings-app-info">
+          語音卡片筆記 · LIFF 相容版<br>
+          版本：<span id="settingsAppVersion"></span>
+        </div>
       </div>
     </main>
 
+    <!-- 發送列：只在「筆記」分頁顯示（卡片內容才需要發送），其他分頁
+         顯示發送按鈕沒有意義（共享筆記是別人的資料不該由我發送、
+         摘要有自己專屬的複製/分享按鈕，設定頁更不需要） -->
     <div class="action-bar" id="actionBar" style="display:none;">
       <div class="send-btn-row">
         <button class="btn-primary" id="sendToRoomBtn" onclick="handleSendToRoom()">📥 送回聊天室</button>
@@ -916,6 +1116,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- 分享出去的子選單彈窗：兩個選項，各自附上限制與建議說明 -->
   <div class="modal-overlay hidden" id="shareMenuModal">
@@ -960,7 +1161,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-json-single-cell';
+    const APP_VERSION = '2026-09-tab-redesign';
 
     const IntroModal = {
       switchTab(tab) {
@@ -1003,12 +1204,10 @@
           localStorage.removeItem('gemini_api_key');
           localStorage.removeItem('intro_modal_seen_version');
           localStorage.removeItem('record_notice_acknowledged');
-          // ★ 修正：摘要改為「語音卡片」／「共享筆記」兩種來源各自
-          // 獨立保存，原本單一的 SUMMARY_STORAGE_KEY 已拆成兩個 key，
-          // 這裡要把兩個都清掉，SUMMARY_STORAGE_KEYS 定義在 SummaryModule
-          // 前面，是個 {cards: '...', shared: '...'} 的對照表
-          localStorage.removeItem(SUMMARY_STORAGE_KEYS.cards);
-          localStorage.removeItem(SUMMARY_STORAGE_KEYS.shared);
+          // ★ 修正：摘要改回單一份保存（原本因為卡片／共享筆記分開
+          // 來源而拆成兩個 key，現在合併回統一勾選池後只需要一個
+          // SUMMARY_STORAGE_KEY）
+          localStorage.removeItem(SUMMARY_STORAGE_KEY);
           // ★ 新增：分享斷點接續的中斷進度記錄，內容依附於當下的卡片
           // 內容而存在，清除本機資料後卡片本身就會被清空，殘留的接續
           // 記錄會變成「指向不存在內容」的孤兒資料，一併清除
@@ -1019,6 +1218,12 @@
         }
         CardSandbox.clearPersisted();
         CardSandbox.cards = [];
+
+        // ★ 新增：統一勾選池的內容依附於卡片與共享筆記而存在，兩邊都
+        // 被清空後，池中記錄的鍵全部變成指向不存在的孤兒資料，一併
+        // 清除，避免畫面殘留無意義的勾選項目
+        SelectionPool.clear();
+
         CardSandbox.render();
         CardSandbox.renderLivePreview();
 
@@ -1033,6 +1238,13 @@
         document.getElementById('geminiApiKeyInput').value = '';
         this.updateKeySavedIndicator();
         this.updateGeminiKeySavedIndicator();
+        // ★ 新增：Key 被清掉後，「錄音」「摘要」分頁的缺漏提示條要
+        // 重新出現（如果原本因為有 Key 而隱藏著的話）
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+        // ★ 新增：刪除全部後，設定頁的逐項清單也要同步刷新（所有燈號
+        // 應變回灰色），避免使用者看到「已刪除全部」提示，但清單畫面
+        // 還停留在刪除前的狀態
+        if (typeof SettingsPanel !== 'undefined') SettingsPanel.render();
         document.getElementById('clearDataModal').classList.add('hidden');
         alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容、已保存的摘要與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
       },
@@ -1053,6 +1265,131 @@
         document.getElementById('geminiKeyStatusText').textContent = hasKey
           ? '這台裝置已記住一把 Key'
           : '尚未設定 Key';
+      },
+
+      // ★ 新增：個別清除單一把 Key，不影響其他任何資料（卡片、摘要、
+      // 另一把 Key 都保留），供設定頁「忘記這把 Key」按鈕使用
+      forgetGroqKey() {
+        if (!confirm('確定要忘記這把 Groq API Key 嗎？之後需要重新輸入才能繼續錄音轉文字。')) return;
+        try { localStorage.removeItem('whisper_api_key'); } catch (e) { /* 忽略 */ }
+        document.getElementById('apiKeyInput').value = '';
+        this.updateKeySavedIndicator();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+
+      forgetGeminiKey() {
+        if (!confirm('確定要忘記這把 Gemini API Key 嗎？之後需要重新輸入才能使用 AI 摘要功能。')) return;
+        try { localStorage.removeItem('gemini_api_key'); } catch (e) { /* 忽略 */ }
+        document.getElementById('geminiApiKeyInput').value = '';
+        this.updateGeminiKeySavedIndicator();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      }
+    };
+
+    // ---------- ★ 新增：設定頁逐項資料管理（SettingsPanel）----------
+    //
+    // 背景：原本「清除本機資料」是單一顆按鈕，一次性清光 Groq Key、
+    // Gemini Key、卡片草稿、摘要等所有東西，沒有「只刪其中一項」的
+    // 選項。改版後設定頁提供每一項獨立的刪除按鈕（狀態燈號顯示目前
+    // 是否有資料），讓使用者可以只清 Gemini Key、保留其他，或只清
+    // 卡片草稿、保留 API Key，操作更細緻。「刪除全部本機資料」
+    // 仍然保留，作為危險區域裡的一次性完整清除，底層直接複用既有的
+    // ClearLocalData.confirm() 邏輯，不重複寫兩份清除規則。
+    const SettingsPanel = {
+      // 每一項的定義：id（畫面元素用）、name（顯示名稱）、
+      // hasData()（回傳布林值，決定綠點/灰點）、del()（實際刪除動作）
+      items: [
+        {
+          id: 'cardsDraft',
+          name: '語音卡片草稿',
+          hasData: () => CardSandbox.cards.length > 0,
+          statusText: () => CardSandbox.cards.length > 0 ? `目前有 ${CardSandbox.cards.length} 張卡片` : '目前沒有卡片',
+          del: () => {
+            if (!confirm('確定要刪除目前所有語音卡片嗎？此動作無法復原。')) return;
+            CardSandbox.clearPersisted();
+            CardSandbox.cards = [];
+            SelectionPool.order = SelectionPool.order.filter(k => !k.startsWith('card:'));
+            CardSandbox.render();
+            CardSandbox.renderLivePreview();
+            SummaryModule.renderPool();
+            SettingsPanel.render();
+          }
+        },
+        {
+          id: 'summaryDraft',
+          name: 'AI 摘要',
+          hasData: () => !!SummaryModule.currentSummary,
+          statusText: () => SummaryModule.currentSummary ? '已保存一份摘要' : '目前沒有已保存的摘要',
+          del: () => {
+            if (!SummaryModule.currentSummary) return;
+            if (!confirm('確定要刪除已保存的 AI 摘要嗎？此動作無法復原。')) return;
+            SummaryModule.currentSummary = null;
+            SummaryModule._renderCurrentUI();
+            try { localStorage.removeItem(SUMMARY_STORAGE_KEY); } catch (e) { /* 忽略 */ }
+            SettingsPanel.render();
+          }
+        },
+        {
+          id: 'shareResume',
+          name: '分享中斷續傳記錄',
+          hasData: () => {
+            try { return !!localStorage.getItem(SHARE_RESUME_STORAGE_KEY); }
+            catch (e) { return false; }
+          },
+          statusText: () => SettingsPanel.items.find(i => i.id === 'shareResume').hasData()
+            ? '有未完成的分享，下次分享時會詢問是否接續' : '目前沒有中斷記錄',
+          del: () => {
+            try { localStorage.removeItem(SHARE_RESUME_STORAGE_KEY); } catch (e) { /* 忽略 */ }
+            SettingsPanel.render();
+          }
+        },
+        {
+          id: 'readNotices',
+          name: '已讀提示記錄',
+          hasData: () => {
+            try {
+              return !!localStorage.getItem('intro_modal_seen_version') || !!localStorage.getItem('record_notice_acknowledged');
+            } catch (e) { return false; }
+          },
+          statusText: () => SettingsPanel.items.find(i => i.id === 'readNotices').hasData()
+            ? '下次不會再跳出更新公告／錄音提醒' : '尚未記錄過已讀',
+          del: () => {
+            try {
+              localStorage.removeItem('intro_modal_seen_version');
+              localStorage.removeItem('record_notice_acknowledged');
+            } catch (e) { /* 忽略 */ }
+            SettingsPanel.render();
+          }
+        }
+      ],
+
+      render() {
+        const container = document.getElementById('settingsItemsList');
+        if (!container) return;
+
+        container.innerHTML = this.items.map(item => {
+          const hasData = item.hasData();
+          return `
+            <div class="settings-item-row">
+              <div class="settings-item-left">
+                <span class="settings-item-dot ${hasData ? '' : 'empty'}"></span>
+                <div class="settings-item-text">
+                  <div class="settings-item-name">${item.name}</div>
+                  <div class="settings-item-status">${item.statusText()}</div>
+                </div>
+              </div>
+              <button class="settings-item-del" onclick="SettingsPanel.deleteItem('${item.id}')" ${hasData ? '' : 'disabled'}>刪除</button>
+            </div>
+          `;
+        }).join('');
+
+        const versionEl = document.getElementById('settingsAppVersion');
+        if (versionEl) versionEl.textContent = APP_VERSION;
+      },
+
+      deleteItem(id) {
+        const item = this.items.find(i => i.id === id);
+        if (item) item.del();
       }
     };
 
@@ -1110,6 +1447,7 @@
     function saveApiKey(val) {
       localStorage.setItem('whisper_api_key', val.trim());
       ClearLocalData.updateKeySavedIndicator();
+      updateKeyMissingHints();
     }
     ClearLocalData.updateKeySavedIndicator();
 
@@ -1117,17 +1455,66 @@
     function saveGeminiApiKey(val) {
       localStorage.setItem('gemini_api_key', val.trim());
       ClearLocalData.updateGeminiKeySavedIndicator();
+      updateKeyMissingHints();
     }
     ClearLocalData.updateGeminiKeySavedIndicator();
 
-    // 頁面切換
-    function switchTab(tab) {
-      document.getElementById('tabMeeting').className = tab === 'meeting' ? 'active' : '';
-      document.getElementById('tabReview').className = tab === 'review' ? 'active' : '';
-      document.getElementById('meetingView').style.display = tab === 'meeting' ? 'block' : 'none';
-      document.getElementById('reviewView').style.display = tab === 'review' ? 'block' : 'none';
-      document.getElementById('actionBar').style.display = tab === 'review' ? 'block' : 'none';
+    // ★ 新增：API Key 缺漏提示條。原本 API Key 卡片常駐在主畫面最
+    // 上方，使用者一定會看到；現在移到獨立的「設定」分頁後，使用者
+    // 切到「錄音」或「摘要」分頁時可能根本不知道要去哪裡設定 Key，
+    // 所以在這兩個分頁各放一條精簡提示，只在對應 Key 尚未設定時
+    // 顯示，點擊直接帶去設定分頁，不需要使用者自己摸索路徑。
+    function updateKeyMissingHints() {
+      let hasGroqKey = false, hasGeminiKey = false;
+      try {
+        hasGroqKey = !!localStorage.getItem('whisper_api_key');
+        hasGeminiKey = !!localStorage.getItem('gemini_api_key');
+      } catch (e) { /* 忽略，保守起見視為未設定，提示會顯示 */ }
+
+      const recordHint = document.getElementById('recordKeyMissingHint');
+      const summaryHint = document.getElementById('summaryKeyMissingHint');
+      if (recordHint) recordHint.classList.toggle('hidden', hasGroqKey);
+      if (summaryHint) summaryHint.classList.toggle('hidden', hasGeminiKey);
     }
+    updateKeyMissingHints();
+
+    // ---------- ★ 新增：主導覽 Tab 管理（取代原本的 switchTab）----------
+    // 5 個分頁：record（錄音）／cards（筆記）／shared（共享）／
+    // summary（摘要）／settings（設定），同一時間只顯示一個分頁內容。
+    // action-bar（送回聊天室／分享出去）只在「筆記」分頁顯示，因為
+    // 那是唯一「使用者自己整理的內容」該被發送的分頁——共享筆記是
+    // 別人的資料，摘要有自己專屬的複製/分享按鈕，設定頁不需要發送。
+    const MainNav = {
+      current: 'record',
+
+      switchTo(tab) {
+        this.current = tab;
+
+        const tabs = ['record', 'cards', 'shared', 'summary', 'settings'];
+        tabs.forEach(t => {
+          const btn = document.getElementById('navTab' + this._capitalize(t));
+          const panel = document.getElementById('navPanel' + this._capitalize(t));
+          if (btn) btn.classList.toggle('active', t === tab);
+          if (panel) panel.classList.toggle('hidden', t !== tab);
+        });
+
+        document.getElementById('actionBar').style.display = (tab === 'cards') ? 'block' : 'none';
+
+        // 每次切到「筆記」或「摘要」分頁時，順手刷新一次相關畫面，
+        // 確保跨分頁的狀態（例如在「共享」分頁勾選後切來「摘要」
+        // 分頁）永遠是最新的，不需要使用者手動重新整理頁面
+        if (tab === 'summary' && typeof SummaryModule !== 'undefined') {
+          SummaryModule.renderPool();
+        }
+        if (tab === 'settings' && typeof SettingsPanel !== 'undefined') {
+          SettingsPanel.render();
+        }
+      },
+
+      _capitalize(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+      }
+    };
 
     // ---------- 編輯模式管理（合併／改順序／編輯內容，三選一互斥）----------
     const EditModeManager = {
@@ -1143,7 +1530,8 @@
         const buttons = {
           merge: document.getElementById('modeMergeBtn'),
           reorder: document.getElementById('modeReorderBtn'),
-          edit: document.getElementById('modeEditBtn')
+          edit: document.getElementById('modeEditBtn'),
+          select: document.getElementById('modeSelectBtn')
         };
         Object.keys(buttons).forEach(key => {
           buttons[key].classList.toggle('active', this.current === key);
@@ -1153,7 +1541,12 @@
         const hints = {
           merge: '合併模式：點卡片上的「↓ 合併」按鈕，把它和下一張卡片合併成一句。',
           reorder: '改順序模式：點「↑」「↓」調整前後一格，點「⤒」直接移到最上面。',
-          edit: '編輯內容模式：點卡片文字即可直接修改，點 ✕ 可以刪除整張卡片。'
+          edit: '編輯內容模式：點卡片文字即可直接修改，點 ✕ 可以刪除整張卡片。',
+          // ★ 修正：勾選模式提示文字，說明點擊卡片即可切換是否納入
+          // 「AI 摘要」分頁的來源池，離開此模式不會取消已勾選的內容。
+          // 原文說「下方」已經不準確——改版後摘要池顯示在另一個分頁
+          // （不是同一畫面往下捲就看得到），措辭改成「AI 摘要分頁」
+          select: '勾選模式：點擊整張卡片即可勾選／取消，加入「📝 AI 摘要」分頁的來源池；順序即點選順序，離開此模式不會清空已勾選的內容。'
         };
         if (this.current) {
           hint.textContent = hints[this.current];
@@ -1174,6 +1567,117 @@
         toast.classList.add('show');
         clearTimeout(this._timer);
         this._timer = setTimeout(() => toast.classList.remove('show'), 4200);
+      }
+    };
+
+    // ---------- ★ 新增：統一勾選順序池（SelectionPool）----------
+    //
+    // 背景：會議摘要原本分成「語音卡片」／「共享筆記」兩個互斥的來源
+    // 分頁，使用者只能二選一。改版後兩邊都能勾選、混合送去生成同一份
+    // 摘要，且送給 Gemini 的順序不是固定的（不是永遠卡片在前、共享
+    // 筆記在後，也不是永遠依 Sheet 原始順序），而是「使用者點選的
+    // 先後順序」——例如可以先勾共享筆記的第2筆，再勾自己的卡片，
+    // 最後勾共享筆記的第1筆，最終順序就是「共享筆記2 → 卡片 →
+    // 共享筆記1」。
+    //
+    // 設計方式：用一個陣列（不是 Set，因為 Set 不保證插入順序在所有
+    // JS 環境都穩定被當作可靠的順序依據，這裡刻意用陣列讓順序意圖
+    // 明確可見）記錄「已勾選項目」的識別鍵，鍵的格式是
+    // `${source}:${id}`，source 是 'card' 或 'shared'，id 是卡片的
+    // card.id 或共享筆記資料列在 SharedSheetNotes.rows 裡的索引。
+    // 用字串組合鍵是因為卡片 id 與共享筆記索引是兩個獨立的編號空間，
+    // 直接用數字比對會撞號（例如卡片 id=2 跟共享筆記索引=2 是完全
+    // 不同的兩筆資料），前綴 source 可以避免混淆。
+    //
+    // 這個池子本身不儲存實際內容，只存「識別鍵的順序」，實際內容在
+    // 真正要生成摘要或渲染畫面時，才即時從 CardSandbox.cards 或
+    // SharedSheetNotes.rows 查找——這樣卡片或共享筆記內容如果之後被
+    // 編輯或重新讀取，摘要池顯示的內容也會自動反映最新狀態，不需要
+    // 額外同步。
+    const SelectionPool = {
+      order: [], // 陣列，元素是 `${source}:${id}` 字串，順序即勾選順序
+
+      _key(source, id) {
+        return `${source}:${id}`;
+      },
+
+      isSelected(source, id) {
+        return this.order.includes(this._key(source, id));
+      },
+
+      // 切換勾選狀態：已勾選就移除（保留原本相對順序不變，只是少一項），
+      // 未勾選就加到陣列尾端（成為目前順序中最新的一個）
+      toggle(source, id) {
+        const key = this._key(source, id);
+        const idx = this.order.indexOf(key);
+        if (idx === -1) {
+          this.order.push(key);
+        } else {
+          this.order.splice(idx, 1);
+        }
+        this._onChange();
+      },
+
+      // 依目前的鍵取得該鍵在池中的順序編號（1-based），未勾選回傳 null，
+      // 供畫面上顯示「順序1」「順序2」的標號用
+      getOrderNumber(source, id) {
+        const idx = this.order.indexOf(this._key(source, id));
+        return idx === -1 ? null : idx + 1;
+      },
+
+      remove(source, id) {
+        const key = this._key(source, id);
+        const idx = this.order.indexOf(key);
+        if (idx === -1) return;
+        this.order.splice(idx, 1);
+        this._onChange();
+      },
+
+      clear() {
+        this.order = [];
+        this._onChange();
+      },
+
+      // 依目前順序，把每個鍵解析回實際資料物件 { source, id, label,
+      // content, type }，找不到對應資料的鍵（例如卡片被刪除了、或
+      // 共享筆記重新讀取後索引對不上）會被安靜跳過，不拋錯——這是
+      // 合理的邊角情況（使用者可能勾選後又去刪了那張卡片），不需要
+      // 用錯誤訊息打斷使用者，跳過即可
+      resolveItems() {
+        const items = [];
+        this.order.forEach(key => {
+          const [source, idStr] = key.split(':');
+          if (source === 'card') {
+            const id = parseInt(idStr, 10);
+            const card = CardSandbox.cards.find(c => c.id === id);
+            if (card) {
+              items.push({ source: 'card', id, label: '語音卡片', content: card.text, type: 'raw' });
+            }
+          } else if (source === 'shared') {
+            const idx = parseInt(idStr, 10);
+            const row = SharedSheetNotes.rows[idx];
+            if (row) {
+              items.push({ source: 'shared', id: idx, label: row.label || '（未命名）', content: row.content, type: row.type || 'raw' });
+            }
+          }
+        });
+        return items;
+      },
+
+      getTotalChars() {
+        return this.resolveItems().reduce((sum, item) => sum + item.content.length, 0);
+      },
+
+      // 內容變動時統一呼叫的入口：更新摘要區塊的池清單顯示、更新兩邊
+      // 清單裡的順序標號顯示。集中在這裡呼叫，任何觸發勾選變化的地方
+      // （卡片點擊、共享筆記 checkbox）只需要呼叫 toggle()，不需要
+      // 自己記得要呼叫哪些渲染函式
+      _onChange() {
+        if (typeof SummaryModule !== 'undefined') SummaryModule.renderPool();
+        if (typeof CardSandbox !== 'undefined') CardSandbox.render();
+        if (typeof SharedSheetNotes !== 'undefined' && SharedSheetNotes.rows.length > 0) {
+          SharedSheetNotes.renderSelect();
+        }
       }
     };
 
@@ -1299,6 +1803,7 @@
         list.innerHTML = this.cards.map((card, i) => {
           const modeClass = mode ? `mode-${mode}` : 'readonly';
           const isEditable = mode === 'edit';
+          const isSelectMode = mode === 'select';
           const isLast = i === this.cards.length - 1;
           const isFirst = i === 0;
 
@@ -1315,8 +1820,22 @@
             actionsHtml = `<button class="del" title="刪除" onclick="CardSandbox.remove(${card.id})">✕</button>`;
           }
 
+          // ★ 新增：勾選模式下，卡片最前面顯示順序標號（已勾選才有
+          // 數字，未勾選是空白圓圈佔位），點擊整張卡片（不是點文字
+          // 進入編輯）即可切換勾選狀態，交給 SelectionPool 統一管理
+          let selectBadgeHtml = '';
+          let cardOnClick = '';
+          let isSelected = false;
+          if (isSelectMode) {
+            const orderNum = SelectionPool.getOrderNumber('card', card.id);
+            isSelected = orderNum !== null;
+            selectBadgeHtml = `<span class="selection-order-badge ${isSelected ? 'selected' : ''}">${isSelected ? orderNum : ''}</span>`;
+            cardOnClick = `onclick="SelectionPool.toggle('card', ${card.id})"`;
+          }
+
           return `
-            <div class="card ${modeClass}" data-id="${card.id}">
+            <div class="card ${modeClass} ${isSelected ? 'card-selected' : ''}" data-id="${card.id}" ${cardOnClick}>
+              ${selectBadgeHtml}
               <span class="card-text"
                     ${isEditable ? 'contenteditable="true"' : ''}
                     ${isEditable ? `onblur="CardSandbox.update(${card.id}, this.innerText)"` : ''}>${this.escapeHtml(card.text)}</span>
@@ -1344,6 +1863,11 @@
       remove(id) {
         this.cards = this.cards.filter(c => c.id !== id);
         this.persist();
+        // ★ 新增：卡片刪除後，若這張卡片曾被勾選納入摘要池，一併從
+        // SelectionPool 移除，避免摘要池顯示一筆「已勾選但找不到內容」
+        // 的殘影項目（雖然 resolveItems() 本身有防呆不會讓程式出錯，
+        // 但畫面上留著沒有意義的殘留項目對使用者是困惑的）
+        SelectionPool.remove('card', id);
         this.render();
       },
 
@@ -1408,10 +1932,8 @@
     //   https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv
     // 只讀取第一個工作分頁，對方表格需設為「知道連結的使用者可檢視」。
     const SharedSheetNotes = {
-      // 目前解析出來的資料列，每筆 { label, content, timestamp }
+      // 目前解析出來的資料列，每筆 { label, content, timestamp, type }
       rows: [],
-      // 目前勾選中的列索引（Set），對應 checkbox 多選狀態
-      selectedIndexes: new Set(),
 
       // 從使用者貼上的各種 Google Sheet 網址格式中擷取 SHEET_ID。
       // 常見格式包含：
@@ -1546,9 +2068,15 @@
           return;
         }
 
-        // 讀取前先清掉上一次的選單與內容顯示，避免舊資料殘留造成混淆
+        // 讀取前先清掉上一次的選單與內容顯示，避免舊資料殘留造成混淆。
+        // ★ 修正：重新讀取表格時，SelectionPool 裡任何 'shared:' 開頭
+        // 的勾選項目都要一併清掉——舊表格的索引 0、1、2... 在新表格裡
+        // 會對應到完全不同的資料，如果不清掉，勾選池會顯示「舊索引
+        // 對應到新內容」的錯亂結果，使用者以為勾的是A資料，實際送去
+        // 生成摘要的卻是新表格裡同一個索引位置的B資料，是嚴重的資料
+        // 錯亂風險，因此改成表格內容一變動就強制清空共享筆記側的勾選。
         this.rows = [];
-        this.selectedIndexes = new Set();
+        SelectionPool.order = SelectionPool.order.filter(key => !key.startsWith('shared:'));
         document.getElementById('sharedNotesSelectRow').classList.remove('show');
         document.getElementById('sharedNotesOutput').classList.remove('show');
 
@@ -1653,7 +2181,13 @@
           this.rows.push({
             label: typeof parsed.label === 'string' ? parsed.label.trim() : '',
             content: parsed.content.trim(),
-            timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp.trim() : ''
+            timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp.trim() : '',
+            // ★ 新增：type 欄位區分這筆資料是原始逐字稿（'raw'）還是
+            // 別人已經生成好的摘要（'summary'）。沒有這個欄位的舊資料
+            // （理論上已被上個版本淘汰，但仍做防呆）預設視為 'raw'，
+            // 只有明確標記為 'summary' 才會顯示摘要標籤，避免任何
+            // 意外把逐字稿誤判成摘要
+            type: parsed.type === 'summary' ? 'summary' : 'raw'
           });
         });
 
@@ -1674,15 +2208,13 @@
         }
 
         this.renderSelect();
+        // ★ 新增：重新讀取表格清空了共享筆記側的勾選，摘要池畫面也
+        // 要同步刷新（若原本池裡有共享筆記項目、現在被清空了，摘要
+        // 池的清單需要立即反映這個變化，不能等到使用者自己動手才更新）
+        if (typeof SummaryModule !== 'undefined') SummaryModule.renderPool();
       },
 
       renderSelect() {
-        // ★ 修正：原本是單選 <select>，改成 checkbox 多選清單，
-        // 支援多人接力錄音的情境（例如兩人分別錄上下半場、各自貼進
-        // Sheet，任何人都能一次勾選多筆合併使用）。selectedIndexes
-        // 用 Set 記錄目前勾選的列索引，預設全部不勾選。
-        this.selectedIndexes = new Set();
-
         const list = document.getElementById('sharedNotesCheckboxList');
         list.innerHTML = this.rows.map((r, idx) => {
           // ★ 修正：原本用「第 idx+2 列」暗示 Sheet 實際列號（因為
@@ -1693,11 +2225,25 @@
           // 目前清單裡的第幾個項目
           const label = r.label || `（未命名資料 ${idx + 1}）`;
           const charCount = r.content.length;
+
+          // ★ 新增：type 標籤（逐字稿／摘要），用顏色區分，讓使用者
+          // 一眼看出這筆是原始逐字稿還是別人已經生成好的摘要
+          const typeTag = r.type === 'summary'
+            ? '<span class="type-tag summary">📝 摘要</span>'
+            : '<span class="type-tag raw">🎤 逐字稿</span>';
+
+          // ★ 修正：勾選狀態與順序改由 SelectionPool 統一管理，這裡
+          // 不再自己維護 selectedIndexes；checkbox 是否勾選、順序標號
+          // 都從 SelectionPool 查詢取得
+          const orderNum = SelectionPool.getOrderNumber('shared', idx);
+          const isChecked = orderNum !== null;
+
           return `
             <label class="shared-notes-checkbox-item">
-              <input type="checkbox" onchange="SharedSheetNotes.onCheckboxChange(${idx}, this.checked)">
+              <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="SelectionPool.toggle('shared', ${idx})">
+              <span class="selection-order-badge ${isChecked ? 'selected' : ''}">${isChecked ? orderNum : ''}</span>
               <div class="shared-notes-checkbox-item-body">
-                <div class="shared-notes-checkbox-item-label">${CardSandbox.escapeHtml(label)}</div>
+                <div class="shared-notes-checkbox-item-label">${typeTag}${CardSandbox.escapeHtml(label)}</div>
                 <div class="shared-notes-checkbox-item-meta">${charCount} 字${r.timestamp ? '　🕒 ' + CardSandbox.escapeHtml(r.timestamp) : ''}</div>
               </div>
             </label>
@@ -1718,6 +2264,10 @@
         return Math.round(charCount * 2.5);
       },
 
+      // ★ 修正：字數統計改為只計算「屬於共享筆記」的勾選項目（不含
+      // 卡片），因為卡片的字數已經在下方 CardSandbox 那邊的畫面自己
+      // 顯示。若要看「摘要池全部來源（卡片+共享筆記）合計字數」，
+      // 那個統計顯示在 SummaryModule.renderPool() 裡。
       updateTotalCount() {
         const el = document.getElementById('sharedNotesTotalCount');
         if (!el) return;
@@ -1731,55 +2281,47 @@
         el.innerHTML = `已勾選 ${selectedRows.length} 筆　共 <b>${totalChars.toLocaleString()}</b> 字　約 <b>${estTokens.toLocaleString()}</b> tokens（估算值）`;
       },
 
-      onCheckboxChange(idx, checked) {
-        if (checked) {
-          this.selectedIndexes.add(idx);
-        } else {
-          this.selectedIndexes.delete(idx);
-        }
-        this.updateTotalCount();
-        this.renderOutput();
-        // ★ 新增：如果使用者目前正在「共享筆記」摘要來源分頁，勾選
-        // 變動時同步刷新那邊顯示的「已勾選 N 筆」提示文字，不用切換
-        // 分頁再切回來才會更新
-        if (typeof SummaryModule !== 'undefined' && SummaryModule.currentSource === 'shared') {
-          SummaryModule._refreshSharedSourceHint();
-        }
-      },
-
       toggleSelectAll() {
-        const allSelected = this.selectedIndexes.size === this.rows.length;
-        const list = document.getElementById('sharedNotesCheckboxList');
-        const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+        // ★ 修正：改用 SelectionPool 判斷目前是否已全選（該表格所有
+        // 列的 'shared:idx' 鍵是否都在池中）
+        const allSelected = this.rows.every((_, idx) => SelectionPool.isSelected('shared', idx));
         if (allSelected) {
-          this.selectedIndexes.clear();
-          checkboxes.forEach(cb => { cb.checked = false; });
+          this.rows.forEach((_, idx) => SelectionPool.remove('shared', idx));
           document.getElementById('sharedNotesSelectAllBtn').textContent = '全選';
         } else {
-          this.rows.forEach((_, idx) => this.selectedIndexes.add(idx));
-          checkboxes.forEach(cb => { cb.checked = true; });
+          // 依表格順序依序加入，維持一個可預期的批次勾選順序（而非
+          // 隨機或反向），使用者若不滿意這個順序，仍可以先取消全選
+          // 再自己依想要的順序逐一點選
+          this.rows.forEach((_, idx) => {
+            if (!SelectionPool.isSelected('shared', idx)) {
+              SelectionPool.toggle('shared', idx);
+            }
+          });
           document.getElementById('sharedNotesSelectAllBtn').textContent = '取消全選';
         }
+        // SelectionPool.toggle/remove 內部已經會呼叫 _onChange 觸發
+        // renderSelect 重繪，這裡不需要再自己呼叫一次 render，只需要
+        // 補上這個畫面自己專屬的統計與唯讀預覽區塊更新
         this.updateTotalCount();
         this.renderOutput();
-        if (typeof SummaryModule !== 'undefined' && SummaryModule.currentSource === 'shared') {
-          SummaryModule._refreshSharedSourceHint();
-        }
       },
 
-      // 依 Sheet 原始順序回傳目前勾選的資料列（不是依勾選先後順序），
-      // 這樣接力錄音的內容拼起來才會符合原本的時間／組別順序，不會
-      // 因為使用者勾選的手速快慢而讓段落順序錯亂
+      // 依 SelectionPool 記錄的勾選順序（不是 Sheet 原始順序）回傳
+      // 目前勾選的資料列，只包含屬於 'shared' 來源的項目
       getSelectedRows() {
-        return Array.from(this.selectedIndexes)
-          .sort((a, b) => a - b)
-          .map(idx => this.rows[idx])
+        return SelectionPool.order
+          .filter(key => key.startsWith('shared:'))
+          .map(key => {
+            const idx = parseInt(key.split(':')[1], 10);
+            return this.rows[idx];
+          })
           .filter(Boolean);
       },
 
       // 唯讀文字區塊呈現，刻意不做成卡片樣式：這是別人的資料，不應該
-      // 讓使用者誤以為能編輯或直接合併進自己的卡片列表。多選時依序
-      // 顯示每一筆，並標示是哪一筆的內容，方便使用者確認勾對了。
+      // 讓使用者誤以為能編輯或直接合併進自己的卡片列表。多選時依
+      // SelectionPool 記錄的勾選順序依序顯示，並標示是哪一筆的內容，
+      // 方便使用者確認勾對了。
       renderOutput() {
         const output = document.getElementById('sharedNotesOutput');
         const selectedRows = this.getSelectedRows();
@@ -1804,20 +2346,14 @@
         output.classList.add('show');
       },
 
-      // ★ 新增：提供給 SummaryModule 呼叫，取得目前勾選項目合併後的
-      // 完整文字內容（依 Sheet 原始順序拼接，每筆之間空一行分隔），
-      // 作為「共享筆記」來源生成摘要時的輸入逐字稿
-      getSelectedContent() {
-        const selectedRows = this.getSelectedRows();
-        return selectedRows.map(r => r.content).filter(Boolean).join('\n\n');
-      },
-
       // 共用裝置清除本機資料時呼叫，把畫面重置回初始狀態，避免上一位
       // 使用者讀到的別人資料內容殘留在螢幕上。這裡只清畫面與記憶體，
       // 讀取結果本來就沒有寫進 localStorage，所以不需要額外移除儲存項目。
+      // ★ 修正：不再需要重置 selectedIndexes（已改由 SelectionPool
+      // 統一管理，清除邏輯交給呼叫端的 ClearLocalData 一併呼叫
+      // SelectionPool.clear()）
       resetUI() {
         this.rows = [];
-        this.selectedIndexes = new Set();
         this.hideError();
         this.setLoading(false);
         document.getElementById('sharedSheetUrlInput').value = '';
@@ -1832,8 +2368,8 @@
 
     // ---------- ★ 修正：複製成 Sheet 貼上格式 ----------
     //
-    // 目的：方便使用者手動把自己整理好的卡片內容貼進共用 Google Sheet
-    // 的下一個空儲存格。
+    // 目的：方便使用者手動把整理好的內容（語音卡片或會議摘要）貼進
+    // 共用 Google Sheet 的下一個空儲存格。
     //
     // ★ 格式改版說明：原本用 Tab 字元分隔成「標籤\t內容\t時間」三欄，
     // 讓 Google Sheets 貼上時自動分欄成 A/B/C 三個獨立儲存格——這個
@@ -1844,29 +2380,41 @@
     // 現在改為：整包內容打包成一個 JSON 字串，只落在單一儲存格
     // （不使用 Tab，不會自動分欄）。這份 Google Sheet 從此不是給
     // 人類直接閱讀用的表格，而是純粹的資料庫——人類唯一要做的事就是
-    // 「複製這一整包 JSON、貼到下一個空白儲存格（A1、A2、A3...
-    // 任何一欄都一樣，因為每一列只用第一欄）」，格式的產生與解析
+    // 「複製這一整包 JSON、貼到下一個空白儲存格」，格式的產生與解析
     // 都交給程式處理，不需要人類理解或手動維護欄位對應關係。
     //
-    // label 標籤直接自動帶入「目前日期時間」，不彈窗詢問使用者輸入
-    // ——若使用者想要更有意義的名稱（例如「A組」），可以直接在
-    // Sheet 儲存格裡編輯那個 JSON 字串裡 "label" 的值，或者貼上後
-    // 用 Sheet 的尋找/取代功能調整。
+    // ★ 新增：type 欄位標記這筆資料是原始逐字稿（'raw'，來自語音
+    // 卡片）還是已經生成好的摘要（'summary'），讓其他人讀取這份共用
+    // 表格時能一眼分辨，避免誤把別人的摘要當逐字稿疊加使用。
+    //
+    // ★ 新增：label 標籤改為主動詢問使用者輸入自訂主題（例如
+    // 「資料一」「上半場逐字稿」），不再單純自動帶入日期時間——
+    // 使用者取消輸入或留空時，才退回自動帶入日期時間作為預設值，
+    // 確保無論如何都會有一個非空的標籤可用。
     const CopyToSheetFormat = {
       formatTimestamp(date) {
         const pad = n => String(n).padStart(2, '0');
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
       },
 
-      copy() {
-        if (CardSandbox.cards.length === 0) {
-          alert('目前沒有任何卡片內容可以複製，請先錄音或編輯出至少一張卡片。');
+      // 通用複製方法，供「卡片複製」與「摘要複製」共用同一套詢問
+      // 主題／組 JSON／寫入剪貼簿的流程，只有 content 與 type 不同
+      copyContent(content, type) {
+        if (!content || !content.trim()) {
+          alert(type === 'summary' ? '目前沒有已生成的摘要可以複製。' : '目前沒有任何內容可以複製，請先錄音或編輯出至少一張卡片。');
           return;
         }
 
         const now = new Date();
-        const label = this.formatTimestamp(now);
-        const content = CardSandbox.cards.map(c => c.text).join('\n');
+        const defaultLabel = this.formatTimestamp(now);
+
+        // ★ 新增：詢問使用者輸入自訂主題。prompt() 回傳 null 代表
+        // 使用者按了取消，回傳空字串代表按確定但沒輸入任何文字——
+        // 這兩種情況都視為「沒有提供有效標籤」，退回自動帶入日期時間，
+        // 確保不會出現標籤是空字串的資料被貼進共用表格
+        const typeLabel = type === 'summary' ? '摘要' : '逐字稿';
+        const userInput = prompt(`請輸入這筆${typeLabel}的主題名稱（留空則自動使用目前日期時間）：`, '');
+        const label = (userInput && userInput.trim()) ? userInput.trim() : defaultLabel;
 
         // JSON.stringify 會自動把 content 裡的換行字元轉成跳脫序列
         // \n（字面上的反斜線加 n，不是真正的換行），確保整個結果是
@@ -1875,93 +2423,105 @@
         const pasteText = JSON.stringify({
           label: label,
           content: content,
-          timestamp: label
+          timestamp: defaultLabel,
+          type: type
         });
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(pasteText)
-            .then(() => alert(`已複製成可直接貼上 Google Sheet 的格式（標籤：${label}）。\n\n請開啟共用 Sheet，點選下一個空白儲存格，直接貼上即可（會落在單一格，不會自動分欄）。`))
+            .then(() => alert(`已複製成可直接貼上 Google Sheet 的格式（主題：${label}，類型：${typeLabel}）。\n\n請開啟共用 Sheet，點選下一個空白儲存格，直接貼上即可（會落在單一格，不會自動分欄）。`))
             .catch(() => alert('複製失敗，請改用其他方式手動整理內容。'));
         } else {
           alert('這個瀏覽器不支援自動複製，請手動選取以下內容：\n\n' + pasteText);
         }
+      },
+
+      // 卡片複製的入口，維持原本按鈕呼叫的方法名稱與呼叫方式不變，
+      // 內部改為呼叫共用的 copyContent()，並固定標記 type 為 'raw'
+      copy() {
+        const content = CardSandbox.cards.map(c => c.text).join('\n');
+        this.copyContent(content, 'raw');
       }
     };
 
-    // ---------- 會議摘要模組 ----------
-    // ★ 修正：原本只有一個 SUMMARY_STORAGE_KEY，摘要來源改為可切換
-    // 「語音卡片」／「共享筆記」後，兩種來源的摘要各自獨立保存，
-    // 用不同的 localStorage key，避免互相覆蓋。
-    const SUMMARY_STORAGE_KEYS = {
-      cards: 'meeting_summary_draft',
-      shared: 'meeting_summary_draft_shared'
-    };
+    // ---------- ★ 修正：會議摘要模組 ----------
+    // 原本分成「語音卡片」／「共享筆記」兩個互斥來源分頁，各自獨立
+    // 保存摘要結果。現在改為單一統一勾選池（SelectionPool）：卡片與
+    // 共享筆記的資料可以自由混合勾選，摘要來源就是池中目前的內容，
+    // 依使用者勾選的先後順序合併送去生成，因此摘要結果也只有一份，
+    // 不再需要分開保存。
+    const SUMMARY_STORAGE_KEY = 'meeting_summary_draft';
 
     const SummaryModule = {
       GEMINI_MODEL: 'gemini-3.5-flash',
       isGenerating: false,
+      currentSummary: null,
 
-      // ★ 新增：目前選擇的摘要來源，'cards'（語音卡片）或
-      // 'shared'（共享筆記，多人接力錄音時合併多筆勾選內容一起摘要）。
-      // currentSummary 改成依來源分別記錄的物件，而非單一字串，這樣
-      // 切換來源分頁時可以各自保留、各自顯示，不會互相清空。
-      currentSource: 'cards',
-      currentSummary: { cards: null, shared: null },
+      // ★ 新增：把 SelectionPool 目前的內容畫成清單，顯示在會議摘要
+      // 區塊裡，讓使用者在按下「生成」之前就能清楚看到「目前選了哪些
+      // 資料、順序是什麼」，並提供每一項的移除按鈕（點擊會呼叫
+      // SelectionPool.remove，跟直接去卡片/共享筆記清單取消勾選是
+      // 完全等效的操作，這裡只是提供更方便的操作入口）
+      renderPool() {
+        const hintEl = document.getElementById('summaryPoolHint');
+        const listEl = document.getElementById('summaryPoolList');
+        if (!hintEl || !listEl) return; // 尚未進入摘要分頁時，這些元素可能還沒渲染
 
-      // ★ 新增：切換摘要來源。切換時只更新畫面顯示，不會清除任何一邊
-      // 已經生成的內容——兩邊的摘要各自獨立保存，隨時切換都看得到。
-      switchSource(source) {
-        if (this.currentSource === source) return;
-        this.currentSource = source;
+        const items = SelectionPool.resolveItems();
 
-        document.getElementById('summarySourceCardsBtn').classList.toggle('active', source === 'cards');
-        document.getElementById('summarySourceSharedBtn').classList.toggle('active', source === 'shared');
-
-        if (source === 'cards') {
-          document.getElementById('summarySourceHint').innerHTML = '摘要來源：目前裝置上的語音卡片。';
-        } else {
-          this._refreshSharedSourceHint();
+        if (items.length === 0) {
+          hintEl.style.display = 'block';
+          listEl.innerHTML = '';
+          return;
         }
 
-        this._renderCurrentSourceUI();
-      },
+        hintEl.style.display = 'none';
 
-      // 更新「共享筆記」來源的提示文字（已勾選幾筆），供 switchSource
-      // 以及 SharedSheetNotes 勾選變動時共用，避免邏輯重複兩份
-      _refreshSharedSourceHint() {
-        const hint = document.getElementById('summarySourceHint');
-        if (!hint) return;
-        const selectedCount = (typeof SharedSheetNotes !== 'undefined' && SharedSheetNotes.selectedIndexes)
-          ? SharedSheetNotes.selectedIndexes.size : 0;
-        hint.innerHTML = selectedCount > 0
-          ? `摘要來源：上方「查看共享筆記」目前勾選的 <b>${selectedCount}</b> 筆資料。適合多人接力錄音、各自整理後貼進共用 Sheet，再合併生成整場摘要。`
-          : '摘要來源：共享筆記。請先到上方「查看共享筆記」讀取表格並勾選要納入摘要的資料。';
-      },
+        const totalChars = items.reduce((sum, item) => sum + item.content.length, 0);
+        const estTokens = Math.round(totalChars * 2.5);
 
-      // 依目前選擇的來源，取得要送去生成摘要的逐字稿全文
-      _getSourceText() {
-        if (this.currentSource === 'shared') {
-          return (typeof SharedSheetNotes !== 'undefined') ? SharedSheetNotes.getSelectedContent() : '';
-        }
-        return CardSandbox.cards.map(c => c.text).join('\n');
+        const summaryLine = `<div class="shared-notes-total-count">已選 ${items.length} 筆　共 <b>${totalChars.toLocaleString()}</b> 字　約 <b>${estTokens.toLocaleString()}</b> tokens（估算值）</div>`;
+
+        const itemsHtml = items.map((item, i) => {
+          const sourceLabel = item.source === 'card' ? '🗂️ 卡片' : '📖 共享筆記';
+          const typeTag = item.type === 'summary' ? '📝' : '';
+          return `
+            <div class="summary-pool-item">
+              <span class="pool-order">${i + 1}</span>
+              <span class="pool-label">${typeTag} ${CardSandbox.escapeHtml(item.label)}</span>
+              <span class="pool-source">${sourceLabel}</span>
+              <button class="pool-remove" title="移除" onclick="SelectionPool.remove('${item.source}', ${item.id})">✕</button>
+            </div>
+          `;
+        }).join('');
+
+        listEl.innerHTML = summaryLine + itemsHtml;
       },
 
       async generate() {
         if (this.isGenerating) return;
 
-        const fullText = this._getSourceText();
-        if (!fullText.trim()) {
-          if (this.currentSource === 'shared') {
-            alert('目前沒有勾選任何共享筆記資料，請先到上方「查看共享筆記」讀取表格並至少勾選一筆，再生成摘要。');
-          } else {
-            alert('目前沒有任何卡片內容，請先錄音或編輯出至少一張卡片，再生成摘要。');
-          }
+        const items = SelectionPool.resolveItems();
+        if (items.length === 0) {
+          alert('目前沒有勾選任何資料。請到「查看共享筆記」勾選資料，或在「整理完成的語音卡片」切到「✅ 勾選模式」勾選卡片，再生成摘要。');
           return;
+        }
+
+        // ★ 新增：偵測勾選池裡是否已經包含摘要類型的資料（type ===
+        // 'summary'，代表這筆是別人或自己先前已經生成好、存回 Sheet
+        // 的摘要）。這種情況下提醒使用者一下，避免不小心把「摘要的
+        // 摘要」再摘要一次而不自知——但不強制阻擋，因為某些情境下
+        // （例如彙整多場會議各自的摘要成一份總覽）刻意這樣做是合理的，
+        // 交由使用者自己判斷，只給提示不強制介入。
+        const hasSummaryType = items.some(item => item.type === 'summary');
+        if (hasSummaryType) {
+          const proceed = confirm('目前勾選的資料中，有一筆或多筆本身已經是「摘要」類型（而不是原始逐字稿）。\n\n若你是想把多份摘要彙整成一份總覽，可以繼續；若不是，建議先確認是否選錯了資料。\n\n按「確定」繼續生成，按「取消」返回調整勾選。');
+          if (!proceed) return;
         }
 
         const apiKey = localStorage.getItem('gemini_api_key');
         if (!apiKey) {
-          alert('請先在上方「設定 Gemini API Key」卡片內填入你的 Key，才能使用會議摘要功能。');
+          alert('請先到「⚙️ 設定」分頁填入 Gemini API Key，才能使用 AI 摘要功能。');
           return;
         }
 
@@ -1969,11 +2529,11 @@
         this._setLoadingUI(true);
 
         try {
-          const summaryText = await this._callGemini(fullText, apiKey);
+          const summaryText = await this._callGemini(items, apiKey);
           this._renderSummary(summaryText);
           this._persist(summaryText);
         } catch (err) {
-          console.error('生成會議摘要失敗：', err);
+          console.error('生成 AI 摘要失敗：', err);
           this._renderError('生成摘要失敗：' + err.message);
         } finally {
           this.isGenerating = false;
@@ -1981,16 +2541,25 @@
         }
       },
 
-      async _callGemini(fullText, apiKey) {
+      async _callGemini(items, apiKey) {
         const modelName = this.GEMINI_MODEL || 'gemini-2.5-flash';
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
-        // ★ 修正：共享筆記來源可能是多人各自貼上的內容合併而成（例如
-        // A組錄上半場、B組錄下半場），提示詞額外說明這點，讓 Gemini
-        // 知道輸入內容可能來自多個段落／多個人整理，摘要時應視為同一場
-        // 會議的完整內容做整體整理，而不是誤以為是互不相干的多篇文件。
-        const sourceNote = this.currentSource === 'shared'
-          ? '\n\n這份逐字稿可能是由多人／多個時段各自錄音整理後合併而成（例如同一場會議的上下半場，或多組人各自負責的部分），請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要特別區分是誰整理的。'
+        // ★ 修正：來源可能混合了卡片與共享筆記，甚至混合了多筆不同
+        // 標籤的資料（例如「上半場」「下半場」各自一筆），提示詞需要
+        // 說明這是可能由多個段落組成的完整內容，且依照使用者指定的
+        // 順序排列，請 Gemini 視為一份連貫的會議記錄整體整理，而非
+        // 互不相干的多篇文件。每個段落前面加上它的標籤，方便 Gemini
+        // 判斷段落邊界（尤其是「多場不同會議」而非「同場接力」的
+        // 情境，加上標籤能提供更好的上下文線索）。
+        const hasMultipleItems = items.length > 1;
+        const fullText = items.map(item => {
+          const label = item.label || '（未命名）';
+          return hasMultipleItems ? `【${label}】\n${item.content}` : item.content;
+        }).join('\n\n');
+
+        const sourceNote = hasMultipleItems
+          ? '\n\n這份逐字稿是由多個段落合併而成（可能來自不同人分別整理、或同一場會議的不同時段），每個段落前面用【標籤】標示來源，已按照指定順序排列。請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要逐段分別摘要或特別區分是誰整理的。'
           : '';
 
         const payload = {
@@ -2049,12 +2618,6 @@
           if (res.status === 404) {
             throw new Error('找不到指定的 Gemini 模型（' + modelName + '），可能已被下架或名稱錯誤：' + apiMessage);
           }
-          // ★ 新增：內容過長導致的失敗提示。目前刻意不預先限制字數，
-          // 讓使用者先嘗試一次性生成（十萬字以內大多模型仍在 context
-          // window 容許範圍內），但若真的失敗且錯誤訊息像是超出長度
-          // 限制，給出明確提示，而不是丟一句原始 API 錯誤訊息讓人
-          // 摸不著頭緒。未來若要做「分段接力摘要」，可以從這裡的
-          // catch 分支繼續擴充，本次先不實作。
           if (res.status === 400 && /(token|context|too long|exceed)/i.test(apiMessage)) {
             throw new Error('這份逐字稿內容量可能超過模型單次可處理的長度上限，導致生成失敗：' + apiMessage + '\n\n可以嘗試減少勾選的資料筆數，或將內容分批生成摘要。');
           }
@@ -2069,8 +2632,6 @@
           throw new Error('這段內容被 Gemini 的安全機制擋下，無法生成摘要。');
         }
         if (candidate.finishReason === 'MAX_TOKENS') {
-          // ★ 新增：這個 finishReason 代表輸出（不是輸入）被長度上限
-          // 截斷，跟上面「輸入超長」是不同情況，訊息分開講清楚。
           throw new Error('輸入內容過長，Gemini 生成的摘要在完成前就被截斷了。可以嘗試減少勾選的資料筆數後再試一次。');
         }
 
@@ -2088,7 +2649,7 @@
         const box = document.getElementById('summaryOutputBox');
         box.classList.remove('empty', 'loading');
         box.textContent = text;
-        this.currentSummary[this.currentSource] = text;
+        this.currentSummary = text;
         this._updateActionsRowVisibility();
       },
 
@@ -2098,15 +2659,15 @@
         box.classList.add('empty');
         box.textContent = text;
         // 生成失敗不動之前已保存的摘要（如果有的話），錯誤訊息只是
-        // 暫時蓋在畫面上；若使用者想找回舊摘要，切換來源再切回來，
-        // 或重新整理頁面會從 localStorage 還原回上一次成功保存的內容
+        // 暫時蓋在畫面上；若使用者想找回舊摘要，重新整理頁面會從
+        // localStorage 還原回上一次成功保存的內容
       },
 
       _setLoadingUI(loading) {
         const btn = document.getElementById('summaryGenerateBtn');
         const box = document.getElementById('summaryOutputBox');
         btn.disabled = loading;
-        btn.textContent = loading ? '⏳ 生成中...' : '📝 生成會議摘要';
+        btn.textContent = loading ? '⏳ 生成中...' : '📝 生成 AI 摘要';
         if (loading) {
           box.classList.remove('empty');
           box.classList.add('loading');
@@ -2116,38 +2677,29 @@
 
       _persist(text) {
         try {
-          localStorage.setItem(SUMMARY_STORAGE_KEYS[this.currentSource], text);
+          localStorage.setItem(SUMMARY_STORAGE_KEY, text);
         } catch (e) {
           console.warn('摘要自動儲存失敗（可能是儲存空間已滿或隱私模式）：', e);
         }
       },
 
-      // 頁面載入時呼叫一次，把兩種來源上次保存的摘要都還原到記憶體，
-      // 但畫面只顯示目前選擇中的來源（預設 'cards'）
       restore() {
-        Object.keys(SUMMARY_STORAGE_KEYS).forEach(source => {
-          let raw = null;
-          try { raw = localStorage.getItem(SUMMARY_STORAGE_KEYS[source]); }
-          catch (e) { return; }
-          if (raw) this.currentSummary[source] = raw;
-        });
-        this._renderCurrentSourceUI();
+        let raw = null;
+        try { raw = localStorage.getItem(SUMMARY_STORAGE_KEY); }
+        catch (e) { return; }
+        if (raw) this.currentSummary = raw;
+        this._renderCurrentUI();
       },
 
-      // ★ 新增：依 currentSource 把畫面（輸出框、保存狀態列）刷新成
-      // 對應來源的內容，供 switchSource 與 restore 共用
-      _renderCurrentSourceUI() {
+      _renderCurrentUI() {
         const box = document.getElementById('summaryOutputBox');
-        const text = this.currentSummary[this.currentSource];
         box.classList.remove('loading');
-        if (text) {
+        if (this.currentSummary) {
           box.classList.remove('empty');
-          box.textContent = text;
+          box.textContent = this.currentSummary;
         } else {
           box.classList.add('empty');
-          box.textContent = this.currentSource === 'shared'
-            ? '尚未生成摘要。到上方「查看共享筆記」讀取表格並勾選資料後，點下方按鈕即可生成摘要。'
-            : '尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。';
+          box.textContent = '尚未生成摘要。勾選好要納入的資料後，點上方按鈕即可生成重點摘要。';
         }
         this._updateActionsRowVisibility();
       },
@@ -2155,14 +2707,13 @@
       _updateActionsRowVisibility() {
         const row = document.getElementById('summaryActionsRow');
         if (!row) return;
-        row.classList.toggle('hidden', !this.currentSummary[this.currentSource]);
+        row.classList.toggle('hidden', !this.currentSummary);
       },
 
       copy() {
-        const text = this.currentSummary[this.currentSource];
-        if (!text) return;
+        if (!this.currentSummary) return;
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text)
+          navigator.clipboard.writeText(this.currentSummary)
             .then(() => alert('已複製摘要到剪貼簿。'))
             .catch(() => alert('複製失敗，請手動選取摘要內容複製。'));
         } else {
@@ -2170,26 +2721,33 @@
         }
       },
 
+      // ★ 新增：把已生成的摘要複製成可貼進共用 Sheet 的格式，標記
+      // type 為 'summary'，讓其他人讀取這份共用表格時能清楚分辨這筆
+      // 是摘要而非原始逐字稿。直接複用 CopyToSheetFormat 的共用邏輯
+      // （詢問主題、組 JSON、寫入剪貼簿），不需要另外寫一份。
+      copyToSheet() {
+        if (!this.currentSummary) return;
+        CopyToSheetFormat.copyContent(this.currentSummary, 'summary');
+      },
+
       remove() {
-        const text = this.currentSummary[this.currentSource];
-        if (!text) return;
-        if (!confirm('確定要刪除已保存的會議摘要嗎？此動作無法復原（語音卡片與共享筆記內容不受影響）。')) return;
-        this.currentSummary[this.currentSource] = null;
-        this._renderCurrentSourceUI();
-        try { localStorage.removeItem(SUMMARY_STORAGE_KEYS[this.currentSource]); }
+        if (!this.currentSummary) return;
+        if (!confirm('確定要刪除已保存的 AI 摘要嗎？此動作無法復原（語音卡片與共享筆記內容不受影響）。')) return;
+        this.currentSummary = null;
+        this._renderCurrentUI();
+        try { localStorage.removeItem(SUMMARY_STORAGE_KEY); }
         catch (e) { /* 忽略 */ }
       },
 
-      // 共用裝置清除本機資料時呼叫，把兩種來源的摘要都從記憶體與畫面
-      // 清掉；localStorage 的部分由 ClearLocalData 統一處理移除
+      // 共用裝置清除本機資料時呼叫，把摘要從記憶體與畫面清掉；
+      // localStorage 的部分由 ClearLocalData 統一處理移除
       clearFromMemoryAndUI() {
-        this.currentSummary = { cards: null, shared: null };
-        this._renderCurrentSourceUI();
+        this.currentSummary = null;
+        this._renderCurrentUI();
       },
 
       share() {
-        const text = this.currentSummary[this.currentSource];
-        if (!text) return;
+        if (!this.currentSummary) return;
         document.getElementById('summaryShareMenuModal').classList.remove('hidden');
       },
 
@@ -2199,20 +2757,18 @@
 
       shareViaLineFriend() {
         this.closeShareMenu();
-        const text = this.currentSummary[this.currentSource];
-        if (!text) return;
-        ChatPreview.show(text, 'LINE 好友選單', () => doSend(text));
+        if (!this.currentSummary) return;
+        ChatPreview.show(this.currentSummary, 'LINE 好友選單', () => doSend(this.currentSummary));
       },
 
       shareViaWebShare() {
         this.closeShareMenu();
-        const text = this.currentSummary[this.currentSource];
-        if (!text) return;
+        if (!this.currentSummary) return;
         if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
-          ChatPreview.show(text, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(text));
+          ChatPreview.show(this.currentSummary, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(this.currentSummary));
           return;
         }
-        ChatPreview.show(text, '手機系統分享', () => doWebShare(text));
+        ChatPreview.show(this.currentSummary, '手機系統分享', () => doWebShare(this.currentSummary));
       }
     };
 
@@ -2271,7 +2827,7 @@
           const text = await this._transcribeFile(file);
           if (text && text.trim()) {
             CardSandbox.add(text.trim());
-            alert('轉寫完成，內容已加入語音卡片，可以到「錄音內容編輯」分頁查看。');
+            alert('轉寫完成，內容已加入語音卡片，可以到「🗂️ 筆記」分頁查看。');
           } else {
             alert('轉寫完成，但沒有偵測到任何文字內容（可能是檔案本身沒有語音，或音量過小）。');
           }
@@ -2743,10 +3299,10 @@
         CardSandbox.renderLivePreview();
 
         SummaryModule.restore();
-        // 頁面初次載入時，摘要來源預設為 'cards'，補上對應的提示文字
-        // （switchSource 只在「切換」時才會更新這段文字，初始狀態需要
-        // 額外呼叫一次，否則 hint 區塊會是空白）
-        document.getElementById('summarySourceHint').innerHTML = '摘要來源：目前裝置上的語音卡片。';
+        // ★ 修正：摘要來源改為統一勾選池後，不再需要切換來源分頁，
+        // 這裡改成初始化摘要池的顯示（此時 SelectionPool.order 是
+        // 空的，renderPool 會顯示「尚未勾選任何資料」的提示）
+        SummaryModule.renderPool();
 
         // ★ 新增：每次進站時，共享筆記查看區塊重置回初始狀態（沒有
         // 讀取結果、輸入框空白），避免顯示上一次瀏覽期間殘留的畫面
@@ -2754,8 +3310,13 @@
         // 這裡只是確保 UI 顯示與資料狀態一致
         SharedSheetNotes.resetUI();
 
+        // ★ 新增：初始化設定頁的逐項清單顯示，讓使用者第一次切到
+        // 設定分頁時畫面已經是最新狀態，不會有短暫空白或需要等待
+        SettingsPanel.render();
+        updateKeyMissingHints();
+
         if (CardSandbox.cards.length > 0) {
-          switchTab('review');
+          MainNav.switchTo('cards');
         }
       }
     };
