@@ -417,6 +417,10 @@
       display: none; white-space: pre-wrap;
     }
     .shared-notes-error.show { display: block; }
+    /* ★ 新增：警告等級樣式（用於「部分列格式有問題但其他資料仍正常
+       讀取成功」這種非致命情況），用偏黃色調跟真正的錯誤（紅色）做
+       區分，避免使用者誤以為整批讀取都失敗了 */
+    .shared-notes-error.warn { color: #a06800; }
     .shared-notes-loading {
       font-size: 12px; color: var(--ink-soft); display: none;
       align-items: center; gap: 8px; margin-bottom: 10px;
@@ -425,28 +429,77 @@
     .shared-notes-loading .upload-progress-spinner { flex-shrink: 0; }
     .shared-notes-select-row { display: none; margin-bottom: 10px; }
     .shared-notes-select-row.show { display: block; }
-    .shared-notes-select-row label {
-      font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; display: block;
+    .shared-notes-select-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
     }
-    .shared-notes-select-row select {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
-      font-size: 13px; background: var(--bg); color: var(--ink); font-weight: 600;
+    .shared-notes-select-header label {
+      font-size: 11.5px; font-weight: 600; color: var(--ink-soft);
     }
-    .shared-notes-select-row select:focus { outline: none; border-color: var(--line-green); }
+    .shared-notes-select-all-btn {
+      border: 1px solid var(--border); background: var(--card-bg); cursor: pointer;
+      font-size: 11px; padding: 3px 8px; border-radius: 6px; color: var(--ink-soft); font-weight: 600;
+    }
+    /* ★ 新增：共享筆記改為 checkbox 多選清單（取代原本的單選
+       <select>），依 Sheet 列順序排列，方便多人接力錄音的情境下
+       一次勾選多筆資料合併使用。每個項目附上字數，方便使用者在
+       勾選時就能大致掌握總量，不用等到生成摘要才發現內容過長。 */
+    .shared-notes-checkbox-list {
+      max-height: 260px; overflow-y: auto; border: 1px solid var(--border);
+      border-radius: 10px; background: var(--bg);
+    }
+    .shared-notes-checkbox-item {
+      display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px;
+      border-bottom: 1px solid var(--border); cursor: pointer;
+    }
+    .shared-notes-checkbox-item:last-child { border-bottom: none; }
+    .shared-notes-checkbox-item input[type="checkbox"] {
+      margin-top: 2px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer;
+    }
+    .shared-notes-checkbox-item-body { flex: 1; min-width: 0; }
+    .shared-notes-checkbox-item-label {
+      font-size: 13px; font-weight: 600; color: var(--ink);
+    }
+    .shared-notes-checkbox-item-meta {
+      font-size: 11px; color: var(--ink-faint); margin-top: 2px;
+    }
+    .shared-notes-total-count {
+      font-size: 11.5px; color: var(--ink-soft); margin-top: 8px; text-align: right;
+    }
+    .shared-notes-total-count b { color: var(--line-green-dark); }
     .shared-notes-output {
       display: none; margin-top: 4px; padding: 12px; background: var(--bg);
       border-radius: 10px; font-size: 13px; line-height: 1.7; color: var(--ink);
       white-space: pre-wrap; word-break: break-word;
+      max-height: 320px; overflow-y: auto;
     }
     .shared-notes-output.show { display: block; }
+    .shared-notes-output-entry {
+      margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border);
+    }
+    .shared-notes-output-entry:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .shared-notes-output-entry-label {
+      font-size: 11.5px; font-weight: 700; color: var(--line-green-dark); margin-bottom: 4px;
+    }
     .shared-notes-output-meta {
-      font-size: 11px; color: var(--ink-faint); margin-top: 8px;
-      padding-top: 8px; border-top: 1px dashed var(--border);
+      font-size: 11px; color: var(--ink-faint); margin-top: 4px;
     }
     .shared-notes-warn-note {
       font-size: 11px; color: var(--ink-faint); line-height: 1.6;
       margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);
     }
+
+    /* ★ 新增：會議摘要來源切換（語音卡片／共享筆記），樣式比照
+       mode-switch 的簡約風格，放在生成按鈕上方 */
+    .summary-source-switch { display: flex; gap: 6px; margin-bottom: 8px; }
+    .summary-source-switch button {
+      flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border);
+      background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft);
+    }
+    .summary-source-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .summary-source-hint {
+      font-size: 11px; color: var(--ink-faint); line-height: 1.6; margin-bottom: 10px;
+    }
+    .summary-source-hint b { color: var(--ink-soft); }
 
     /* ★ 新增：複製成 Sheet 貼上格式按鈕，放在卡片列表區塊上方 */
     .copy-sheet-format-row {
@@ -482,12 +535,44 @@
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
             <li><b>整理好的語音卡片會自動儲存在這台裝置的瀏覽器裡</b>，就算不小心切出去、誤觸上一頁或重新整理，回來也找得回來；但這也代表若為共用裝置，請務必在使用完畢後於 API Key 卡片內點「清除本機資料」，避免下一位使用者看到你的內容</li>
             <li>發送功能有三種：「送回聊天室」直接存回你打開此頁面時所在的聊天室（僅限從 LINE 聊天室進入時可用，最推薦）；「LINE 好友選單」需要先登入 LINE 才能選對象發送；「手機分享」在 LINE 內開啟時會自動改走好友選單（LINE 內建瀏覽器對系統分享有限制）</li>
-            <li>「查看共享筆記」是唯讀功能，只能讀取別人貼在共用 Google Sheet 裡的內容，不會寫回 Sheet；要把自己整理好的內容加進 Sheet，仍需自己手動複製貼上</li>
+            <li>「查看共享筆記」是唯讀功能，只能讀取別人貼在共用 Google Sheet 裡的內容（可勾選多筆一起查看或合併生成摘要），不會寫回 Sheet；要把自己整理好的內容加進 Sheet，仍需自己手動複製貼上</li>
           </ul>
         </div>
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>共享筆記改為單欄 JSON 格式（⚠️ 不相容舊表格）</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「查看共享筆記」的資料格式改版：原本用 A/B/C 三欄分別存標籤、內容、時間戳記，需要理解欄位定義、貼上時容易貼錯欄；現在改成<b>每一格存一整包完整資料</b>，人類只需要負責複製、貼到下一個空白儲存格，不需要理解或維護欄位格式</li>
+              <li><b>這是不相容的格式變更</b>：用舊版「複製成 Sheet 貼上格式」貼進去的舊表格，用這個新版本讀取會失敗。請所有共用同一份 Sheet 的成員都更新到這個版本後，重新用新按鈕產生的內容貼一份新的</li>
+              <li>若表格裡混雜了新舊格式或有貼壞的資料，讀取時會清楚標示哪幾筆格式有問題並略過，其餘正常的資料仍會正常顯示，不會整批讀取失敗</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>分享中斷後可接續，不用整段重來</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「分享出去 → LINE 好友分享」若因內容較長分批送出、中途取消或失敗，下次再點分享時會自動偵測到上次中斷在第幾批，詢問是否要接著送，不需要整段重新發送</li>
+              <li>只要中斷後卡片內容有任何新增、刪除、編輯、合併或調整順序，就會判定內容已變動，中斷進度會自動失效並提示改成整段重新分享，避免接續到錯誤的段落</li>
+              <li>中斷進度不限時間保存，除非成功送完或手動點「清除本機資料」，否則隔天再打開仍可以選擇接續</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>LINE 好友分享支援超過 5 則的長內容分批送出</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「分享出去 → LINE 好友分享」原本超過 5 則訊息（約 24000 字以上）就會直接放棄改複製剪貼簿，現在改為<b>依序分批呼叫</b>（每批最多 5 則），可以送出更長的內容</li>
+              <li>因為 LINE 選擇分享對象的畫面在每一批之間會重新跳出，第二批（含）以後送出前會先提醒「請選擇跟上一批相同的對象」，並在全部送完後提醒使用者自行確認每批是否都送到了同一人</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>共享筆記可多選並直接生成摘要、分享功能修正</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「查看共享筆記」從單選改為<b>可複選</b>，適合多人接力錄音（例如一人錄上半場、另一人錄下半場，各自整理後貼進同一份共用 Sheet）——現在可以一次勾選多筆，依表格原始順序合併查看</li>
+              <li>會議摘要新增「來源切換」：可選擇用「語音卡片」或「共享筆記」目前勾選的內容來生成摘要，兩邊各自獨立保存，互不覆蓋，切換來源不會清空另一邊已生成的摘要</li>
+              <li>勾選共享筆記資料時，會即時顯示已勾選筆數、總字數，以及估算的 token 數（約 2.5 token／中文字，僅供參考），方便掌握內容量是否過大</li>
+              <li>修正「分享出去 → LINE 好友分享」在內容較長（例如超過 5000 字）時會直接失敗、卻沒有任何提示的問題——原本只有「送回聊天室」有做自動分段，「分享出去」漏了同步這段邏輯，現已修正為兩種發送方式都會自動分段</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>讀取共享 Google Sheet 筆記（唯讀）</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>「錄音內容編輯」分頁新增「📖 查看共享筆記」區塊，貼上共用 Google Sheet 的連結，即可用下拉選單選擇要查看哪一筆別人整理好的內容（例如另一組人的會議記錄）</li>
@@ -747,31 +832,18 @@
       <div id="reviewView" style="display:none;">
 
         <div class="section-label">會議摘要</div>
-        <div class="summary-panel" id="summaryPanel">
-          <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成會議摘要</button>
-          <div class="summary-output empty" id="summaryOutputBox">
-            尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。
-          </div>
-          <div class="summary-actions-row hidden" id="summaryActionsRow">
-            <span class="summary-saved-hint">💾 已保存在本機</span>
-            <div class="summary-actions-inline">
-              <button class="copy" onclick="SummaryModule.copy()" title="複製摘要文字">📋 複製</button>
-              <button class="share" onclick="SummaryModule.share()" title="分享摘要">🔗 分享</button>
-              <button class="del" onclick="SummaryModule.remove()" title="刪除已保存的摘要">✕ 刪除</button>
-            </div>
-          </div>
-        </div>
-
         <!-- ★ 新增：查看共享 Google Sheet 筆記（唯讀＋多筆選擇）
-             流程：貼連結 → 讀取解析 CSV → 依 A 欄標籤列出下拉選單 →
-             選擇後顯示對應 B 欄內容（唯讀文字區塊，不可編輯/合併進卡片）。
-             本工具本次更版完全不寫入 Sheet，寫入交由使用者自行手動操作，
+             流程：貼連結 → 讀取解析每一格的 JSON 資料 → 依標籤列出勾選清單 →
+             勾選後的內容可作為下方會議摘要的來源之一（多人接力錄音，
+             各自整理後貼進同一份 Sheet，任何人都能讀取全部內容一起
+             生成摘要，不需要透過 LINE 傳遞逐字稿原文）。
+             這裡仍然完全不寫入 Sheet，寫入交由使用者自行手動操作，
              下方「複製成 Sheet 貼上格式」按鈕是為了那個手動步驟提供便利。 -->
         <div class="section-label">📖 查看共享筆記</div>
         <div class="shared-notes-panel" id="sharedNotesPanel">
           <div class="shared-notes-panel-label">讀取共用 Google Sheet</div>
           <div class="shared-notes-panel-desc">
-            貼上共用 Google Sheet 的分享連結，讀取後可從下拉選單選擇要查看誰整理的內容（例如「資料一 / A組」）。這裡只能「查看」，不會修改 Sheet 本身。
+            貼上共用 Google Sheet 的分享連結，讀取後可勾選要查看（或用來生成摘要）的資料，可複選。這裡只能「查看」，不會修改 Sheet 本身。
           </div>
           <div class="shared-notes-input-row">
             <input type="text" id="sharedSheetUrlInput" placeholder="貼上 Google Sheet 分享連結">
@@ -783,12 +855,41 @@
             <span>正在讀取共用表格...</span>
           </div>
           <div class="shared-notes-select-row" id="sharedNotesSelectRow">
-            <label for="sharedNotesSelect">選擇要查看的資料</label>
-            <select id="sharedNotesSelect" onchange="SharedSheetNotes.onSelect(this.value)"></select>
+            <div class="shared-notes-select-header">
+              <label>勾選要查看的資料（依表格順序，可複選）</label>
+              <button class="shared-notes-select-all-btn" onclick="SharedSheetNotes.toggleSelectAll()" id="sharedNotesSelectAllBtn">全選</button>
+            </div>
+            <div class="shared-notes-checkbox-list" id="sharedNotesCheckboxList"></div>
+            <div class="shared-notes-total-count" id="sharedNotesTotalCount"></div>
           </div>
           <div class="shared-notes-output" id="sharedNotesOutput"></div>
           <div class="shared-notes-warn-note">
-            ⚠️ 對方表格需設為「知道連結的使用者可檢視」才讀得到；僅讀取第一個工作分頁；多人同時手動貼上時沒有鎖定機制，貼上前請先確認自己要貼在空白列，避免覆蓋他人資料。
+            ⚠️ 這份表格每一格存放一整包資料，請不要手動編輯格式或自行輸入內容，一律使用「複製成 Sheet 貼上格式」按鈕產生內容，貼到下一個空白儲存格即可；對方表格需設為「知道連結的使用者可檢視」才讀得到；僅讀取第一個工作分頁；多人同時手動貼上時沒有鎖定機制，貼上前請先確認自己要貼在空白儲存格，避免覆蓋他人資料。
+          </div>
+        </div>
+
+        <div class="section-label">會議摘要</div>
+        <div class="summary-panel" id="summaryPanel">
+          <!-- ★ 新增：摘要來源切換（卡片 / 共享筆記），兩種來源各自
+               生成獨立的摘要結果，互不覆蓋，因此下方顯示區塊也會依
+               目前選擇的來源切換內容，並各自有自己的保存/複製/分享/
+               刪除狀態 -->
+          <div class="summary-source-switch">
+            <button id="summarySourceCardsBtn" class="active" onclick="SummaryModule.switchSource('cards')">🗂️ 語音卡片</button>
+            <button id="summarySourceSharedBtn" onclick="SummaryModule.switchSource('shared')">📖 共享筆記</button>
+          </div>
+          <div class="summary-source-hint" id="summarySourceHint"></div>
+          <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成會議摘要</button>
+          <div class="summary-output empty" id="summaryOutputBox">
+            尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。
+          </div>
+          <div class="summary-actions-row hidden" id="summaryActionsRow">
+            <span class="summary-saved-hint">💾 已保存在本機</span>
+            <div class="summary-actions-inline">
+              <button class="copy" onclick="SummaryModule.copy()" title="複製摘要文字">📋 複製</button>
+              <button class="share" onclick="SummaryModule.share()" title="分享摘要">🔗 分享</button>
+              <button class="del" onclick="SummaryModule.remove()" title="刪除已保存的摘要">✕ 刪除</button>
+            </div>
           </div>
         </div>
 
@@ -859,7 +960,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-shared-sheet-notes-csp-fix';
+    const APP_VERSION = '2026-09-json-single-cell';
 
     const IntroModal = {
       switchTab(tab) {
@@ -902,7 +1003,16 @@
           localStorage.removeItem('gemini_api_key');
           localStorage.removeItem('intro_modal_seen_version');
           localStorage.removeItem('record_notice_acknowledged');
-          localStorage.removeItem(SUMMARY_STORAGE_KEY);
+          // ★ 修正：摘要改為「語音卡片」／「共享筆記」兩種來源各自
+          // 獨立保存，原本單一的 SUMMARY_STORAGE_KEY 已拆成兩個 key，
+          // 這裡要把兩個都清掉，SUMMARY_STORAGE_KEYS 定義在 SummaryModule
+          // 前面，是個 {cards: '...', shared: '...'} 的對照表
+          localStorage.removeItem(SUMMARY_STORAGE_KEYS.cards);
+          localStorage.removeItem(SUMMARY_STORAGE_KEYS.shared);
+          // ★ 新增：分享斷點接續的中斷進度記錄，內容依附於當下的卡片
+          // 內容而存在，清除本機資料後卡片本身就會被清空，殘留的接續
+          // 記錄會變成「指向不存在內容」的孤兒資料，一併清除
+          localStorage.removeItem(SHARE_RESUME_STORAGE_KEY);
           sessionStorage.removeItem('pending_send_text');
         } catch (e) {
           console.warn('清除本機資料時發生問題：', e);
@@ -1074,6 +1184,20 @@
       nextId: 1,
       _hasShownFirstSaveToast: false,
 
+      // ★ 新增：內容變更版本號，供 ShareResumeManager 判斷「卡片內容
+      // 自上次分享登記後是否變動過」。每次 persist() 被呼叫（也就是
+      // 卡片有任何新增/編輯/刪除/合併/排序）就 +1，不需要逐一在每個
+      // 變更方法裡分別插入邏輯——persist() 是所有變更方法共同的
+      // 呼叫終點，在這裡統一遞增即可涵蓋全部情況。
+      //
+      // 這個版本號會跟卡片內容一起寫進 CARDS_STORAGE_KEY、隨頁面
+      // restore() 一併還原，讓「關閉頁面、隔天再打開」的情境下仍然
+      // 能正確比對版本號、判斷內容是否變動過——中斷進度的保存需求
+      // 是「不限時間，直到使用者手動清除或成功送完」，若版本號只存
+      // 在記憶體、重新整理就重置，會導致隔天重開一律判定不可接續，
+      // 這不符合需求，因此改為持久化。
+      changeVersion: 0,
+
       _s2tConverter: null,
       _s2tInitTried: false,
       getS2TConverter() {
@@ -1090,10 +1214,12 @@
       },
 
       persist() {
+        this.changeVersion++;
         try {
           localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify({
             cards: this.cards,
-            nextId: this.nextId
+            nextId: this.nextId,
+            changeVersion: this.changeVersion
           }));
         } catch (e) {
           console.warn('卡片內容自動儲存失敗（可能是儲存空間已滿或隱私模式）：', e);
@@ -1111,6 +1237,10 @@
           if (Array.isArray(parsed.cards)) {
             this.cards = parsed.cards.filter(c => c && typeof c.id !== 'undefined' && typeof c.text === 'string');
             this.nextId = typeof parsed.nextId === 'number' ? parsed.nextId : (this.cards.length + 1);
+            // ★ 新增：還原上次的 changeVersion，讓分享斷點接續的判斷
+            // 能跨越「重新整理頁面」「關閉再打開」持續有效，而不是每次
+            // 載入頁面就重置歸零、導致舊的中斷進度永遠被判定為已變動
+            this.changeVersion = typeof parsed.changeVersion === 'number' ? parsed.changeVersion : 0;
           }
         } catch (e) {
           console.warn('還原上次卡片內容失敗，將從空白開始：', e);
@@ -1252,15 +1382,27 @@
       }
     };
 
-    // ---------- ★ 新增：讀取共享 Google Sheet 筆記（唯讀＋多筆選擇）----------
+    // ---------- ★ 修正：讀取共享 Google Sheet 筆記（唯讀＋多筆選擇）----------
     //
     // 需求背景：多方人馬各自把整理好的逐字稿/摘要手動貼進同一份 Google
-    // Sheet 的不同列（A欄=標籤、B欄=內容、C欄=時間戳記選填），任何人
-    // 打開這個工具、貼上共用 Sheet 連結，就能選擇要看誰的內容。
+    // Sheet，任何人打開這個工具、貼上共用 Sheet 連結，就能選擇要看誰
+    // 的內容。
+    //
+    // ★ 格式改版：原本每一列固定用 A/B/C 三欄分別存標籤、內容、時間
+    // 戳記，人類使用者需要理解這個欄位定義，貼上時稍有不慎（貼錯欄、
+    // 漏貼一欄）整份資料就會錯位，而且這份 Sheet 表面上看起來像是
+    // 「給人看的表格」，容易讓人想去手動填欄，反而更容易貼壞。
+    //
+    // 改為單欄 JSON 設計：每一格（不限 A1、A2...任何欄位，但固定
+    // 只讀取每列的第一個儲存格）都是一筆完整的 JSON 字串
+    // {"label":"...","content":"...","timestamp":"..."}，沒有標題列、
+    // 每一列都是資料。這份 Sheet 從此不是設計給人類閱讀的表格，而是
+    // 純粹的資料庫——人類只需要負責「複製一整包、貼上」，格式的產生
+    // （CopyToSheetFormat.copy()）與解析（下方 load()）都交給程式碼，
+    // 人類不需要理解或手動維護欄位對應關係。
     //
     // 範圍：只做讀取＋選擇顯示，完全不寫入。寫入交由使用者自己手動
-    // 複製貼上到 Sheet（下方 CopyToSheetFormat 模組是為了那個手動
-    // 步驟提供的輔助功能）。
+    // 複製貼上到 Sheet。
     //
     // 技術方案：沿用 CSV 匯出端點
     //   https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv
@@ -1268,6 +1410,8 @@
     const SharedSheetNotes = {
       // 目前解析出來的資料列，每筆 { label, content, timestamp }
       rows: [],
+      // 目前勾選中的列索引（Set），對應 checkbox 多選狀態
+      selectedIndexes: new Set(),
 
       // 從使用者貼上的各種 Google Sheet 網址格式中擷取 SHEET_ID。
       // 常見格式包含：
@@ -1282,14 +1426,21 @@
       },
 
       // ---------- 簡易 CSV Parser（處理雙引號跳脫）----------
-      // 一般的 split(',') 無法正確處理「儲存格內容本身包含逗號或換行，
-      // 因而被雙引號包起來」的情況（例如 "內容, 含逗號"），也無法處理
-      // 雙引號跳脫（Google Sheets CSV 匯出時，儲存格內的雙引號會被
-      // 轉成兩個連續雙引號 ""）。這裡實作一個逐字元掃描的簡易 parser，
-      // 足以應付常見情境，不追求完整 RFC 4180 規格。
+      // ★ 說明：雖然現在每一列只用 A 欄存一整包 JSON 字串，理論上
+      // 「一列一欄」看起來不太需要處理逗號分欄，但這裡仍然保留完整
+      // 的 CSV parser，原因是：Google Sheets 匯出 CSV 時，只要儲存格
+      // 內容本身包含逗號、換行或雙引號（JSON 字串裡通常會有逗號和
+      // 雙引號，例如 {"label":"A","content":"..."}），Google 依然會
+      // 把整個儲存格用一對雙引號包起來、並把內部的雙引號轉成兩個
+      // 連續雙引號（""）跳脫。如果只用最陽春的 split(',') 或
+      // split('\n')，會把 JSON 字串內部的逗號誤判成分欄、把 JSON
+      // 字串截斷，導致後面的 JSON.parse 失敗。因此還是需要這個
+      // 逐字元掃描的 parser 來正確還原每一列「未被雙引號跳脫影響」
+      // 的完整原始內容，之後才交給 JSON.parse 處理。
       //
       // 輸入：完整 CSV 文字字串
-      // 輸出：二維陣列，每個內層陣列代表一列的各欄位值
+      // 輸出：二維陣列，每個內層陣列代表一列的各欄位值（本頁面固定
+      // 只使用每列的第一個欄位，即 r[0]）
       parseCSV(csvText) {
         const rows = [];
         let row = [];
@@ -1363,13 +1514,15 @@
         return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
       },
 
-      showError(msg) {
+      showError(msg, isWarning) {
         const el = document.getElementById('sharedNotesError');
         el.textContent = msg;
         el.classList.add('show');
+        el.classList.toggle('warn', !!isWarning);
       },
       hideError() {
-        document.getElementById('sharedNotesError').classList.remove('show');
+        const el = document.getElementById('sharedNotesError');
+        el.classList.remove('show', 'warn');
       },
 
       setLoading(loading) {
@@ -1395,6 +1548,7 @@
 
         // 讀取前先清掉上一次的選單與內容顯示，避免舊資料殘留造成混淆
         this.rows = [];
+        this.selectedIndexes = new Set();
         document.getElementById('sharedNotesSelectRow').classList.remove('show');
         document.getElementById('sharedNotesOutput').classList.remove('show');
 
@@ -1460,52 +1614,202 @@
 
         const parsedRows = this.parseCSV(csvText);
 
-        // 第一列視為標題列，直接跳過；從第二列開始才是實際資料
-        const dataRows = parsedRows.slice(1);
+        // ★ 修正：原本假設固定三欄格式（A=標籤／B=內容／C=時間戳記），
+        // 第一列當標題列跳過，人類使用者需要理解「這一格要填標籤、
+        // 那一格要填內容」的欄位定義，貼上時稍有不慎就會貼錯欄。
+        //
+        // 改為單欄 JSON 設計：每一格（A1、A2、A3...）都是一筆完整的
+        // JSON 字串 {"label":"...","content":"...","timestamp":"..."}，
+        // 沒有標題列、每一列都是資料。人類使用者只需要負責「複製一整包
+        // JSON、貼到下一個空儲存格」，不需要理解格式細節，格式的產生
+        // 與解析都交給程式處理（見下方 CopyToSheetFormat.copy()，
+        // 負責產生使用者要複製貼上的那包 JSON 字串）。
+        //
+        // 逐列嘗試 JSON.parse，個別列解析失敗不會讓整批資料掛掉——
+        // 收集失敗的列號，讀取成功後在錯誤區塊提示使用者「哪幾列格式
+        // 有問題」，其餘正常的列仍正常顯示，不因為一列貼壞就整份報廢。
+        this.rows = [];
+        const invalidRowNumbers = [];
 
-        // A 欄（標籤）、B 欄（內容）、C 欄（時間戳記，選填）
-        this.rows = dataRows
-          .map(r => ({
-            label: (r[0] || '').trim(),
-            content: (r[1] || '').trim(),
-            timestamp: (r[2] || '').trim()
-          }))
-          // 忽略「A、B 兩欄都是空的」這種完全空白列
-          .filter(r => r.label || r.content);
+        parsedRows.forEach((r, idx) => {
+          const cellText = (r[0] || '').trim();
+          if (!cellText) return; // 完全空白的列直接略過，不視為錯誤
+
+          let parsed;
+          try {
+            parsed = JSON.parse(cellText);
+          } catch (e) {
+            invalidRowNumbers.push(idx + 1); // Sheet 列號從 1 開始
+            return;
+          }
+
+          // 基本結構檢查：至少要能辨識出 content，否則這筆資料沒有
+          // 意義可顯示。label／timestamp 允許缺漏，用預設值補上。
+          if (!parsed || typeof parsed !== 'object' || typeof parsed.content !== 'string') {
+            invalidRowNumbers.push(idx + 1);
+            return;
+          }
+
+          this.rows.push({
+            label: typeof parsed.label === 'string' ? parsed.label.trim() : '',
+            content: parsed.content.trim(),
+            timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp.trim() : ''
+          });
+        });
 
         if (this.rows.length === 0) {
-          this.showError('這份表格目前沒有可顯示的資料（第 2 列開始都是空的）。請確認資料已貼在正確的欄位。');
+          if (invalidRowNumbers.length > 0) {
+            this.showError(`這份表格沒有任何可解析的資料。第 ${invalidRowNumbers.join('、')} 列的內容不是有效的 JSON 格式，請確認是否使用「複製成 Sheet 貼上格式」按鈕產生的內容直接貼上，貼上時不要手動修改格式。`);
+          } else {
+            this.showError('這份表格目前是空的，還沒有任何資料。請先用「複製成 Sheet 貼上格式」按鈕複製內容，貼到這份表格的空白儲存格。');
+          }
           return;
+        }
+
+        // 有部分列格式不對，但仍有其他列讀取成功：正常顯示成功的部分，
+        // 額外提示哪幾列有問題（用警告樣式而非錯誤樣式，因為這不是
+        // 致命失敗，其餘資料仍正常可用），方便使用者回頭檢查修正
+        if (invalidRowNumbers.length > 0) {
+          this.showError(`已讀取 ${this.rows.length} 筆資料。另外第 ${invalidRowNumbers.join('、')} 列的內容格式無法辨識（不是有效的 JSON），已略過這幾列，不影響其他資料顯示。`, true);
         }
 
         this.renderSelect();
       },
 
       renderSelect() {
-        const select = document.getElementById('sharedNotesSelect');
-        select.innerHTML = '<option value="" disabled selected>請選擇...</option>' +
-          this.rows.map((r, idx) => {
-            const label = r.label || `（未命名 - 第 ${idx + 2} 列）`;
-            return `<option value="${idx}">${CardSandbox.escapeHtml(label)}</option>`;
-          }).join('');
+        // ★ 修正：原本是單選 <select>，改成 checkbox 多選清單，
+        // 支援多人接力錄音的情境（例如兩人分別錄上下半場、各自貼進
+        // Sheet，任何人都能一次勾選多筆合併使用）。selectedIndexes
+        // 用 Set 記錄目前勾選的列索引，預設全部不勾選。
+        this.selectedIndexes = new Set();
+
+        const list = document.getElementById('sharedNotesCheckboxList');
+        list.innerHTML = this.rows.map((r, idx) => {
+          // ★ 修正：原本用「第 idx+2 列」暗示 Sheet 實際列號（因為
+          // 舊格式第一列是標題列固定要跳過）。現在沒有標題列，且部分
+          // 列可能因 JSON 格式錯誤在 load() 階段就被過濾掉，this.rows
+          // 的索引已經不對應 Sheet 實際列號，繼續講「第幾列」會誤導
+          // 使用者去 Sheet 對錯格子，改成單純用「第幾筆」表示這是
+          // 目前清單裡的第幾個項目
+          const label = r.label || `（未命名資料 ${idx + 1}）`;
+          const charCount = r.content.length;
+          return `
+            <label class="shared-notes-checkbox-item">
+              <input type="checkbox" onchange="SharedSheetNotes.onCheckboxChange(${idx}, this.checked)">
+              <div class="shared-notes-checkbox-item-body">
+                <div class="shared-notes-checkbox-item-label">${CardSandbox.escapeHtml(label)}</div>
+                <div class="shared-notes-checkbox-item-meta">${charCount} 字${r.timestamp ? '　🕒 ' + CardSandbox.escapeHtml(r.timestamp) : ''}</div>
+              </div>
+            </label>
+          `;
+        }).join('');
+
         document.getElementById('sharedNotesSelectRow').classList.add('show');
+        this.updateTotalCount();
+        this.renderOutput();
       },
 
-      onSelect(idxStr) {
-        if (idxStr === '') return;
-        const idx = parseInt(idxStr, 10);
-        const row = this.rows[idx];
-        if (!row) return;
+      // ★ 新增：字數／token 統計。中文字約 2.5 token/字是使用者提供的
+      // 經驗估算值（不同語言模型的 tokenizer 略有差異，這裡只是給
+      // 使用者一個大致的參考數字，用來判斷「這個量會不會太大」，
+      // 不是精確計算，也不做強制限制——先讓使用者自己嘗試一次性
+      // 生成摘要，token 數字只是輔助判斷用的提示。
+      estimateTokens(charCount) {
+        return Math.round(charCount * 2.5);
+      },
 
-        const output = document.getElementById('sharedNotesOutput');
-        // 唯讀文字區塊呈現，刻意不做成卡片樣式：這是別人的資料，
-        // 不應該讓使用者誤以為能編輯或直接合併進自己的卡片列表
-        let html = CardSandbox.escapeHtml(row.content || '（這筆資料沒有內容）').replace(/\n/g, '<br>');
-        if (row.timestamp) {
-          html += `<div class="shared-notes-output-meta">🕒 ${CardSandbox.escapeHtml(row.timestamp)}</div>`;
+      updateTotalCount() {
+        const el = document.getElementById('sharedNotesTotalCount');
+        if (!el) return;
+        const selectedRows = this.getSelectedRows();
+        if (selectedRows.length === 0) {
+          el.textContent = '尚未勾選任何資料';
+          return;
         }
-        output.innerHTML = html;
+        const totalChars = selectedRows.reduce((sum, r) => sum + r.content.length, 0);
+        const estTokens = this.estimateTokens(totalChars);
+        el.innerHTML = `已勾選 ${selectedRows.length} 筆　共 <b>${totalChars.toLocaleString()}</b> 字　約 <b>${estTokens.toLocaleString()}</b> tokens（估算值）`;
+      },
+
+      onCheckboxChange(idx, checked) {
+        if (checked) {
+          this.selectedIndexes.add(idx);
+        } else {
+          this.selectedIndexes.delete(idx);
+        }
+        this.updateTotalCount();
+        this.renderOutput();
+        // ★ 新增：如果使用者目前正在「共享筆記」摘要來源分頁，勾選
+        // 變動時同步刷新那邊顯示的「已勾選 N 筆」提示文字，不用切換
+        // 分頁再切回來才會更新
+        if (typeof SummaryModule !== 'undefined' && SummaryModule.currentSource === 'shared') {
+          SummaryModule._refreshSharedSourceHint();
+        }
+      },
+
+      toggleSelectAll() {
+        const allSelected = this.selectedIndexes.size === this.rows.length;
+        const list = document.getElementById('sharedNotesCheckboxList');
+        const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+        if (allSelected) {
+          this.selectedIndexes.clear();
+          checkboxes.forEach(cb => { cb.checked = false; });
+          document.getElementById('sharedNotesSelectAllBtn').textContent = '全選';
+        } else {
+          this.rows.forEach((_, idx) => this.selectedIndexes.add(idx));
+          checkboxes.forEach(cb => { cb.checked = true; });
+          document.getElementById('sharedNotesSelectAllBtn').textContent = '取消全選';
+        }
+        this.updateTotalCount();
+        this.renderOutput();
+        if (typeof SummaryModule !== 'undefined' && SummaryModule.currentSource === 'shared') {
+          SummaryModule._refreshSharedSourceHint();
+        }
+      },
+
+      // 依 Sheet 原始順序回傳目前勾選的資料列（不是依勾選先後順序），
+      // 這樣接力錄音的內容拼起來才會符合原本的時間／組別順序，不會
+      // 因為使用者勾選的手速快慢而讓段落順序錯亂
+      getSelectedRows() {
+        return Array.from(this.selectedIndexes)
+          .sort((a, b) => a - b)
+          .map(idx => this.rows[idx])
+          .filter(Boolean);
+      },
+
+      // 唯讀文字區塊呈現，刻意不做成卡片樣式：這是別人的資料，不應該
+      // 讓使用者誤以為能編輯或直接合併進自己的卡片列表。多選時依序
+      // 顯示每一筆，並標示是哪一筆的內容，方便使用者確認勾對了。
+      renderOutput() {
+        const output = document.getElementById('sharedNotesOutput');
+        const selectedRows = this.getSelectedRows();
+
+        if (selectedRows.length === 0) {
+          output.classList.remove('show');
+          output.innerHTML = '';
+          return;
+        }
+
+        output.innerHTML = selectedRows.map((row, i) => {
+          const label = row.label || `（未命名）`;
+          let entryHtml = `<div class="shared-notes-output-entry">`;
+          entryHtml += `<div class="shared-notes-output-entry-label">${CardSandbox.escapeHtml(label)}</div>`;
+          entryHtml += CardSandbox.escapeHtml(row.content || '（這筆資料沒有內容）').replace(/\n/g, '<br>');
+          if (row.timestamp) {
+            entryHtml += `<div class="shared-notes-output-meta">🕒 ${CardSandbox.escapeHtml(row.timestamp)}</div>`;
+          }
+          entryHtml += `</div>`;
+          return entryHtml;
+        }).join('');
         output.classList.add('show');
+      },
+
+      // ★ 新增：提供給 SummaryModule 呼叫，取得目前勾選項目合併後的
+      // 完整文字內容（依 Sheet 原始順序拼接，每筆之間空一行分隔），
+      // 作為「共享筆記」來源生成摘要時的輸入逐字稿
+      getSelectedContent() {
+        const selectedRows = this.getSelectedRows();
+        return selectedRows.map(r => r.content).filter(Boolean).join('\n\n');
       },
 
       // 共用裝置清除本機資料時呼叫，把畫面重置回初始狀態，避免上一位
@@ -1513,27 +1817,41 @@
       // 讀取結果本來就沒有寫進 localStorage，所以不需要額外移除儲存項目。
       resetUI() {
         this.rows = [];
+        this.selectedIndexes = new Set();
         this.hideError();
         this.setLoading(false);
         document.getElementById('sharedSheetUrlInput').value = '';
         document.getElementById('sharedNotesSelectRow').classList.remove('show');
-        document.getElementById('sharedNotesSelect').innerHTML = '';
+        document.getElementById('sharedNotesCheckboxList').innerHTML = '';
+        document.getElementById('sharedNotesTotalCount').textContent = '';
+        document.getElementById('sharedNotesSelectAllBtn').textContent = '全選';
         document.getElementById('sharedNotesOutput').classList.remove('show');
         document.getElementById('sharedNotesOutput').innerHTML = '';
       }
     };
 
-    // ---------- ★ 新增：複製成 Sheet 貼上格式 ----------
+    // ---------- ★ 修正：複製成 Sheet 貼上格式 ----------
     //
     // 目的：方便使用者手動把自己整理好的卡片內容貼進共用 Google Sheet
-    // 的下一個空列。組成一段用 Tab 字元（\t）分隔的文字：
-    //   標籤（自動帶入目前日期時間）\t內容（所有卡片合併成一段文字）\tC欄留空
-    // Tab 是關鍵：貼到 Excel/Google Sheets 儲存格時會被自動辨識成分欄，
-    // 貼上後直接落在 A、B（、C）三個獨立儲存格，不需要使用者手動拆分。
+    // 的下一個空儲存格。
     //
-    // A 欄標籤直接自動帶入「目前日期時間」，不彈窗詢問使用者輸入——
-    // 若使用者想要更有意義的名稱（例如「A組」），貼到 Sheet 後自行
-    // 到儲存格上修改即可，這裡優先求「一鍵複製」的操作速度。
+    // ★ 格式改版說明：原本用 Tab 字元分隔成「標籤\t內容\t時間」三欄，
+    // 讓 Google Sheets 貼上時自動分欄成 A/B/C 三個獨立儲存格——這個
+    // 設計對「人類要讀懂這份表格」很方便，但也代表人類使用者必須先
+    // 理解 A/B/C 欄各自的意義，貼上時稍有不慎（例如不小心多按一次
+    // Tab、或貼到不是第一欄的位置）整份資料的欄位就會全部錯位。
+    //
+    // 現在改為：整包內容打包成一個 JSON 字串，只落在單一儲存格
+    // （不使用 Tab，不會自動分欄）。這份 Google Sheet 從此不是給
+    // 人類直接閱讀用的表格，而是純粹的資料庫——人類唯一要做的事就是
+    // 「複製這一整包 JSON、貼到下一個空白儲存格（A1、A2、A3...
+    // 任何一欄都一樣，因為每一列只用第一欄）」，格式的產生與解析
+    // 都交給程式處理，不需要人類理解或手動維護欄位對應關係。
+    //
+    // label 標籤直接自動帶入「目前日期時間」，不彈窗詢問使用者輸入
+    // ——若使用者想要更有意義的名稱（例如「A組」），可以直接在
+    // Sheet 儲存格裡編輯那個 JSON 字串裡 "label" 的值，或者貼上後
+    // 用 Sheet 的尋找/取代功能調整。
     const CopyToSheetFormat = {
       formatTimestamp(date) {
         const pad = n => String(n).padStart(2, '0');
@@ -1546,16 +1864,23 @@
           return;
         }
 
-        const label = this.formatTimestamp(new Date());
+        const now = new Date();
+        const label = this.formatTimestamp(now);
         const content = CardSandbox.cards.map(c => c.text).join('\n');
-        // C 欄（時間戳記）留空，讓使用者自行決定是否填寫；用 Tab 分隔
-        // 三欄，即使 C 欄留空也保留這個 Tab，貼上時才會正確落在三個
-        // 獨立儲存格，而不是把 C 欄內容誤併入 B 欄
-        const pasteText = `${label}\t${content}\t`;
+
+        // JSON.stringify 會自動把 content 裡的換行字元轉成跳脫序列
+        // \n（字面上的反斜線加 n，不是真正的換行），確保整個結果是
+        // 單一行、不含真正的 Tab 或換行字元，貼到 Sheet 儲存格時
+        // 天生就會乖乖落在單一格，不會被誤判成要分欄或分列
+        const pasteText = JSON.stringify({
+          label: label,
+          content: content,
+          timestamp: label
+        });
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(pasteText)
-            .then(() => alert(`已複製成可直接貼上 Google Sheet 的格式（標籤：${label}）。\n\n請開啟共用 Sheet，點選下一個空白列的 A 欄儲存格，直接貼上即可自動分欄。`))
+            .then(() => alert(`已複製成可直接貼上 Google Sheet 的格式（標籤：${label}）。\n\n請開啟共用 Sheet，點選下一個空白儲存格，直接貼上即可（會落在單一格，不會自動分欄）。`))
             .catch(() => alert('複製失敗，請改用其他方式手動整理內容。'));
         } else {
           alert('這個瀏覽器不支援自動複製，請手動選取以下內容：\n\n' + pasteText);
@@ -1564,19 +1889,73 @@
     };
 
     // ---------- 會議摘要模組 ----------
-    const SUMMARY_STORAGE_KEY = 'meeting_summary_draft';
+    // ★ 修正：原本只有一個 SUMMARY_STORAGE_KEY，摘要來源改為可切換
+    // 「語音卡片」／「共享筆記」後，兩種來源的摘要各自獨立保存，
+    // 用不同的 localStorage key，避免互相覆蓋。
+    const SUMMARY_STORAGE_KEYS = {
+      cards: 'meeting_summary_draft',
+      shared: 'meeting_summary_draft_shared'
+    };
 
     const SummaryModule = {
       GEMINI_MODEL: 'gemini-3.5-flash',
       isGenerating: false,
-      currentSummary: null,
+
+      // ★ 新增：目前選擇的摘要來源，'cards'（語音卡片）或
+      // 'shared'（共享筆記，多人接力錄音時合併多筆勾選內容一起摘要）。
+      // currentSummary 改成依來源分別記錄的物件，而非單一字串，這樣
+      // 切換來源分頁時可以各自保留、各自顯示，不會互相清空。
+      currentSource: 'cards',
+      currentSummary: { cards: null, shared: null },
+
+      // ★ 新增：切換摘要來源。切換時只更新畫面顯示，不會清除任何一邊
+      // 已經生成的內容——兩邊的摘要各自獨立保存，隨時切換都看得到。
+      switchSource(source) {
+        if (this.currentSource === source) return;
+        this.currentSource = source;
+
+        document.getElementById('summarySourceCardsBtn').classList.toggle('active', source === 'cards');
+        document.getElementById('summarySourceSharedBtn').classList.toggle('active', source === 'shared');
+
+        if (source === 'cards') {
+          document.getElementById('summarySourceHint').innerHTML = '摘要來源：目前裝置上的語音卡片。';
+        } else {
+          this._refreshSharedSourceHint();
+        }
+
+        this._renderCurrentSourceUI();
+      },
+
+      // 更新「共享筆記」來源的提示文字（已勾選幾筆），供 switchSource
+      // 以及 SharedSheetNotes 勾選變動時共用，避免邏輯重複兩份
+      _refreshSharedSourceHint() {
+        const hint = document.getElementById('summarySourceHint');
+        if (!hint) return;
+        const selectedCount = (typeof SharedSheetNotes !== 'undefined' && SharedSheetNotes.selectedIndexes)
+          ? SharedSheetNotes.selectedIndexes.size : 0;
+        hint.innerHTML = selectedCount > 0
+          ? `摘要來源：上方「查看共享筆記」目前勾選的 <b>${selectedCount}</b> 筆資料。適合多人接力錄音、各自整理後貼進共用 Sheet，再合併生成整場摘要。`
+          : '摘要來源：共享筆記。請先到上方「查看共享筆記」讀取表格並勾選要納入摘要的資料。';
+      },
+
+      // 依目前選擇的來源，取得要送去生成摘要的逐字稿全文
+      _getSourceText() {
+        if (this.currentSource === 'shared') {
+          return (typeof SharedSheetNotes !== 'undefined') ? SharedSheetNotes.getSelectedContent() : '';
+        }
+        return CardSandbox.cards.map(c => c.text).join('\n');
+      },
 
       async generate() {
         if (this.isGenerating) return;
 
-        const fullText = CardSandbox.cards.map(c => c.text).join('\n');
+        const fullText = this._getSourceText();
         if (!fullText.trim()) {
-          alert('目前沒有任何卡片內容，請先錄音或編輯出至少一張卡片，再生成摘要。');
+          if (this.currentSource === 'shared') {
+            alert('目前沒有勾選任何共享筆記資料，請先到上方「查看共享筆記」讀取表格並至少勾選一筆，再生成摘要。');
+          } else {
+            alert('目前沒有任何卡片內容，請先錄音或編輯出至少一張卡片，再生成摘要。');
+          }
           return;
         }
 
@@ -1606,6 +1985,14 @@
         const modelName = this.GEMINI_MODEL || 'gemini-2.5-flash';
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
+        // ★ 修正：共享筆記來源可能是多人各自貼上的內容合併而成（例如
+        // A組錄上半場、B組錄下半場），提示詞額外說明這點，讓 Gemini
+        // 知道輸入內容可能來自多個段落／多個人整理，摘要時應視為同一場
+        // 會議的完整內容做整體整理，而不是誤以為是互不相干的多篇文件。
+        const sourceNote = this.currentSource === 'shared'
+          ? '\n\n這份逐字稿可能是由多人／多個時段各自錄音整理後合併而成（例如同一場會議的上下半場，或多組人各自負責的部分），請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要特別區分是誰整理的。'
+          : '';
+
         const payload = {
           systemInstruction: {
             parts: [{
@@ -1615,7 +2002,8 @@
                     '2. 接著用條列式列出討論到的重點，每點盡量簡潔\n' +
                     '3. 如果逐字稿中有提到待辦事項、下一步行動或需要追蹤的事情，額外列一個「待辦事項」區塊\n' +
                     '4. 直接輸出整理結果，不需要額外的開場白或結語\n'+
-                    '<demand>\n'
+                    sourceNote +
+                    '\n<demand>\n'
             }]
           },
           contents: [{
@@ -1661,6 +2049,15 @@
           if (res.status === 404) {
             throw new Error('找不到指定的 Gemini 模型（' + modelName + '），可能已被下架或名稱錯誤：' + apiMessage);
           }
+          // ★ 新增：內容過長導致的失敗提示。目前刻意不預先限制字數，
+          // 讓使用者先嘗試一次性生成（十萬字以內大多模型仍在 context
+          // window 容許範圍內），但若真的失敗且錯誤訊息像是超出長度
+          // 限制，給出明確提示，而不是丟一句原始 API 錯誤訊息讓人
+          // 摸不著頭緒。未來若要做「分段接力摘要」，可以從這裡的
+          // catch 分支繼續擴充，本次先不實作。
+          if (res.status === 400 && /(token|context|too long|exceed)/i.test(apiMessage)) {
+            throw new Error('這份逐字稿內容量可能超過模型單次可處理的長度上限，導致生成失敗：' + apiMessage + '\n\n可以嘗試減少勾選的資料筆數，或將內容分批生成摘要。');
+          }
           throw new Error(apiMessage);
         }
 
@@ -1670,6 +2067,11 @@
         }
         if (candidate.finishReason === 'SAFETY') {
           throw new Error('這段內容被 Gemini 的安全機制擋下，無法生成摘要。');
+        }
+        if (candidate.finishReason === 'MAX_TOKENS') {
+          // ★ 新增：這個 finishReason 代表輸出（不是輸入）被長度上限
+          // 截斷，跟上面「輸入超長」是不同情況，訊息分開講清楚。
+          throw new Error('輸入內容過長，Gemini 生成的摘要在完成前就被截斷了。可以嘗試減少勾選的資料筆數後再試一次。');
         }
 
         const parts = candidate.content && candidate.content.parts;
@@ -1686,7 +2088,7 @@
         const box = document.getElementById('summaryOutputBox');
         box.classList.remove('empty', 'loading');
         box.textContent = text;
-        this.currentSummary = text;
+        this.currentSummary[this.currentSource] = text;
         this._updateActionsRowVisibility();
       },
 
@@ -1695,6 +2097,9 @@
         box.classList.remove('loading');
         box.classList.add('empty');
         box.textContent = text;
+        // 生成失敗不動之前已保存的摘要（如果有的話），錯誤訊息只是
+        // 暫時蓋在畫面上；若使用者想找回舊摘要，切換來源再切回來，
+        // 或重新整理頁面會從 localStorage 還原回上一次成功保存的內容
       },
 
       _setLoadingUI(loading) {
@@ -1711,34 +2116,53 @@
 
       _persist(text) {
         try {
-          localStorage.setItem(SUMMARY_STORAGE_KEY, text);
+          localStorage.setItem(SUMMARY_STORAGE_KEYS[this.currentSource], text);
         } catch (e) {
           console.warn('摘要自動儲存失敗（可能是儲存空間已滿或隱私模式）：', e);
         }
       },
 
+      // 頁面載入時呼叫一次，把兩種來源上次保存的摘要都還原到記憶體，
+      // 但畫面只顯示目前選擇中的來源（預設 'cards'）
       restore() {
-        let raw = null;
-        try { raw = localStorage.getItem(SUMMARY_STORAGE_KEY); }
-        catch (e) { return; }
-        if (!raw) return;
-        this.currentSummary = raw;
+        Object.keys(SUMMARY_STORAGE_KEYS).forEach(source => {
+          let raw = null;
+          try { raw = localStorage.getItem(SUMMARY_STORAGE_KEYS[source]); }
+          catch (e) { return; }
+          if (raw) this.currentSummary[source] = raw;
+        });
+        this._renderCurrentSourceUI();
+      },
+
+      // ★ 新增：依 currentSource 把畫面（輸出框、保存狀態列）刷新成
+      // 對應來源的內容，供 switchSource 與 restore 共用
+      _renderCurrentSourceUI() {
         const box = document.getElementById('summaryOutputBox');
-        box.classList.remove('empty', 'loading');
-        box.textContent = raw;
+        const text = this.currentSummary[this.currentSource];
+        box.classList.remove('loading');
+        if (text) {
+          box.classList.remove('empty');
+          box.textContent = text;
+        } else {
+          box.classList.add('empty');
+          box.textContent = this.currentSource === 'shared'
+            ? '尚未生成摘要。到上方「查看共享筆記」讀取表格並勾選資料後，點下方按鈕即可生成摘要。'
+            : '尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。';
+        }
         this._updateActionsRowVisibility();
       },
 
       _updateActionsRowVisibility() {
         const row = document.getElementById('summaryActionsRow');
         if (!row) return;
-        row.classList.toggle('hidden', !this.currentSummary);
+        row.classList.toggle('hidden', !this.currentSummary[this.currentSource]);
       },
 
       copy() {
-        if (!this.currentSummary) return;
+        const text = this.currentSummary[this.currentSource];
+        if (!text) return;
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(this.currentSummary)
+          navigator.clipboard.writeText(text)
             .then(() => alert('已複製摘要到剪貼簿。'))
             .catch(() => alert('複製失敗，請手動選取摘要內容複製。'));
         } else {
@@ -1747,24 +2171,25 @@
       },
 
       remove() {
-        if (!this.currentSummary) return;
-        if (!confirm('確定要刪除已保存的會議摘要嗎？此動作無法復原（語音卡片不受影響）。')) return;
-        this.clearFromMemoryAndUI();
-        try { localStorage.removeItem(SUMMARY_STORAGE_KEY); }
+        const text = this.currentSummary[this.currentSource];
+        if (!text) return;
+        if (!confirm('確定要刪除已保存的會議摘要嗎？此動作無法復原（語音卡片與共享筆記內容不受影響）。')) return;
+        this.currentSummary[this.currentSource] = null;
+        this._renderCurrentSourceUI();
+        try { localStorage.removeItem(SUMMARY_STORAGE_KEYS[this.currentSource]); }
         catch (e) { /* 忽略 */ }
       },
 
+      // 共用裝置清除本機資料時呼叫，把兩種來源的摘要都從記憶體與畫面
+      // 清掉；localStorage 的部分由 ClearLocalData 統一處理移除
       clearFromMemoryAndUI() {
-        this.currentSummary = null;
-        const box = document.getElementById('summaryOutputBox');
-        box.classList.remove('loading');
-        box.classList.add('empty');
-        box.textContent = '尚未生成摘要。整理好語音卡片後，點上方按鈕即可將目前所有卡片內容送去生成重點摘要。';
-        this._updateActionsRowVisibility();
+        this.currentSummary = { cards: null, shared: null };
+        this._renderCurrentSourceUI();
       },
 
       share() {
-        if (!this.currentSummary) return;
+        const text = this.currentSummary[this.currentSource];
+        if (!text) return;
         document.getElementById('summaryShareMenuModal').classList.remove('hidden');
       },
 
@@ -1774,18 +2199,20 @@
 
       shareViaLineFriend() {
         this.closeShareMenu();
-        if (!this.currentSummary) return;
-        ChatPreview.show(this.currentSummary, 'LINE 好友選單', () => doSend(this.currentSummary));
+        const text = this.currentSummary[this.currentSource];
+        if (!text) return;
+        ChatPreview.show(text, 'LINE 好友選單', () => doSend(text));
       },
 
       shareViaWebShare() {
         this.closeShareMenu();
-        if (!this.currentSummary) return;
+        const text = this.currentSummary[this.currentSource];
+        if (!text) return;
         if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
-          ChatPreview.show(this.currentSummary, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(this.currentSummary));
+          ChatPreview.show(text, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(text));
           return;
         }
-        ChatPreview.show(this.currentSummary, '手機系統分享', () => doWebShare(this.currentSummary));
+        ChatPreview.show(text, '手機系統分享', () => doWebShare(text));
       }
     };
 
@@ -2316,6 +2743,10 @@
         CardSandbox.renderLivePreview();
 
         SummaryModule.restore();
+        // 頁面初次載入時，摘要來源預設為 'cards'，補上對應的提示文字
+        // （switchSource 只在「切換」時才會更新這段文字，初始狀態需要
+        // 額外呼叫一次，否則 hint 區塊會是空白）
+        document.getElementById('summarySourceHint').innerHTML = '摘要來源：目前裝置上的語音卡片。';
 
         // ★ 新增：每次進站時，共享筆記查看區塊重置回初始狀態（沒有
         // 讀取結果、輸入框空白），避免顯示上一次瀏覽期間殘留的畫面
@@ -2369,6 +2800,112 @@
       return segments;
     }
 
+    // ---------- ★ 新增：分享斷點接續（ShareResumeManager）----------
+    //
+    // 背景：「分享出去 → LINE 好友分享」在內容較長需要分批送出時，
+    // 使用者可能在中途按到取消（或不小心切出頁面、發送失敗），導致
+    // 只送出一部分。原本每次點分享都是從頭整段重來，這裡改成記住
+    // 上次中斷的進度，下次點分享時主動偵測、詢問是否要接續。
+    //
+    // 設計重點：不保存卡片原始內容（rawdata），只保存極精簡的中繼
+    // 資料——總批次數、已完成批次數、內容的「版本標記」。之所以能
+    // 這麼精簡，是因為判斷「內容是否變動過」不需要重新比對逐字內容，
+    // 而是直接利用系統中本來就存在的「內容已變更」信號：CardSandbox
+    // 每次新增/編輯/刪除/合併/排序卡片時，都會呼叫 persist()，這裡
+    // 搭一個遞增的 changeVersion 計數器，只要 persist() 被呼叫一次，
+    // changeVersion 就 +1。分享登記當下記錄「目前的 changeVersion 是
+    // 多少」，下次要接續時比對「現在的 changeVersion」是否跟記錄的
+    // 相同——不同就代表卡片內容在中斷期間被動過手（無論是新增、刪除
+    // 還是編輯了哪怕一個字），批次邊界可能已經錯位，不能再視為同一份
+    // 內容的延續，因此直接判定不可接續，提示使用者改成整段重新分享。
+    //
+    // 這個機制目前只套用在「語音卡片」的分享出去，共享筆記與摘要
+    // 分享內容通常較短，暫不需要斷點接續。
+    const SHARE_RESUME_STORAGE_KEY = 'share_resume_progress';
+
+    const ShareResumeManager = {
+      // 這次分享開始時，把目前的 CardSandbox.changeVersion 一併記下來，
+      // 之後 checkResumable 比對用的就是這個數字，不是內容本身
+      register(fullText, totalBatches) {
+        const record = {
+          totalBatches,
+          completedBatches: 0,
+          changeVersion: CardSandbox.changeVersion,
+          totalChars: fullText.length
+        };
+        this._save(record);
+      },
+
+      updateProgress(completedBatches) {
+        let record = this._load();
+        if (!record) return;
+        record.completedBatches = completedBatches;
+        this._save(record);
+      },
+
+      // 檢查是否有可接續的中斷進度。回傳 record（含 completedBatches／
+      // totalBatches）或 null（沒有記錄，或內容已變動過不可接續）。
+      // fullText 只用來算目前字數做為額外的粗略檢查，真正判斷內容是否
+      // 變動的關鍵是 changeVersion 是否一致。
+      checkResumable(fullText) {
+        const record = this._load();
+        if (!record) return null;
+
+        // 已經全部送完的記錄理論上會被 clear() 清掉，這裡多一層防呆：
+        // 萬一某次流程漏了呼叫 clear()，避免對一個「其實已送完」的
+        // 記錄詢問接續
+        if (record.completedBatches >= record.totalBatches) {
+          this.clear();
+          return null;
+        }
+
+        // 核心判斷：changeVersion 不同，代表卡片內容在中斷期間被
+        // 新增、刪除、編輯、合併或調整過順序，批次邊界已經不可靠，
+        // 視為不可接續
+        if (record.changeVersion !== CardSandbox.changeVersion) {
+          this.clear();
+          return null;
+        }
+
+        // 額外保險：字數也對不上的話，同樣視為不可接續（理論上
+        // changeVersion 沒變字數就不會變，這裡是雙重確認，避免任何
+        // 遺漏更新 changeVersion 的邊角情況導致誤判可接續）
+        if (record.totalChars !== fullText.length) {
+          this.clear();
+          return null;
+        }
+
+        return record;
+      },
+
+      clear() {
+        try { localStorage.removeItem(SHARE_RESUME_STORAGE_KEY); }
+        catch (e) { /* 忽略 */ }
+      },
+
+      _save(record) {
+        try {
+          localStorage.setItem(SHARE_RESUME_STORAGE_KEY, JSON.stringify(record));
+        } catch (e) {
+          console.warn('分享進度紀錄儲存失敗（不影響本次發送）：', e);
+        }
+      },
+
+      _load() {
+        let raw = null;
+        try { raw = localStorage.getItem(SHARE_RESUME_STORAGE_KEY); }
+        catch (e) { return null; }
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed.totalBatches === 'number' && typeof parsed.completedBatches === 'number') {
+            return parsed;
+          }
+        } catch (e) { /* 格式錯誤，視為沒有記錄 */ }
+        return null;
+      }
+    };
+
     async function doSendToRoom(fullText) {
       const segments = splitTextForLine(fullText, LINE_MAX_CHARS);
       const messages = segments.map((text, idx) => ({
@@ -2407,10 +2944,29 @@
         alert('目前沒有任何卡片內容可以發送。');
         return;
       }
+
+      // ★ 新增：斷點接續偵測。點擊「分享出去 → LINE 好友分享」時，
+      // 先檢查是否有上次未送完的中斷進度，且內容自那時起沒有變動過
+      // （見 ShareResumeManager 註解），若符合就詢問使用者要不要
+      // 從中斷處繼續，而不是每次都整段重新開始。
+      const resumeInfo = ShareResumeManager.checkResumable(fullText);
+      if (resumeInfo) {
+        const wantResume = confirm(
+          `偵測到上次分享中斷在第 ${resumeInfo.completedBatches} / ${resumeInfo.totalBatches} 批（內容未變動過）。\n\n` +
+          `按「確定」從第 ${resumeInfo.completedBatches + 1} 批繼續送出，按「取消」則放棄中斷進度、改成整段重新分享。`
+        );
+        if (wantResume) {
+          ChatPreview.show(fullText, 'LINE 好友選單（接續上次中斷）', () => doSend(fullText, resumeInfo.completedBatches));
+          return;
+        } else {
+          ShareResumeManager.clear();
+        }
+      }
+
       ChatPreview.show(fullText, 'LINE 好友選單', () => doSend(fullText));
     }
 
-    async function doSend(fullText) {
+    async function doSend(fullText, resumeFromBatch) {
       if (!liffReady) {
         copyToClipboardFallback(fullText);
         return;
@@ -2426,20 +2982,99 @@
       }
 
       if (typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker')) {
+        // ★ 修正：原本這裡不管內容多長，一律包成單一則 { type: 'text',
+        // text: fullText } 直接送給 shareTargetPicker。LINE 文字訊息
+        // 單則有 5000 字元上限，超過會直接送出失敗——這正是「送回聊天室」
+        // 已經處理過、但「分享出去」這條路徑當初漏掉同步的問題。
+        //
+        // shareTargetPicker 跟 liff.sendMessages 用的是同一種
+        // messages 陣列格式，也同樣有「單次呼叫最多 5 則」的限制
+        // （LINE_MAX_MESSAGES_PER_CALL），所以沿用同一套
+        // splitTextForLine 分段邏輯把長文字切成多個訊息。
+        //
+        // ★ 再次修正：原本超過 5 則就直接放棄、回退剪貼簿，但
+        // shareTargetPicker 其實可以「分批呼叫」送出更多則——差別在於
+        // sendMessages 是送到已經確定的對象（聊天室），可以在背景
+        // 迴圈裡靜靜地連續呼叫；shareTargetPicker 每次呼叫都會跳出
+        // 「選擇要傳給誰」的互動畫面，LINE 官方沒有保證連續呼叫時
+        // 「這次選的對象」一定跟「上次選的對象」相同——如果使用者在
+        // 第二批的選擇畫面手滑點了別人，內容就會分裂到不同對話，
+        // 而且無法用程式碼強制鎖定同一人，只能靠提示降低出錯機率。
+        //
+        // 因此改為：依序分批呼叫（每批最多 5 則），第一批送出後才
+        // 呼叫下一批，每批呼叫前提示「請選擇跟上一批相同的對象」，
+        // 讓使用者清楚知道這是同一次發送的延續，並在最終結果訊息裡
+        // 列出批數，方便使用者自行確認每一批是否都送到了同一人。
+        const segments = splitTextForLine(fullText, LINE_MAX_CHARS);
+        const allMessages = segments.map((text, idx) => ({
+          type: 'text',
+          text: segments.length > 1 ? `（${idx + 1}/${segments.length}）\n${text}` : text
+        }));
+
+        // 把訊息陣列依 LINE_MAX_MESSAGES_PER_CALL 切成多批
+        const batches = [];
+        for (let i = 0; i < allMessages.length; i += LINE_MAX_MESSAGES_PER_CALL) {
+          batches.push(allMessages.slice(i, i + LINE_MAX_MESSAGES_PER_CALL));
+        }
+
+        // ★ 新增：若是從中斷處接續，從指定批次開始，而不是從 0 開始；
+        // 同時把這次分享登記進 ShareResumeManager，之後每送完一批就
+        // 更新進度，若中途取消或失敗，記錄會保留在 localStorage，
+        // 下次點擊分享時才能被 checkResumable 偵測到並詢問是否接續。
+        const startBatch = resumeFromBatch || 0;
+        ShareResumeManager.register(fullText, batches.length);
+
         try {
-          const res = await liff.shareTargetPicker(
-            [{ type: 'text', text: fullText }],
-            { isMultiple: false }
-          );
-          if (res) {
-            alert('已送出，請確認對方（例如你的官方帳號）是否收到。');
-            StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
-          } else {
-            alert('已取消發送。');
+          for (let b = startBatch; b < batches.length; b++) {
+            if (b > 0) {
+              // 第二批（含）以後，先提醒使用者這是同一次發送的延續，
+              // 務必選擇跟上一批相同的對象；使用者可以在這裡取消，
+              // 若取消則視為中止後續批次，已送出的批次不會被撤回，
+              // 中斷進度會保留下來，下次點分享時可以選擇接續
+              const proceed = confirm(
+                `已送出第 ${b} / ${batches.length} 批。\n\n` +
+                `內容較長，需要分成 ${batches.length} 批才能送完。請在接下來跳出的畫面中「選擇跟剛才相同的對象」，才能讓對方收到完整內容。\n\n` +
+                `按「確定」繼續送出第 ${b + 1} 批，按「取消」則停在這裡（已送出的批次不會被收回，下次點「分享出去」可以選擇從這裡接續）。`
+              );
+              if (!proceed) {
+                alert(`已停止發送，共送出 ${b} / ${batches.length} 批。下次點擊「分享出去 → LINE 好友分享」時，只要卡片內容沒有變動過，會詢問是否要從這裡接續；也可以改用「送回聊天室」或手動複製貼上。`);
+                return;
+              }
+            }
+
+            const res = await liff.shareTargetPicker(
+              batches[b],
+              { isMultiple: false }
+            );
+
+            if (!res) {
+              // 使用者在選擇畫面中途取消。中斷進度保留在 b（尚未送出
+              // 這一批），下次接續時會從這一批重新開始，不會漏掉。
+              if (b === 0) {
+                alert('已取消發送。');
+                if (!resumeFromBatch) ShareResumeManager.clear();
+              } else {
+                alert(`已取消，共送出 ${b} / ${batches.length} 批。下次點擊「分享出去 → LINE 好友分享」時，只要卡片內容沒有變動過，會詢問是否要從這裡接續。`);
+              }
+              return;
+            }
+
+            // 這一批確定送出成功，更新中斷進度紀錄
+            ShareResumeManager.updateProgress(b + 1);
           }
+
+          // 全部批次都送完了，清除中斷進度紀錄
+          ShareResumeManager.clear();
+
+          alert(batches.length > 1
+            ? `已分成 ${batches.length} 批（共 ${segments.length} 則訊息）送出。請自行確認每一批是否都送到了同一位對象，避免因中途選錯對象導致內容分散。`
+            : (segments.length > 1
+              ? `已分成 ${segments.length} 則訊息送出，請確認對方是否收到。`
+              : '已送出，請確認對方（例如你的官方帳號）是否收到。'));
+          StorageToast.show('已送出。卡片內容<b>仍保留在本機</b>，若已不需要，可至上方「清除本機資料」手動刪除。');
         } catch (err) {
           console.error('shareTargetPicker 發送失敗：', err);
-          alert('發送失敗，改為複製到剪貼簿，請手動貼上：\n' + err.message);
+          alert('發送失敗，中斷進度已保留，可下次重新分享時選擇接續。改為複製到剪貼簿，請手動貼上：\n' + err.message);
           copyToClipboardFallback(fullText);
         }
         return;
