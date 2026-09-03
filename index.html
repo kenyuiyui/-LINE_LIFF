@@ -687,6 +687,13 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>新增韓文辨識，自動模式支援中英日韓混雜</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「辨識語言」下拉選單新增<b>韓文</b>選項，跟中／英／日一樣可以固定鎖定整場錄音的語言</li>
+              <li>「自動」模式原本只認得中英日三種語言，現在擴充到能辨識<b>中英日韓四語混雜</b>的情境，偵測到韓文時會自動鎖定 60 秒（跟其他語言邏輯一致），提升這段時間內的轉寫準確度</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>修正「複製成 Sheet 貼上格式」偶爾複製失敗的問題</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>部分瀏覽器環境（尤其 iPhone／iOS 上的 Safari 與 LINE 內建瀏覽器）點擊「複製成 Sheet 貼上格式」輸入完主題名稱後，會出現「複製失敗」——這是瀏覽器對彈出輸入框之後緊接著呼叫剪貼簿功能的時序限制所致，跟輸入的內容無關</li>
@@ -1031,7 +1038,8 @@
             <option value="zh" selected>中文</option>
             <option value="en">英文</option>
             <option value="ja">日文</option>
-            <option value="auto">自動（中英日混雜）</option>
+            <option value="ko">韓文</option>
+            <option value="auto">自動（中英日韓混雜）</option>
           </select>
         </div>
 
@@ -1284,7 +1292,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-clipboard-fix';
+    const APP_VERSION = '2026-09-korean-support';
 
     const IntroModal = {
       switchTab(tab) {
@@ -3121,7 +3129,12 @@
       FIXED_LANG_CONFIG: {
         zh: { languageCode: 'zh', prompt: '這是一段會議錄音，內容關於工作討論與進度回報。' },
         en: { languageCode: 'en', prompt: 'This is a recording of a business meeting discussing work updates and progress.' },
-        ja: { languageCode: 'ja', prompt: 'これは仕事の進捗報告や打ち合わせに関する会議の録音です。' }
+        ja: { languageCode: 'ja', prompt: 'これは仕事の進捗報告や打ち合わせに関する会議の録音です。' },
+        // ★ 新增：韓文固定語言選項。languageCode 用 ISO 639-1 標準
+        // 代碼 'ko'（Groq Whisper API 文件列出的語言參數格式），
+        // prompt 比照其他語言的做法，用韓文本身書寫，讓 Whisper 的
+        // 文字延續預測機制更貼合韓文語感與字體慣例
+        ko: { languageCode: 'ko', prompt: '이것은 업무 논의와 진행 상황 보고에 관한 회의 녹음입니다.' }
       },
 
       AUTO_LOCK_MS: 60000,
@@ -3156,7 +3169,11 @@
       onDetectedLanguage(detectedLangRaw) {
         if (this.selectedMode !== 'auto' || !detectedLangRaw) return;
 
-        const map = { chinese: 'zh', english: 'en', japanese: 'ja' };
+        // ★ 修正：新增韓文對應。Whisper 的 language 欄位回傳完整
+        // 語言名稱（英文全名、小寫），'korean' 是 Groq Whisper API
+        // 對韓文的回傳格式，比照既有 chinese/english/japanese 的
+        // 對應方式加入
+        const map = { chinese: 'zh', english: 'en', japanese: 'ja', korean: 'ko' };
         const langCode = map[detectedLangRaw.toLowerCase()];
         if (!langCode) return;
 
@@ -3166,7 +3183,8 @@
       },
 
       showDetectHint(langCode) {
-        const labels = { zh: '中文', en: '英文', ja: '日文' };
+        // ★ 修正：新增韓文顯示標籤
+        const labels = { zh: '中文', en: '英文', ja: '日文', ko: '韓文' };
         const hint = document.getElementById('langDetectHint');
         if (!hint) return;
         hint.textContent = `🌐 偵測到：${labels[langCode] || langCode}`;
