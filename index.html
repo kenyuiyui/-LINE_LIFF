@@ -267,11 +267,18 @@
     }
 
     .mindmap-view-toggle { display: flex; gap: 4px; }
+    .mindmap-view-toggle.hidden { display: none; }
     .mindmap-toggle-btn {
       padding: 3px 10px; font-size: 11px; font-weight: 600; border: 1px solid var(--border);
       background: var(--card-bg); color: var(--ink-soft); border-radius: 999px; cursor: pointer;
     }
     .mindmap-toggle-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    /* ★ 新增：心智圖「待生成」狀態的提示區塊，比照 .summary-panel
+       淡色卡片風格，跟已生成後的 SVG／編輯框視覺區隔開來 */
+    .mindmap-generate-wrap.hidden { display: none; }
+    .mindmap-generate-hint {
+      font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 8px;
+    }
     .mindmap-svg {
       width: 100%; height: 260px; background: var(--card-bg);
       border: 1px solid var(--border); border-radius: 10px;
@@ -1244,21 +1251,32 @@
             <div class="action-items-list" id="summaryActionItemsList"></div>
           </div>
 
-          <!-- ★ 新增：簡易心智圖。「檢視」用 markmap 渲染 SVG（唯讀，
-               不可拖曳節點——這是刻意的設計取捨，見專案討論記錄：
-               心智圖的核心價值在結構關係而非像素座標，拖曳互動的
-               開發與維護成本不成比例）；「編輯」是一個縮排大綱純
-               文字框，改文字內容或縮排層級，按重新渲染即可更新
-               檢視畫面，藉此間接達成「調整心智圖結構」的效果。 -->
+          <!-- ★ 修正：簡易心智圖。改為按需生成——摘要生成完成後不會
+               自動連帶生成心智圖，畫面先顯示「產生心智圖」按鈕，使用
+               者點擊後才呼叫 Gemini，依據「已經生成好的摘要文字」
+               （而非重新讀一次逐字稿）整理成心智圖大綱，確保心智圖
+               內容跟畫面上的摘要一致。「檢視」用 markmap 渲染 SVG
+               （唯讀，不可拖曳節點——這是刻意的設計取捨，見專案討論
+               記錄：心智圖的核心價值在結構關係而非像素座標，拖曳
+               互動的開發與維護成本不成比例）；「編輯」是一個縮排
+               大綱純文字框，改文字內容或縮排層級，按重新渲染即可
+               更新檢視畫面，藉此間接達成「調整心智圖結構」的效果。 -->
           <div class="summary-section hidden" id="summaryMindmapSection">
             <div class="summary-section-title">
               🧠 簡易心智圖
-              <div class="mindmap-view-toggle">
+              <div class="mindmap-view-toggle hidden" id="mindmapViewToggleRow">
                 <button class="mindmap-toggle-btn active" id="mindmapViewBtnView" onclick="SummaryModule.switchMindmapView('view')">檢視</button>
                 <button class="mindmap-toggle-btn" id="mindmapViewBtnEdit" onclick="SummaryModule.switchMindmapView('edit')">編輯</button>
               </div>
             </div>
-            <div id="mindmapViewWrap">
+
+            <!-- ★ 新增：待生成狀態——尚未呼叫過 Gemini 整理心智圖時顯示 -->
+            <div id="mindmapGenerateWrap" class="mindmap-generate-wrap">
+              <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次 Gemini。</div>
+              <button class="btn-mindmap-rerender" id="mindmapGenerateBtn" onclick="SummaryModule.generateMindmap()">🧠 產生心智圖</button>
+            </div>
+
+            <div id="mindmapViewWrap" class="hidden">
               <svg id="mindmapSvg" class="mindmap-svg"></svg>
             </div>
             <div id="mindmapEditWrap" class="hidden">
@@ -2916,11 +2934,21 @@
           ? '\n\n這份逐字稿是由多個段落合併而成（可能來自不同人分別整理、或同一場會議的不同時段），每個段落前面用【標籤】標示來源，已按照指定順序排列。請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要逐段分別摘要或特別區分是誰整理的。'
           : '';
 
-        // ★ 新增：結構化輸出——摘要之外，額外要求 Gemini 產生「待辦
-        // 事項清單」「可回溯的來源引用」「簡易心智圖大綱」。改用
-        // responseSchema 強制 JSON 輸出，前端再依欄位分區塊渲染。
-        // 舊版純文字摘要不受影響：解析失敗時會 fallback 成純摘要模式
-        // （見 _callGemini 下方的容錯處理與 _normalizeSummaryData）。
+        // ★ 修正：結構化輸出——摘要之外，額外要求 Gemini 產生「待辦
+        // 事項清單」「可回溯的來源引用」。改用 responseSchema 強制
+        // JSON 輸出，前端再依欄位分區塊渲染。舊版純文字摘要不受
+        // 影響：解析失敗時會 fallback 成純摘要模式（見 _callGemini
+        // 下方的容錯處理與 _normalizeSummaryData）。
+        //
+        // ★ 心智圖大綱（mindmapOutline）刻意不在這裡一起生成——
+        // 拆成獨立的 _callGeminiMindmap()，理由：
+        // 1. 心智圖應該「根據已生成的摘要」整理結構，而不是跟摘要
+        //    平行地各自重新理解逐字稿；用摘要當輸入能確保心智圖
+        //    內容跟摘要一致，不會出現兩邊各自解讀逐字稿而對不上的
+        //    情況。
+        // 2. 拆開後兩次呼叫互不拖累：心智圖生成失敗不會連累已經
+        //    產生好的摘要跟著 fallback；使用者若不點開心智圖分頁，
+        //    也不需要多等這段生成時間、多耗這段 token。
         const payload = {
           systemInstruction: {
             parts: [{
@@ -2930,9 +2958,8 @@
                     '<demand>\n' +
                     '1. summary：先用 1-2 句話整體總結這場會議的主題，接著用條列式列出討論到的重點，每點盡量簡潔。直接輸出整理結果，不需要額外的開場白或結語。\n' +
                     '2. actionItems：抽取逐字稿中明確提及的待辦事項、下一步行動或需要追蹤的事情。每一項包含 task（待辦內容）、owner（負責人）、deadline（期限）。owner 與 deadline 若逐字稿沒有明確指出，一律填 null，絕對不可以自行臆測或推論負責人與期限。如果逐字稿完全沒有提到任何待辦事項，回傳空陣列 []。\n' +
-                    '3. mindmapOutline：用 Markdown 格式整理這場討論的主題與子主題成階層式心智圖大綱。第一行必須是 "# " 開頭的整體主題（作為心智圖的根節點），接下來每一層子項目都用清單並以縮排表示層級（每層用兩個半形空白縮排，"- " 開頭）。最多三層、最多 25 個節點，避免內容過於冗長。範例格式：\n# 整體主題\n- 子主題1\n  - 細節A\n  - 細節B\n- 子主題2\n  - 細節C\n' +
-                    '4. sourceRefs：列出 summary 中每一個重點對應到逐字稿的哪一個【標籤】段落（若原始逐字稿沒有分段標籤，此欄位回傳空陣列 []）。每一項包含 point（摘要中的那一點文字，簡短即可）與 label（對應的段落標籤名稱）。\n' +
-                    '5. 只根據 <meeting_log> 內的實際內容作答，不可自行補充或推論未提及的資訊。\n' +
+                    '3. sourceRefs：列出 summary 中每一個重點對應到逐字稿的哪一個【標籤】段落（若原始逐字稿沒有分段標籤，此欄位回傳空陣列 []）。每一項包含 point（摘要中的那一點文字，簡短即可）與 label（對應的段落標籤名稱）。\n' +
+                    '4. 只根據 <meeting_log> 內的實際內容作答，不可自行補充或推論未提及的資訊。\n' +
                     sourceNote +
                     '\n</demand>\n'
             }]
@@ -2961,7 +2988,6 @@
                     required: ['task']
                   }
                 },
-                mindmapOutline: { type: 'STRING' },
                 sourceRefs: {
                   type: 'ARRAY',
                   items: {
@@ -3038,11 +3064,13 @@
           throw new Error('Gemini 回傳了空白結果，請稍後再試一次。');
         }
 
-        // ★ 新增：預期收到結構化 JSON（summary/actionItems/mindmapOutline/
-        // sourceRefs）。若 Gemini 沒有遵守 responseSchema 吐出非 JSON
-        // 內容（極少數情況），不讓整個流程掛掉，改為 fallback 成「只有
-        // 純文字摘要」的資料結構，其餘欄位留空，UI 會自動不顯示相關
-        // 區塊，等同於退回舊版行為。
+        // ★ 修正：預期收到結構化 JSON（summary/actionItems/sourceRefs，
+        // 不含 mindmapOutline——心智圖大綱改為使用者切到心智圖分頁
+        // 時才另外呼叫 _callGeminiMindmap 按需生成，見該方法說明）。
+        // 若 Gemini 沒有遵守 responseSchema 吐出非 JSON 內容（極少數
+        // 情況），不讓整個流程掛掉，改為 fallback 成「只有純文字
+        // 摘要」的資料結構，其餘欄位留空，UI 會自動不顯示相關區塊，
+        // 等同於退回舊版行為。
         try {
           const parsed = JSON.parse(text.trim());
           return this._normalizeSummaryData(parsed);
@@ -3068,6 +3096,97 @@
           };
         }
         return { summary: '', actionItems: [], mindmapOutline: '', sourceRefs: [] };
+      },
+
+      // ★ 新增：獨立呼叫 Gemini，把已生成好的摘要文字整理成心智圖
+      // 大綱。刻意以「摘要文字」而非「原始逐字稿」當輸入——心智圖是
+      // 對摘要內容做結構化重整，這樣才能保證心智圖呈現的內容跟畫面
+      // 上的摘要文字一致，不會出現心智圖節點提到摘要沒寫的東西（或
+      // 反過來，摘要提到但心智圖沒畫出來），因為兩者都是同一份文字
+      // 的不同呈現形式。這個方法只在使用者第一次切到「心智圖」分頁
+      // 時才觸發（見 switchMindmapView 呼叫端），不隨摘要生成自動
+      // 執行，避免每次生成摘要都多一次不一定用得到的 API 呼叫。
+      async _callGeminiMindmap(summaryText, apiKey) {
+        const modelName = this.GEMINI_MODEL || 'gemini-2.5-flash';
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+        const payload = {
+          systemInstruction: {
+            parts: [{
+              text: '<role>\n' +
+                    '你是一個心智圖整理助手。請針對使用者在下方 <summary_text> 標籤內提供的會議摘要文字，整理成階層式心智圖大綱。\n' +
+                    '</role>\n\n' +
+                    '<demand>\n' +
+                    '1. 只根據 <summary_text> 裡的內容整理，不可額外補充摘要沒有提到的資訊，也不可遺漏摘要中的重點。\n' +
+                    '2. 用 Markdown 格式輸出：第一行必須是 "# " 開頭的整體主題（作為心智圖的根節點），接下來每一層子項目都用清單並以縮排表示層級（每層用兩個半形空白縮排，"- " 開頭）。\n' +
+                    '3. 最多三層、最多 25 個節點，避免內容過於冗長；把摘要中相關的重點歸納到同一個子主題下。\n' +
+                    '4. 直接輸出心智圖大綱本身，不需要額外的開場白、結語或程式碼區塊標記。範例格式：\n# 整體主題\n- 子主題1\n  - 細節A\n  - 細節B\n- 子主題2\n  - 細節C\n' +
+                    '\n</demand>\n'
+            }]
+          },
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `<summary_text>\n${summaryText}\n</summary_text>`
+            }]
+          }]
+        };
+
+        let res;
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch (networkErr) {
+          throw new Error('無法連線到 Gemini 伺服器，請檢查網路連線：' + networkErr.message);
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          throw new Error('Gemini 回應格式異常，無法解析（HTTP ' + res.status + '）');
+        }
+
+        if (!res.ok) {
+          const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          throw new Error(apiMessage);
+        }
+
+        const candidate = data && data.candidates && data.candidates[0];
+        if (!candidate) {
+          throw new Error('Gemini 沒有回傳任何結果，請稍後再試一次。');
+        }
+        if (candidate.finishReason === 'SAFETY') {
+          throw new Error('這段內容被 Gemini 的安全機制擋下，無法生成心智圖。');
+        }
+
+        const parts = candidate.content && candidate.content.parts;
+        const text = parts ? parts.map(p => p.text).join('') : '';
+
+        if (!text || !text.trim()) {
+          throw new Error('Gemini 回傳了空白結果，請稍後再試一次。');
+        }
+
+        // ★ 基本格式防呆：確保第一行是 "# " 開頭，這是 markmap 官方
+        // 建議的穩定格式（純清單缺少標題根節點時，官方案例顯示解析
+        // 可能不穩定，見專案討論記錄）。若模型沒有照格式輸出（例如
+        // 前面多帶了程式碼區塊標記或說明文字），嘗試簡單修正一次；
+        // 修不了就照原樣返回，交給 _doRenderMindmapSvg 的容錯機制
+        // （渲染失敗時 fallback 顯示純文字）處理。
+        let outline = text.trim();
+        outline = outline.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
+        if (!outline.startsWith('#')) {
+          const firstLine = outline.split('\n')[0].replace(/^[-*]\s*/, '');
+          outline = `# ${firstLine}\n` + outline;
+        }
+
+        return outline;
       },
 
       // ★ 修正：改吃結構化物件 { summary, actionItems, mindmapOutline,
@@ -3240,29 +3359,83 @@
         }).join('');
       },
 
-      // ★ 新增：心智圖渲染。mindmapOutline 為空（例如舊版純文字摘要，
-      // 或 Gemini 這次沒有產生大綱）時整塊隱藏。使用 markmap-lib 的
-      // Transformer 把縮排大綱文字轉成節點資料，交給 markmap-view 的
-      // Markmap 畫成 SVG——這兩個套件都是唯讀渲染引擎，本身不提供
-      // 節點拖曳能力，因此心智圖只能整張重新渲染，無法個別移動
-      // 節點位置（這是刻意的設計取捨，非技術限制下的妥協）。
+      // ★ 修正：心智圖區塊改為「按需生成」——不再依賴 _callGemini
+      // 一次到位帶出 mindmapOutline（那個欄位已從第一次呼叫的
+      // responseSchema 移除，見 _callGemini 上方說明）。這裡只負責
+      // 判斷目前狀態該顯示什麼：已經生成過大綱 → 直接渲染；還沒
+      // 生成過 → 顯示一個「產生心智圖」按鈕，等使用者點擊或切到
+      // 心智圖分頁時才呼叫 Gemini（見 generateMindmap）。
       _renderMindmap(data) {
         const section = document.getElementById('summaryMindmapSection');
         if (!section) return;
 
-        const outline = (data && typeof data.mindmapOutline === 'string') ? data.mindmapOutline.trim() : '';
-        if (!outline) {
+        // 沒有摘要文字就不顯示心智圖區塊——心智圖是根據摘要整理的，
+        // 沒有摘要就沒有東西可以整理
+        if (!data || !data.summary) {
           section.classList.add('hidden');
           return;
         }
-
         section.classList.remove('hidden');
+
+        const outline = (typeof data.mindmapOutline === 'string') ? data.mindmapOutline.trim() : '';
         this._mindmapOutline = outline;
 
         const editTextarea = document.getElementById('mindmapEditTextarea');
         if (editTextarea) editTextarea.value = outline;
 
-        this._doRenderMindmapSvg(outline);
+        if (outline) {
+          this._setMindmapGenerateUIVisible(false);
+          this._doRenderMindmapSvg(outline);
+        } else {
+          // 尚未生成過心智圖大綱：顯示待生成狀態，不主動打 API
+          this._setMindmapGenerateUIVisible(true);
+        }
+      },
+
+      // ★ 新增：切換「待生成」與「已生成」兩種畫面狀態。待生成狀態
+      // 顯示提示文字＋按鈕；已生成狀態顯示 SVG／編輯切換列。
+      _setMindmapGenerateUIVisible(showGenerateUI) {
+        const generateWrap = document.getElementById('mindmapGenerateWrap');
+        const toggleRow = document.getElementById('mindmapViewToggleRow');
+        const viewWrap = document.getElementById('mindmapViewWrap');
+        if (!generateWrap || !toggleRow) return;
+        generateWrap.classList.toggle('hidden', !showGenerateUI);
+        toggleRow.classList.toggle('hidden', showGenerateUI);
+        if (viewWrap) viewWrap.classList.toggle('hidden', showGenerateUI);
+      },
+
+      // ★ 新增：使用者按下「產生心智圖」時才真正呼叫 Gemini，把目前
+      // 已經顯示在畫面上的摘要文字（this.currentSummary.summary）
+      // 送去整理成心智圖大綱。生成結果存回 currentSummary 並持久化，
+      // 之後重新整理頁面或切換分頁不需要再次呼叫 API。
+      async generateMindmap() {
+        if (!this.currentSummary || !this.currentSummary.summary) return;
+        if (this._isGeneratingMindmap) return;
+
+        const apiKey = localStorage.getItem('gemini_api_key');
+        if (!apiKey) {
+          alert('請先到「⚙️ 設定」分頁填入 Gemini API Key，才能使用心智圖功能。');
+          return;
+        }
+
+        const btn = document.getElementById('mindmapGenerateBtn');
+        const hint = document.getElementById('mindmapGenerateHint');
+        this._isGeneratingMindmap = true;
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ 生成中...'; }
+        if (hint) { hint.textContent = '正在根據摘要內容整理心智圖，請稍候...'; }
+
+        try {
+          const outline = await this._callGeminiMindmap(this.currentSummary.summary, apiKey);
+          this.currentSummary.mindmapOutline = outline;
+          this._persist(this.currentSummary);
+          this._renderMindmap(this.currentSummary);
+        } catch (err) {
+          console.error('生成心智圖失敗：', err);
+          if (hint) { hint.textContent = '生成心智圖失敗：' + err.message; }
+        } finally {
+          this._isGeneratingMindmap = false;
+          if (btn) { btn.disabled = false; btn.textContent = '🧠 產生心智圖'; }
+        }
       },
 
       // ★ 新增：實際呼叫 markmap 套件畫圖的地方，跟「資料從哪裡來」
