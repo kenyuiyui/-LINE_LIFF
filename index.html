@@ -846,6 +846,17 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>AI 摘要新增待辦事項、來源核對、簡易心智圖；API Key 改為多把管理</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>AI 摘要現在會額外整理出<b>待辦事項清單</b>（誰要做什麼、期限），逐字稿沒有明確提到的負責人或期限會顯示空白，不會自己亂猜</li>
+              <li>摘要中的重點可以<b>核對出自哪個來源段落</b>：有對應到的句子旁邊會出現小標籤，點一下會捲動並標示到「勾選池」中對應的那筆資料，方便確認 AI 有沒有整理錯</li>
+              <li>新增<b>簡易心智圖</b>：摘要生成後，可以另外按「產生心智圖」，AI 會根據已經生成好的摘要文字（不是重新讀一次逐字稿）整理成階層式心智圖圖形；提供「編輯」分頁可直接修改心智圖的縮排文字大綱再重新渲染，但不支援用手指拖曳節點位置</li>
+              <li>Groq／Gemini 的 API Key 設定改為<b>可儲存多把</b>（Groq 最多 12 把、Gemini 最多 5 把），每把可自訂名稱，方便用完額度或某把被刪除失效時直接切換，不用重新輸入；每種服務可各自設定失效時要「自動切換到下一把」還是「僅提醒，自己手動切換」</li>
+              <li>Key 額度用完（收到額度上限回應）或失效（被刪除、格式錯誤等）時，會跳出提示告知是哪一把、以及後續處理方式（已自動切換到哪把，或請自行到設定分頁切換）</li>
+              <li>修正一個既有問題：錄音中的背景自動轉寫，原本在 Key 失效或額度用完時不會顯示任何錯誤，該段內容會憑空消失且無法察覺原因；現在會正確顯示提示</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>新增韓文辨識，自動模式支援中英日韓混雜</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>「辨識語言」下拉選單新增<b>韓文</b>選項，跟中／英／日一樣可以固定鎖定整場錄音的語言</li>
@@ -1515,7 +1526,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-korean-support';
+    const APP_VERSION = '2026-09-keypool-mindmap';
 
     const IntroModal = {
       switchTab(tab) {
@@ -1724,6 +1735,51 @@
         const pool = this._load(type);
         pool.switchMode = (mode === 'auto') ? 'auto' : 'manual';
         this._persist(type);
+      },
+
+      // ★ 新增：由各處 API 呼叫失敗時回報使用。errorType 只接受
+      // 'invalid'（key 已被刪除／格式錯誤等不可能靠等待恢復的失敗）
+      // 或 'quota_exceeded'（額度用完，過一段時間或換方案可能恢復）。
+      // 兩者的差異值得保留在資料裡：quota_exceeded 的 key 之後可能
+      // 自己恢復正常，不代表這把 key 要被判死刑；invalid 則幾乎可以
+      // 確定要換掉，這個區分之後如果要做「額度重置後自動恢復可用」
+      // 之類的功能會用得到。
+      //
+      // 回傳一個描述接下來發生了什麼的物件，供呼叫端組裝提醒文字：
+      // { switched: boolean, newActiveLabel, failedLabel, mode }
+      // switched 為 true 代表已經自動換到別把；為 false 代表維持
+      // 原狀（手動模式，或自動模式但找不到其他可用的 key）。
+      reportFailure(type, errorType) {
+        const pool = this._load(type);
+        const failedKey = pool.keys.find(k => k.id === pool.activeId);
+        if (!failedKey) {
+          // 目前根本沒有使用中的 key（例如使用者從沒設定過），沒有
+          // 對象可以標記失效，直接返回，避免後續操作對 undefined 動作
+          return { switched: false, newActiveLabel: null, failedLabel: null, mode: pool.switchMode };
+        }
+
+        failedKey.status = errorType;
+        const failedLabel = failedKey.label;
+        const mode = pool.switchMode;
+
+        if (mode === 'auto') {
+          // 找下一把「狀態正常」的 key，依照清單原本的順序找起，
+          // 跳過剛標記失效的這把跟其他已知失效的 key。找不到就維持
+          // 原狀（activeId 不變），讓呼叫端得知「自動切換也救不了」，
+          // 需要提示使用者去設定頁處理（例如全部都失效了）。
+          const nextKey = pool.keys.find(k => k.id !== failedKey.id && k.status === 'ok');
+          if (nextKey) {
+            pool.activeId = nextKey.id;
+            this._persist(type);
+            return { switched: true, newActiveLabel: nextKey.label, failedLabel, mode };
+          }
+          this._persist(type);
+          return { switched: false, newActiveLabel: null, failedLabel, mode };
+        }
+
+        // 手動模式：只標記狀態，不動 activeId，讓使用者自己決定
+        this._persist(type);
+        return { switched: false, newActiveLabel: null, failedLabel, mode };
       }
     };
 
@@ -1857,6 +1913,57 @@
       setSwitchMode(type, mode) {
         KeyPoolManager.setSwitchMode(type, mode);
         this._renderSwitchModeButtons(type);
+      },
+
+      // ★ 新增：防止同一把 key 在短時間內因為連續失敗（例如錄音中
+      // 每隔幾秒自動送一次背景轉寫，key 失效時會連續好幾段都失敗）
+      // 而彈出一長串重複的 alert，打斷使用者操作。記錄「最近一次
+      // 針對某個 key id 跳過提醒」的時間戳記，同一把 key 在冷卻時間
+      // 內的後續失敗只更新狀態資料與畫面，不再重複跳提醒。
+      _lastNotifiedAt: {},
+      NOTIFY_COOLDOWN_MS: 60000,
+
+      // ★ 新增：統一的失效提醒入口，供各處 API 呼叫失敗後呼叫。
+      // 內部呼叫 KeyPoolManager.reportFailure 更新資料，並依照回傳
+      // 結果組出對應的提醒文字，同時刷新設定頁清單（若使用者剛好
+      // 在設定頁，能立刻看到最新的狀態標籤與使用中標記，不需要手動
+      // 重新整理）。
+      //
+      // serviceLabel 是給提醒文字用的服務顯示名稱（例如 'Groq'、
+      // 'Gemini'），errorType 是 'invalid' 或 'quota_exceeded'。
+      notifyFailure(type, errorType, serviceLabel) {
+        // 取得目前使用中的 key id，用於冷卻判斷（在呼叫
+        // reportFailure、activeId 可能因自動切換而改變之前先記錄）
+        const activeIdBeforeReport = KeyPoolManager.getActiveId(type);
+
+        const result = KeyPoolManager.reportFailure(type, errorType);
+        this.render(type);
+
+        if (!result.failedLabel) {
+            // 沒有使用中的 key 可以標記失效（理論上不該走到這裡，
+            // 因為呼叫端本來就是先取得 key 才發出請求；防呆保留）
+          return;
+        }
+
+        // ★ 冷卻判斷：同一把 key（同一個 activeIdBeforeReport）在冷卻
+        // 時間內已經提醒過，這次只更新資料與畫面，不重複彈窗
+        const cooldownKey = `${type}:${activeIdBeforeReport}`;
+        const now = Date.now();
+        const lastAt = this._lastNotifiedAt[cooldownKey] || 0;
+        if (now - lastAt < this.NOTIFY_COOLDOWN_MS) {
+          return;
+        }
+        this._lastNotifiedAt[cooldownKey] = now;
+
+        const reasonText = errorType === 'quota_exceeded' ? '額度已用完' : '已失效（可能是被刪除或內容錯誤）';
+
+        if (result.switched) {
+          alert(`${serviceLabel} Key「${result.failedLabel}」${reasonText}，已自動切換到「${result.newActiveLabel}」。\n\n請重新按一次剛才的操作。`);
+        } else if (result.mode === 'auto') {
+          alert(`${serviceLabel} Key「${result.failedLabel}」${reasonText}，但找不到其他可用的 Key 可以自動切換。\n\n請到「設定」分頁新增或切換一把可用的 Key。`);
+        } else {
+          alert(`${serviceLabel} Key「${result.failedLabel}」${reasonText}。\n\n請到「設定」分頁手動切換到其他 Key。`);
+        }
       }
     };
 
@@ -3387,6 +3494,20 @@
 
         if (!res.ok) {
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          // ★ 新增：Key 失效／額度用完時，回報給 KeyPoolManager 更新
+          // 狀態並視設定的切換模式決定要不要自動換下一把、跳出提醒。
+          // Gemini 的「key 無效」不一定走標準的 401，常見情況是
+          // HTTP 400 搭配訊息內容含「API key not valid」，因此判斷
+          // 規則需要同時看狀態碼與訊息內容，不能只看狀態碼。
+          const isInvalidKey = (res.status === 400 && /API key not valid/i.test(apiMessage))
+            || res.status === 401 || res.status === 403;
+          const isQuotaExceeded = res.status === 429;
+          if (isInvalidKey) {
+            KeyPoolPanel.notifyFailure('gemini', 'invalid', 'Gemini');
+          } else if (isQuotaExceeded) {
+            KeyPoolPanel.notifyFailure('gemini', 'quota_exceeded', 'Gemini');
+          }
+
           if (res.status === 400 && /API key not valid/i.test(apiMessage)) {
             throw new Error('Gemini API Key 無效，請確認貼上的 Key 是否正確。');
           }
@@ -3514,6 +3635,17 @@
 
         if (!res.ok) {
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          // ★ 新增：跟 _callGemini 共用同一套判斷規則（見該方法內的
+          // 說明），Gemini 的「key 無效」常見於 400 + 特定訊息內容，
+          // 不只是標準的 401。
+          const isInvalidKey = (res.status === 400 && /API key not valid/i.test(apiMessage))
+            || res.status === 401 || res.status === 403;
+          const isQuotaExceeded = res.status === 429;
+          if (isInvalidKey) {
+            KeyPoolPanel.notifyFailure('gemini', 'invalid', 'Gemini');
+          } else if (isQuotaExceeded) {
+            KeyPoolPanel.notifyFailure('gemini', 'quota_exceeded', 'Gemini');
+          }
           throw new Error(apiMessage);
         }
 
@@ -4066,6 +4198,14 @@
 
         if (!res.ok) {
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          // ★ 新增：Groq 官方標準錯誤碼——401 代表 key 無效／未授權，
+          // 429 代表額度用完，不像 Gemini 有「400 但其實是 key 問題」
+          // 的特殊情況，判斷規則相對單純。
+          if (res.status === 401) {
+            KeyPoolPanel.notifyFailure('groq', 'invalid', 'Groq');
+          } else if (res.status === 429) {
+            KeyPoolPanel.notifyFailure('groq', 'quota_exceeded', 'Groq');
+          }
           throw new Error(apiMessage);
         }
 
@@ -4307,6 +4447,23 @@
 
           const data = await res.json();
           this._pendingCount = Math.max(0, this._pendingCount - 1);
+
+          // ★ 修正：這裡原本沒有檢查 res.ok，導致 401（key 失效）或
+          // 429（額度用完）等錯誤回應會被誤判成功——因為 Groq 的
+          // 錯誤回應本身仍是合法 JSON（內容是 {"error": {...}}），
+          // res.json() 不會拋例外，原本的 catch 完全抓不到這種失敗，
+          // data.text 是 undefined 所以也不會誤新增空白卡片，但使用者
+          // 會看不到任何錯誤提示、卡片就是憑空少了一段，很難察覺
+          // 問題出在 key 失效。現在補上明確的失敗判斷與提醒。
+          if (!res.ok) {
+            const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+            if (res.status === 401) {
+              KeyPoolPanel.notifyFailure('groq', 'invalid', 'Groq');
+            } else if (res.status === 429) {
+              KeyPoolPanel.notifyFailure('groq', 'quota_exceeded', 'Groq');
+            }
+            throw new Error(apiMessage);
+          }
 
           LanguageManager.onDetectedLanguage(data.language);
 
