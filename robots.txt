@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Point to the sitemap to help search engines discover pages
+Sitemap: https://kenyuiyui.github.io/voice-to-text-line-bot-LIFF/sitemap.xml
