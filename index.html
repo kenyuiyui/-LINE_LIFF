@@ -790,8 +790,9 @@
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"
           integrity="sha384-9JmxkgxoKE5gP14V/eBemUAwCKh8QSb5IFEJje/JNxxh8cn9hKsIs/q5Ho+mfVau"
           crossorigin="anonymous"></script>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <!--
-    ★ 新增：markmap（d3 + markmap-lib + markmap-view）——AI 摘要的
+    ★ 修正：markmap（d3 + markmap-lib + markmap-view）——AI 摘要的
     「簡易心智圖」功能用，見會議摘要模組 SummaryModule._renderMindmap。
     版本鎖定 d3@7.9.0、markmap-lib@0.18.12、markmap-view@0.18.10
     （查證當下的最新穩定版），避免 CDN 上游未來改版造成不可預期的
@@ -808,17 +809,32 @@
       進入點也指向這個檔案）
     - markmap-view：dist/browser/index.js（★ 同樣沒有獨立 .min.js，
       清單中該目錄下只有這一個檔案）
+
+    ★ 修正（手機版卡在「正在確認身分」問題）：這三個 script 原本
+    緊接在 opencc-js 之後、LIFF SDK 之前，且沒有 defer／async，會
+    同步阻塞頁面解析——瀏覽器必須等這三個檔案完整下載執行完，才會
+    繼續往下解析到 LIFF SDK 與後面呼叫 AccessGate.run() 的程式碼。
+    在手機行動網路（尤其 LINE 內嵌 WebView，網路環境往往比桌機
+    寬頻更差）下，這段延遲會直接卡住 LIFF 初始化，導致「正在確認
+    身分」的載入畫面一直轉圈；桌面版寬頻環境下延遲不明顯所以沒有
+    察覺。心智圖是「使用者按下產生心智圖按鈕」才用得到的非核心
+    功能，不需要在頁面一開始就載入完成，因此：
+    1. 搬到 LIFF SDK 之後，確保 LIFF 初始化不會被這些資源排在前面
+       拖慢。
+    2. 加上 defer，讓瀏覽器可以背景並行下載、不阻塞 HTML 解析與
+       DOMContentLoaded；三個 defer script 之間仍會依照文件順序
+       依序執行（HTML 規範保證），不會有 d3 還沒備妥、markmap-lib
+       就先執行導致找不到全域變數的問題。
   -->
-  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
           integrity="sha256-8glLv2FBs1lyLE/kVOtsSw8OQswQzHr5IfwVj864ZTk="
           crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"
+  <script defer src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"
           integrity="sha256-7f4yGj/kbpwPCvg3AUWu4YCXXyQ/IkLw+BgaxCc+COE="
           crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.10/dist/browser/index.js"
+  <script defer src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.10/dist/browser/index.js"
           integrity="sha256-ESWcb69+MMnx0DK25aF3WmF3TAQU61ZRoPtKjtObNVs="
           crossorigin="anonymous"></script>
-  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
   <!-- 首次進站提示彈窗：兩頁（注意事項／更新內容），關閉後記住已讀版本，
