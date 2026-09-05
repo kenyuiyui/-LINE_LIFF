@@ -90,6 +90,7 @@
       --warn-border: #f0c96a;
     }
     * { box-sizing: border-box; }
+    .hidden { display: none !important; }
     body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--ink); }
     .app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
     header { padding: 18px 16px 14px; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
@@ -105,15 +106,15 @@
       border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
     }
     .keypool-item.active { border-color: var(--line-green); background: var(--line-green-tint); }
-    .keypool-item-radio {
+    .keypool-item input.keypool-item-radio {
       flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: var(--line-green);
     }
     .keypool-item-main { flex: 1; min-width: 0; }
-    .keypool-item-label {
+    .keypool-item-main input.keypool-item-label {
       font-size: 12.5px; font-weight: 600; color: var(--ink); border: none; background: transparent;
       width: 100%; padding: 2px 0; box-sizing: border-box;
     }
-    .keypool-item-label:focus { outline: none; border-bottom: 1px solid var(--line-green); }
+    .keypool-item-main input.keypool-item-label:focus { outline: none; border-bottom: 1px solid var(--line-green); }
     .keypool-item-value {
       font-size: 11px; color: var(--ink-faint); font-family: ui-monospace, Menlo, Consolas, monospace;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -297,6 +298,7 @@
       margin-top: 12px; font-size: 13px; line-height: 1.7; color: var(--ink);
       white-space: pre-wrap; word-break: break-word;
     }
+    .summary-output.hidden { display: none; }
     .summary-output.empty { color: var(--ink-faint); font-size: 12px; line-height: 1.6; }
     .summary-output.loading { color: var(--ink-soft); }
     /* ★ 新增：摘要改用 innerHTML 分行渲染（見 _buildSummaryHtml），
@@ -311,16 +313,22 @@
     }
     .summary-source-tag:hover { filter: brightness(0.95); }
 
-    /* ★ 新增：待辦事項清單／簡易心智圖共用的區塊外觀，比照
-       .summary-panel 的卡片風格，維持視覺一致 */
-    .summary-section {
-      margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);
+    /* 摘要結果的次級分頁：摘要／待辦事項／心智圖同層切換 */
+    .summary-result-tabs {
+      display: flex; gap: 4px; margin-top: 12px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
     }
-    .summary-section.hidden { display: none; }
-    .summary-section-title {
-      font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px;
-      display: flex; align-items: center; justify-content: space-between;
+    .summary-result-tabs.hidden { display: none; }
+    .summary-result-tab {
+      flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 700;
+      border: none; background: transparent; color: var(--ink-faint);
+      border-radius: 8px; cursor: pointer;
     }
+    .summary-result-tab.active { background: var(--line-green-tint); color: var(--line-green-dark); }
+    .summary-result-tab:disabled { color: var(--ink-faint); opacity: 0.4; cursor: not-allowed; }
+
+    .summary-result-panel { margin-top: 10px; }
+    .summary-result-panel.hidden { display: none; }
 
     .action-items-list { display: flex; flex-direction: column; gap: 6px; }
     .action-item-row {
@@ -333,9 +341,8 @@
       font-size: 11px; color: var(--ink-soft); white-space: nowrap;
     }
 
-    .mindmap-title-toggle { cursor: pointer; user-select: none; }
-    .mindmap-view-toggle { display: flex; gap: 4px; }
-    .mindmap-view-toggle.hidden { display: none; }
+    .mindmap-edit-toggle-row { display: flex; gap: 4px; margin-bottom: 10px; }
+    .mindmap-edit-toggle-row.hidden { display: none; }
     .mindmap-toggle-btn {
       padding: 3px 10px; font-size: 11px; font-weight: 600; border: 1px solid var(--border);
       background: var(--card-bg); color: var(--ink-soft); border-radius: 999px; cursor: pointer;
@@ -1311,52 +1318,52 @@
           <div class="summary-pool-hint" id="summaryPoolHint">尚未勾選任何資料。到「共享」分頁勾選共享筆記項目，或在「筆記」分頁切到「✅ 勾選模式」勾選卡片，即可納入摘要來源。</div>
           <div class="summary-pool-list" id="summaryPoolList"></div>
           <button class="btn-summary-generate" id="summaryGenerateBtn" onclick="SummaryModule.generate()">📝 生成 AI 摘要</button>
+
+          <!-- 摘要結果的次級分頁：摘要／待辦事項／心智圖同層切換，
+               固定在同一個區塊高度內，不需要滑動穿越三塊內容。
+               待辦事項／心智圖分頁按鈕沒有對應資料時停用。 -->
+          <div class="summary-result-tabs hidden" id="summaryResultTabs">
+            <button class="summary-result-tab active" id="summaryTabBtn-text" onclick="SummaryModule.switchResultTab('text')">📄 摘要</button>
+            <button class="summary-result-tab" id="summaryTabBtn-actions" onclick="SummaryModule.switchResultTab('actions')">✅ 待辦</button>
+            <button class="summary-result-tab" id="summaryTabBtn-mindmap" onclick="SummaryModule.switchResultTab('mindmap')">🧠 心智圖</button>
+          </div>
+
           <div class="summary-output empty" id="summaryOutputBox">
             尚未生成摘要。勾選好要納入的資料後，點上方按鈕即可生成重點摘要。
           </div>
 
-          <!-- ★ 新增：待辦事項清單。沒有待辦事項時整塊隱藏（見
-               SummaryModule._renderActionItems）。 -->
-          <div class="summary-section hidden" id="summaryActionItemsSection">
-            <div class="summary-section-title">✅ 待辦事項</div>
+          <div class="summary-result-panel hidden" id="summaryActionItemsSection">
             <div class="action-items-list" id="summaryActionItemsList"></div>
           </div>
 
           <!-- 心智圖按需生成：根據已生成的摘要文字整理，非重讀逐字稿。
                檢視為 markmap 唯讀渲染（不支援拖曳節點）；編輯是縮排
                大綱文字框，改完重新渲染即可調整結構。 -->
-          <div class="summary-section hidden" id="summaryMindmapSection">
-            <div class="summary-section-title">
-              <span class="mindmap-title-toggle" onclick="SummaryModule.toggleMindmapCollapse()">
-                <span id="mindmapCollapseIcon">🧠 簡易心智圖 ▾</span>
-              </span>
-              <div class="mindmap-view-toggle hidden" id="mindmapViewToggleRow">
-                <button class="mindmap-toggle-btn active" id="mindmapViewBtnView" onclick="SummaryModule.switchMindmapView('view')">檢視</button>
-                <button class="mindmap-toggle-btn" id="mindmapViewBtnEdit" onclick="SummaryModule.switchMindmapView('edit')">編輯</button>
-              </div>
+          <div class="summary-result-panel hidden" id="summaryMindmapSection">
+            <div class="mindmap-edit-toggle-row hidden" id="mindmapViewToggleRow">
+              <button class="mindmap-toggle-btn active" id="mindmapViewBtnView" onclick="SummaryModule.switchMindmapView('view')">檢視</button>
+              <button class="mindmap-toggle-btn" id="mindmapViewBtnEdit" onclick="SummaryModule.switchMindmapView('edit')">編輯</button>
             </div>
 
-            <div id="mindmapCollapseBody">
-              <div id="mindmapGenerateWrap" class="mindmap-generate-wrap">
-                <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次 Gemini。</div>
-                <button class="btn-mindmap-rerender" id="mindmapGenerateBtn" onclick="SummaryModule.generateMindmap()">🧠 產生心智圖</button>
-              </div>
+            <div id="mindmapGenerateWrap" class="mindmap-generate-wrap">
+              <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次 Gemini。</div>
+              <button class="btn-mindmap-rerender" id="mindmapGenerateBtn" onclick="SummaryModule.generateMindmap()">🧠 產生心智圖</button>
+            </div>
 
-              <div id="mindmapViewWrap" class="hidden">
-                <svg id="mindmapSvg" class="mindmap-svg"></svg>
-                <div class="mindmap-view-toolbar">
-                  <button onclick="SummaryModule.resetMindmapView()" title="回到中心">🎯 置中</button>
-                  <button onclick="SummaryModule.downloadMindmapImage()" title="下載成 PNG 圖片">⬇️ 下載圖片</button>
-                  <button onclick="SummaryModule.shareMindmapImage()" title="分享圖片">🔗 分享圖片</button>
-                  <button onclick="SummaryModule.copyMindmapToSheet()" title="存成文字大綱到共用 Sheet">📤 存 Sheet</button>
-                </div>
+            <div id="mindmapViewWrap" class="hidden">
+              <svg id="mindmapSvg" class="mindmap-svg"></svg>
+              <div class="mindmap-view-toolbar">
+                <button onclick="SummaryModule.resetMindmapView()" title="回到中心">🎯 置中</button>
+                <button onclick="SummaryModule.downloadMindmapImage()" title="下載成 PNG 圖片">⬇️ 下載圖片</button>
+                <button onclick="SummaryModule.shareMindmapImage()" title="分享圖片">🔗 分享圖片</button>
+                <button onclick="SummaryModule.copyMindmapToSheet()" title="存成文字大綱到共用 Sheet">📤 存 Sheet</button>
               </div>
-              <div id="mindmapEditWrap" class="hidden">
-                <textarea id="mindmapEditTextarea" class="mindmap-edit-textarea" spellcheck="false"
-                          placeholder="# 整體主題&#10;- 子主題&#10;  - 細節"></textarea>
-                <div class="mindmap-edit-hint">第一行「# 」表示根節點，其餘用縮排清單「- 」表示子項目層級。改完文字後按下方按鈕重新渲染。</div>
-                <button class="btn-mindmap-rerender" onclick="SummaryModule.applyMindmapEdit()">🔄 套用並重新渲染</button>
-              </div>
+            </div>
+            <div id="mindmapEditWrap" class="hidden">
+              <textarea id="mindmapEditTextarea" class="mindmap-edit-textarea" spellcheck="false"
+                        placeholder="# 整體主題&#10;- 子主題&#10;  - 細節"></textarea>
+              <div class="mindmap-edit-hint">第一行「# 」表示根節點，其餘用縮排清單「- 」表示子項目層級。改完文字後按下方按鈕重新渲染。</div>
+              <button class="btn-mindmap-rerender" onclick="SummaryModule.applyMindmapEdit()">🔄 套用並重新渲染</button>
             </div>
           </div>
 
@@ -3704,7 +3711,50 @@
 
         this._renderActionItems(data);
         this._renderMindmap(data);
+        this._renderResultTabsAvailability(data);
         this._updateActionsRowVisibility();
+      },
+
+      // 分頁列只在有摘要時顯示；待辦／心智圖分頁按鈕依是否有對應
+      // 資料決定能不能點，避免點進空分頁。切走的分頁若剛好被停用
+      // （例如切換到沒有待辦事項的新摘要），自動退回摘要分頁。
+      _renderResultTabsAvailability(data) {
+        const tabsEl = document.getElementById('summaryResultTabs');
+        if (!tabsEl) return;
+
+        const hasSummary = !!(data && data.summary);
+        tabsEl.classList.toggle('hidden', !hasSummary);
+        if (!hasSummary) return;
+
+        const hasActionItems = Array.isArray(data.actionItems) && data.actionItems.length > 0;
+        const actionsBtn = document.getElementById('summaryTabBtn-actions');
+        if (actionsBtn) actionsBtn.disabled = !hasActionItems;
+
+        // 心智圖分頁一律可點（沒生成過也要能點進去看到「產生心智圖」按鈕）
+        const mindmapBtn = document.getElementById('summaryTabBtn-mindmap');
+        if (mindmapBtn) mindmapBtn.disabled = false;
+
+        if ((this._activeResultTab === 'actions' && !hasActionItems)) {
+          this.switchResultTab('text');
+        } else {
+          this.switchResultTab(this._activeResultTab || 'text');
+        }
+      },
+
+      // 切換摘要結果的次級分頁（摘要文字／待辦事項／心智圖）
+      switchResultTab(tab) {
+        this._activeResultTab = tab;
+
+        const panels = { text: 'summaryOutputBox', actions: 'summaryActionItemsSection', mindmap: 'summaryMindmapSection' };
+        Object.keys(panels).forEach(key => {
+          const el = document.getElementById(panels[key]);
+          if (el) el.classList.toggle('hidden', key !== tab);
+        });
+
+        ['text', 'actions', 'mindmap'].forEach(key => {
+          const btn = document.getElementById(`summaryTabBtn-${key}`);
+          if (btn) btn.classList.toggle('active', key === tab);
+        });
       },
 
       // ★ 新增：把摘要文字轉成 HTML，若有 sourceRefs（來源引用），
@@ -3768,19 +3818,17 @@
 
       // ★ 新增：渲染待辦事項清單。沒有待辦事項（陣列為空或不存在）
       // 時整塊隱藏，不佔版面、不顯示空清單造成誤解。
+      // 只負責產生內容，是否顯示交給 switchResultTab 統一管理
       _renderActionItems(data) {
-        const section = document.getElementById('summaryActionItemsSection');
         const list = document.getElementById('summaryActionItemsList');
-        if (!section || !list) return;
+        if (!list) return;
 
         const items = (data && Array.isArray(data.actionItems)) ? data.actionItems : [];
         if (items.length === 0) {
-          section.classList.add('hidden');
           list.innerHTML = '';
           return;
         }
 
-        section.classList.remove('hidden');
         list.innerHTML = items.map(it => {
           const task = CardSandbox.escapeHtml(it.task || '');
           const owner = it.owner ? `<span class="action-item-owner">👤 ${CardSandbox.escapeHtml(it.owner)}</span>` : '';
@@ -3789,17 +3837,9 @@
         }).join('');
       },
 
-      // 心智圖按需生成：mindmapOutline 有值就直接渲染，沒有則顯示
-      // 「產生心智圖」按鈕（見 generateMindmap）
+      // 只負責產生內容，是否顯示交給 switchResultTab 統一管理
       _renderMindmap(data) {
-        const section = document.getElementById('summaryMindmapSection');
-        if (!section) return;
-
-        if (!data || !data.summary) {
-          section.classList.add('hidden');
-          return;
-        }
-        section.classList.remove('hidden');
+        if (!data || !data.summary) return;
 
         const outline = (typeof data.mindmapOutline === 'string') ? data.mindmapOutline.trim() : '';
         this._mindmapOutline = outline;
@@ -3820,10 +3860,12 @@
         const generateWrap = document.getElementById('mindmapGenerateWrap');
         const toggleRow = document.getElementById('mindmapViewToggleRow');
         const viewWrap = document.getElementById('mindmapViewWrap');
+        const editWrap = document.getElementById('mindmapEditWrap');
         if (!generateWrap || !toggleRow) return;
         generateWrap.classList.toggle('hidden', !showGenerateUI);
         toggleRow.classList.toggle('hidden', showGenerateUI);
         if (viewWrap) viewWrap.classList.toggle('hidden', showGenerateUI);
+        if (editWrap) editWrap.classList.add('hidden');
       },
 
       // 把已生成的摘要文字送去整理成心智圖大綱，結果存回
@@ -3897,15 +3939,6 @@
           console.error('心智圖渲染失敗：', err);
           showFallback();
         }
-      },
-
-      // 收合／展開心智圖區塊
-      toggleMindmapCollapse() {
-        const body = document.getElementById('mindmapCollapseBody');
-        const icon = document.getElementById('mindmapCollapseIcon');
-        if (!body || !icon) return;
-        const collapsed = body.classList.toggle('hidden');
-        icon.textContent = collapsed ? '🧠 簡易心智圖 ▸' : '🧠 簡易心智圖 ▾';
       },
 
       // 呼叫 markmap 的 fit()，重新置中並縮放到適合畫面
