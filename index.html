@@ -88,6 +88,64 @@
     header .sub { font-size: 12px; color: var(--ink-soft); }
     main { flex: 1; padding: 16px 16px 100px; }
 
+    /* ★ 新增：多把 Key 管理清單（KeyPoolPanel），沿用 .key-panel 的
+       卡片外觀，內部改為清單式呈現，取代原本單一輸入框 */
+    .keypool-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .keypool-item {
+      display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+      border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+    }
+    .keypool-item.active { border-color: var(--line-green); background: var(--line-green-tint); }
+    .keypool-item-radio {
+      flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: var(--line-green);
+    }
+    .keypool-item-main { flex: 1; min-width: 0; }
+    .keypool-item-label {
+      font-size: 12.5px; font-weight: 600; color: var(--ink); border: none; background: transparent;
+      width: 100%; padding: 2px 0; box-sizing: border-box;
+    }
+    .keypool-item-label:focus { outline: none; border-bottom: 1px solid var(--line-green); }
+    .keypool-item-value {
+      font-size: 11px; color: var(--ink-faint); font-family: ui-monospace, Menlo, Consolas, monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .keypool-item-status {
+      flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+    }
+    .keypool-item-status.ok { color: var(--line-green-dark); background: var(--line-green-tint); }
+    .keypool-item-status.invalid { color: var(--danger); background: #fdeaea; }
+    .keypool-item-status.quota_exceeded { color: #b8860b; background: var(--warn-bg); }
+    .keypool-item-del {
+      flex-shrink: 0; border: none; background: none; color: var(--ink-faint); cursor: pointer;
+      font-size: 15px; padding: 2px 4px; line-height: 1;
+    }
+    .keypool-item-del:active { color: var(--danger); }
+    .keypool-empty-hint { font-size: 12px; color: var(--ink-faint); padding: 6px 2px 12px; }
+    .keypool-add-row { display: flex; gap: 6px; }
+    .keypool-add-row input {
+      flex: 1; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 12.5px; box-sizing: border-box; background: var(--bg); min-width: 0;
+    }
+    .keypool-add-row input:focus { outline: none; border-color: var(--line-green); background: var(--card-bg); }
+    .keypool-add-row input.keypool-label-input { flex: 0 0 84px; }
+    .keypool-add-btn {
+      flex-shrink: 0; border: none; background: var(--line-green); color: #fff; font-weight: 700;
+      font-size: 12.5px; padding: 0 14px; border-radius: 10px; cursor: pointer;
+    }
+    .keypool-count-hint { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+
+    .keypool-switch-mode-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+    }
+    .keypool-switch-mode-label { font-size: 12px; color: var(--ink-soft); line-height: 1.5; flex: 1; padding-right: 10px; }
+    .keypool-switch-mode-toggle { display: flex; gap: 4px; flex-shrink: 0; }
+    .keypool-switch-mode-toggle button {
+      padding: 5px 11px; font-size: 11px; font-weight: 600; border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--ink-soft); border-radius: 999px; cursor: pointer;
+    }
+    .keypool-switch-mode-toggle button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
     .key-panel {
       background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
       padding: 16px; margin-bottom: 16px;
@@ -1305,15 +1363,25 @@
 
         <div class="key-panel">
           <div class="key-panel-label">Groq API Key（錄音轉文字用，必填）</div>
-          <div class="key-panel-desc">請貼上你的 Groq API Key，金鑰只會存在你自己的手機記憶體中。</div>
-          <input type="password" id="apiKeyInput" placeholder="gsk_..." onchange="saveApiKey(this.value)">
-          <div class="key-status-row">
-            <span class="status-left">
-              <span class="status-dot" id="keyStatusDot"></span>
-              <span id="keyStatusText">尚未設定 Key</span>
-            </span>
-            <button class="btn-clear-link" onclick="ClearLocalData.forgetGroqKey()" title="只清除 Groq Key，其他資料不受影響">🗑️ 忘記這把 Key</button>
+          <div class="key-panel-desc">可以預先存好多把 Key，額度用完或某把被刪除失效時，不用重新輸入，直接切換到下一把即可。目前使用中的那把會用綠框標示，最多可存 12 把。</div>
+
+          <div class="keypool-list" id="groqKeyPoolList"></div>
+
+          <div class="keypool-add-row">
+            <input type="text" id="groqKeyPoolLabelInput" class="keypool-label-input" placeholder="名稱（選填）">
+            <input type="password" id="groqKeyPoolValueInput" placeholder="貼上新的 Key：gsk_...">
+            <button class="keypool-add-btn" onclick="KeyPoolPanel.addKey('groq')">新增</button>
           </div>
+          <div class="keypool-count-hint" id="groqKeyPoolCountHint"></div>
+
+          <div class="keypool-switch-mode-row">
+            <div class="keypool-switch-mode-label">偵測到目前這把 Key 失效或額度用完時：</div>
+            <div class="keypool-switch-mode-toggle" id="groqSwitchModeToggle">
+              <button id="groqSwitchModeManual" onclick="KeyPoolPanel.setSwitchMode('groq', 'manual')">僅提醒</button>
+              <button id="groqSwitchModeAuto" onclick="KeyPoolPanel.setSwitchMode('groq', 'auto')">自動切換</button>
+            </div>
+          </div>
+
           <details>
             <summary>還沒有 Groq API Key？點這裡看申請教學</summary>
             <div class="guide-body">
@@ -1332,15 +1400,25 @@
 
         <div class="key-panel">
           <div class="key-panel-label">Gemini API Key（AI 摘要用，選填）</div>
-          <div class="key-panel-desc">要使用「AI 摘要」功能才需要填寫，金鑰同樣只存在你自己的手機瀏覽器裡。</div>
-          <input type="password" id="geminiApiKeyInput" placeholder="AIza..." onchange="saveGeminiApiKey(this.value)">
-          <div class="key-status-row">
-            <span class="status-left">
-              <span class="status-dot" id="geminiKeyStatusDot"></span>
-              <span id="geminiKeyStatusText">尚未設定 Key</span>
-            </span>
-            <button class="btn-clear-link" onclick="ClearLocalData.forgetGeminiKey()" title="只清除 Gemini Key，其他資料不受影響">🗑️ 忘記這把 Key</button>
+          <div class="key-panel-desc">要使用「AI 摘要」功能才需要填寫。同樣可以預先存好多把 Key（最多 5 把），失效時直接切換即可。</div>
+
+          <div class="keypool-list" id="geminiKeyPoolList"></div>
+
+          <div class="keypool-add-row">
+            <input type="text" id="geminiKeyPoolLabelInput" class="keypool-label-input" placeholder="名稱（選填）">
+            <input type="password" id="geminiKeyPoolValueInput" placeholder="貼上新的 Key：AIza...">
+            <button class="keypool-add-btn" onclick="KeyPoolPanel.addKey('gemini')">新增</button>
           </div>
+          <div class="keypool-count-hint" id="geminiKeyPoolCountHint"></div>
+
+          <div class="keypool-switch-mode-row">
+            <div class="keypool-switch-mode-label">偵測到目前這把 Key 失效或額度用完時：</div>
+            <div class="keypool-switch-mode-toggle" id="geminiSwitchModeToggle">
+              <button id="geminiSwitchModeManual" onclick="KeyPoolPanel.setSwitchMode('gemini', 'manual')">僅提醒</button>
+              <button id="geminiSwitchModeAuto" onclick="KeyPoolPanel.setSwitchMode('gemini', 'auto')">自動切換</button>
+            </div>
+          </div>
+
           <!-- ★ 新增：Gemini Key 申請教學，比照上方 Groq Key 的
                <details> 展開區塊，補齊原本缺漏的步驟說明 -->
           <details>
@@ -1466,6 +1544,322 @@
     };
     IntroModal.initOnLoad();
 
+    // ---------- ★ 新增：多把 API Key 管理（KeyPoolManager）----------
+    //
+    // 背景：原本每種服務（Groq／Gemini）只能存一把 key，額度用完或
+    // key 失效（在官網被刪除）時，使用者得手動刪掉重新輸入，很麻煩。
+    // 改為「key 池」：每種服務可以預先存好多把 key、各自命名（例如
+    // 「第一把」「備用」），失效時能直接切換到下一把，不用重新輸入。
+    //
+    // 這一版只做「儲存 + 命名 + 手動切換」的資料層與管理 UI，還不做
+    // 「自動偵測失效並依設定切換」的部分（那部分需要動到摘要／轉錄
+    // 呼叫的 catch 邏輯，範圍更大，之後再做）。
+    //
+    // 相容設計：保留舊版 whisper_api_key／gemini_api_key 這兩個
+    // localStorage 欄位不動，讓 KeyPoolManager 在「目前使用中的 key
+    // 有變動」時同步鏡射寫回這兩個欄位。這樣現有 12 處直接讀
+    // localStorage.getItem('whisper_api_key' / 'gemini_api_key') 的
+    // 呼叫點完全不用改，天然就會拿到「目前使用中」那把的值——之後
+    // 接自動偵測時，才需要把這些呼叫點換成呼叫 KeyPoolManager 本身。
+    const KeyPoolManager = {
+      LIMITS: { groq: 12, gemini: 5 },
+      LEGACY_KEY_NAME: { groq: 'whisper_api_key', gemini: 'gemini_api_key' },
+      POOL_STORAGE_KEY: { groq: 'groq_key_pool', gemini: 'gemini_key_pool' },
+
+      // 記憶體快取，避免每次操作都重新 parse localStorage
+      _pools: { groq: null, gemini: null },
+
+      // 產生一個不需要密碼學強度、只求「這次會話內不重複」的簡短 id，
+      // 用於 DOM 綁定與內部比對，不涉及任何安全性用途
+      _genId() {
+        return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      },
+
+      // ★ 核心：取得某個服務目前的 key 池結構。第一次呼叫時會嘗試
+      // 從 localStorage 讀取；若完全不存在，才觸發舊版資料遷移
+      // （_migrateLegacy），確保現有使用者的 key 不會憑空消失。
+      _load(type) {
+        if (this._pools[type]) return this._pools[type];
+
+        let pool = null;
+        try {
+          const raw = localStorage.getItem(this.POOL_STORAGE_KEY[type]);
+          if (raw) pool = JSON.parse(raw);
+        } catch (e) {
+          console.warn(`讀取 ${type} key 池失敗，視為尚未建立：`, e);
+        }
+
+        if (!pool || !Array.isArray(pool.keys)) {
+          pool = this._migrateLegacy(type);
+          this._pools[type] = pool;
+          // ★ 修正：遷移發生時立刻持久化成新版格式，避免每次重新
+          // 整理頁面都重跑一次遷移判斷（雖然結果相同，但屬於不必要
+          // 的重複行為）。這裡直接呼叫 _persist 而非等待外部操作
+          // 觸發，因為遷移本身就是一次需要落地保存的資料異動。
+          this._persist(type);
+          return pool;
+        }
+
+        // 基本形狀防呆：避免任何損毀資料讓後續操作直接壞掉
+        if (!pool.keys) pool.keys = [];
+        if (!pool.switchMode) pool.switchMode = 'manual';
+        if (pool.activeId && !pool.keys.some(k => k.id === pool.activeId)) {
+          pool.activeId = pool.keys[0] ? pool.keys[0].id : null;
+        }
+
+        this._pools[type] = pool;
+        return pool;
+      },
+
+      // ★ 新增：把舊版單一 key（whisper_api_key／gemini_api_key）
+      // 包裝成新版 pool 結構的第一把，並保留原欄位不刪除（維持雙寫
+      // 相容，見檔案頂端說明）。舊欄位沒有值時，回傳一個空池。
+      _migrateLegacy(type) {
+        let legacyValue = '';
+        try { legacyValue = (localStorage.getItem(this.LEGACY_KEY_NAME[type]) || '').trim(); }
+        catch (e) { /* 忽略，視為沒有舊資料 */ }
+
+        if (!legacyValue) {
+          return { keys: [], activeId: null, switchMode: 'manual' };
+        }
+
+        const id = this._genId();
+        return {
+          keys: [{ id, label: '原有 Key', value: legacyValue, status: 'ok' }],
+          activeId: id,
+          switchMode: 'manual'
+        };
+      },
+
+      // 存回 localStorage，並同步鏡射「目前使用中的 key」到舊版
+      // 單一欄位（見檔案頂端相容設計說明）
+      _persist(type) {
+        const pool = this._pools[type];
+        if (!pool) return;
+        try {
+          localStorage.setItem(this.POOL_STORAGE_KEY[type], JSON.stringify(pool));
+        } catch (e) {
+          console.warn(`儲存 ${type} key 池失敗：`, e);
+        }
+        this._syncLegacyMirror(type);
+      },
+
+      _syncLegacyMirror(type) {
+        const pool = this._pools[type];
+        const active = pool && pool.keys.find(k => k.id === pool.activeId);
+        try {
+          localStorage.setItem(this.LEGACY_KEY_NAME[type], active ? active.value : '');
+        } catch (e) {
+          console.warn(`同步 ${type} key 到舊版欄位失敗：`, e);
+        }
+      },
+
+      // ---- 對外查詢 ----
+
+      list(type) {
+        return this._load(type).keys.slice();
+      },
+
+      getActiveId(type) {
+        return this._load(type).activeId;
+      },
+
+      getSwitchMode(type) {
+        return this._load(type).switchMode;
+      },
+
+      // ---- 對外操作 ----
+
+      // 新增一把 key。value 為空字串會被拒絕（沒有意義的空白 key）；
+      // 超過上限（Groq 12 / Gemini 5）會被拒絕，回傳失敗原因供 UI
+      // 顯示提示，而不是靜默失敗或截斷使用者輸入
+      add(type, value, label) {
+        const pool = this._load(type);
+        const trimmedValue = (value || '').trim();
+        if (!trimmedValue) return { ok: false, reason: 'empty' };
+        if (pool.keys.length >= this.LIMITS[type]) return { ok: false, reason: 'limit' };
+
+        const id = this._genId();
+        const finalLabel = (label || '').trim() || `第 ${pool.keys.length + 1} 把`;
+        pool.keys.push({ id, label: finalLabel, value: trimmedValue, status: 'ok' });
+
+        // 新增的第一把 key 自動成為使用中；之後新增的不自動切換，
+        // 避免使用者只是「先存起來備用」卻被意外換成正在用的那把
+        if (!pool.activeId) pool.activeId = id;
+
+        this._persist(type);
+        return { ok: true, id };
+      },
+
+      remove(type, id) {
+        const pool = this._load(type);
+        const idx = pool.keys.findIndex(k => k.id === id);
+        if (idx === -1) return;
+        pool.keys.splice(idx, 1);
+
+        // 刪掉的剛好是目前使用中的那把時，自動接到清單第一把（若還
+        // 有的話），避免 activeId 指向不存在的孤兒 id
+        if (pool.activeId === id) {
+          pool.activeId = pool.keys[0] ? pool.keys[0].id : null;
+        }
+        this._persist(type);
+      },
+
+      rename(type, id, newLabel) {
+        const pool = this._load(type);
+        const key = pool.keys.find(k => k.id === id);
+        if (!key) return;
+        key.label = (newLabel || '').trim() || key.label;
+        this._persist(type);
+      },
+
+      setActive(type, id) {
+        const pool = this._load(type);
+        if (!pool.keys.some(k => k.id === id)) return;
+        pool.activeId = id;
+        this._persist(type);
+      },
+
+      setSwitchMode(type, mode) {
+        const pool = this._load(type);
+        pool.switchMode = (mode === 'auto') ? 'auto' : 'manual';
+        this._persist(type);
+      }
+    };
+
+    // ---------- ★ 新增：多把 API Key 管理 UI（KeyPoolPanel）----------
+    // 負責把 KeyPoolManager 的資料畫成畫面，以及處理使用者在設定頁
+    // 上的互動（新增、命名、切換使用中、刪除、切換模式）。與
+    // KeyPoolManager 分層：Manager 只管資料，Panel 只管畫面與互動，
+    // 兩者不混在一起，方便之後各自獨立修改。
+    const KeyPoolPanel = {
+      LIST_EL_ID: { groq: 'groqKeyPoolList', gemini: 'geminiKeyPoolList' },
+      COUNT_HINT_EL_ID: { groq: 'groqKeyPoolCountHint', gemini: 'geminiKeyPoolCountHint' },
+      LABEL_INPUT_ID: { groq: 'groqKeyPoolLabelInput', gemini: 'geminiKeyPoolLabelInput' },
+      VALUE_INPUT_ID: { groq: 'groqKeyPoolValueInput', gemini: 'geminiKeyPoolValueInput' },
+      SWITCH_BTN_MANUAL_ID: { groq: 'groqSwitchModeManual', gemini: 'geminiSwitchModeManual' },
+      SWITCH_BTN_AUTO_ID: { groq: 'groqSwitchModeAuto', gemini: 'geminiSwitchModeAuto' },
+
+      STATUS_LABEL: {
+        ok: '正常',
+        invalid: '已失效',
+        quota_exceeded: '額度用完'
+      },
+
+      render(type) {
+        this._renderList(type);
+        this._renderCountHint(type);
+        this._renderSwitchModeButtons(type);
+      },
+
+      _renderList(type) {
+        const listEl = document.getElementById(this.LIST_EL_ID[type]);
+        if (!listEl) return;
+
+        const keys = KeyPoolManager.list(type);
+        const activeId = KeyPoolManager.getActiveId(type);
+
+        if (keys.length === 0) {
+          listEl.innerHTML = '<div class="keypool-empty-hint">尚未儲存任何 Key，請在下方新增。</div>';
+          return;
+        }
+
+        listEl.innerHTML = keys.map(k => {
+          const isActive = k.id === activeId;
+          const statusClass = k.status || 'ok';
+          const statusLabel = this.STATUS_LABEL[statusClass] || this.STATUS_LABEL.ok;
+          // 顯示遮蔽過的 key 片段（開頭 6 碼＋...＋末尾 4 碼），讓使用者
+          // 能大致辨認是哪把、但不會整串明碼攤在畫面上被路過的人看到
+          const masked = this._maskValue(k.value);
+          return `
+            <div class="keypool-item ${isActive ? 'active' : ''}" data-key-id="${k.id}">
+              <input type="radio" class="keypool-item-radio" name="keypool-active-${type}"
+                     ${isActive ? 'checked' : ''}
+                     onchange="KeyPoolPanel.setActive('${type}', '${k.id}')"
+                     title="設為目前使用中">
+              <div class="keypool-item-main">
+                <input type="text" class="keypool-item-label" value="${CardSandbox.escapeHtml(k.label)}"
+                       onblur="KeyPoolPanel.renameKey('${type}', '${k.id}', this.value)"
+                       maxlength="20">
+                <div class="keypool-item-value">${masked}</div>
+              </div>
+              <span class="keypool-item-status ${statusClass}">${statusLabel}</span>
+              <button class="keypool-item-del" onclick="KeyPoolPanel.removeKey('${type}', '${k.id}')" title="刪除這把 Key">✕</button>
+            </div>
+          `;
+        }).join('');
+      },
+
+      _maskValue(value) {
+        if (!value) return '';
+        if (value.length <= 12) return value.slice(0, 4) + '...';
+        return value.slice(0, 6) + '...' + value.slice(-4);
+      },
+
+      _renderCountHint(type) {
+        const hintEl = document.getElementById(this.COUNT_HINT_EL_ID[type]);
+        if (!hintEl) return;
+        const count = KeyPoolManager.list(type).length;
+        const limit = KeyPoolManager.LIMITS[type];
+        hintEl.textContent = `已存 ${count} / ${limit} 把`;
+      },
+
+      _renderSwitchModeButtons(type) {
+        const mode = KeyPoolManager.getSwitchMode(type);
+        const manualBtn = document.getElementById(this.SWITCH_BTN_MANUAL_ID[type]);
+        const autoBtn = document.getElementById(this.SWITCH_BTN_AUTO_ID[type]);
+        if (manualBtn) manualBtn.classList.toggle('active', mode !== 'auto');
+        if (autoBtn) autoBtn.classList.toggle('active', mode === 'auto');
+      },
+
+      addKey(type) {
+        const labelInput = document.getElementById(this.LABEL_INPUT_ID[type]);
+        const valueInput = document.getElementById(this.VALUE_INPUT_ID[type]);
+        if (!labelInput || !valueInput) return;
+
+        const result = KeyPoolManager.add(type, valueInput.value, labelInput.value);
+        if (!result.ok) {
+          if (result.reason === 'empty') {
+            alert('請先貼上 Key 內容再新增。');
+          } else if (result.reason === 'limit') {
+            const limit = KeyPoolManager.LIMITS[type];
+            alert(`最多只能儲存 ${limit} 把 Key，請先刪除不需要的再新增。`);
+          }
+          return;
+        }
+
+        labelInput.value = '';
+        valueInput.value = '';
+        this.render(type);
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+
+      removeKey(type, id) {
+        if (!confirm('確定要刪除這把 Key 嗎？此動作無法復原。')) return;
+        KeyPoolManager.remove(type, id);
+        this.render(type);
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+
+      renameKey(type, id, newLabel) {
+        KeyPoolManager.rename(type, id, newLabel);
+        // 只需要重畫清單本身（名稱可能被 rename 內部的空字串防呆
+        // 規則還原成舊名稱），不需要整個 render，減少不必要的重繪
+        this._renderList(type);
+      },
+
+      setActive(type, id) {
+        KeyPoolManager.setActive(type, id);
+        this._renderList(type);
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+
+      setSwitchMode(type, mode) {
+        KeyPoolManager.setSwitchMode(type, mode);
+        this._renderSwitchModeButtons(type);
+      }
+    };
+
     // ---------- 清除本機資料工具 ----------
     const ClearLocalData = {
       open() {
@@ -1510,10 +1904,17 @@
         // 清除時一併重置畫面，避免留在螢幕上被下一位使用者看到
         SharedSheetNotes.resetUI();
 
-        document.getElementById('apiKeyInput').value = '';
-        document.getElementById('geminiApiKeyInput').value = '';
-        this.updateKeySavedIndicator();
-        this.updateGeminiKeySavedIndicator();
+        // ★ 修正：多把 Key 池改用 KeyPoolManager 統一管理，不再有
+        // 單一輸入框可清空；「刪除全部」時把兩個服務的整個 key 池
+        // 直接清掉（而非只清舊版鏡射欄位），確保清單畫面也一併歸零
+        try {
+          localStorage.removeItem(KeyPoolManager.POOL_STORAGE_KEY.groq);
+          localStorage.removeItem(KeyPoolManager.POOL_STORAGE_KEY.gemini);
+        } catch (e) { /* 忽略 */ }
+        KeyPoolManager._pools.groq = null;
+        KeyPoolManager._pools.gemini = null;
+        KeyPoolPanel.render('groq');
+        KeyPoolPanel.render('gemini');
         // ★ 新增：Key 被清掉後，「錄音」「摘要」分頁的缺漏提示條要
         // 重新出現（如果原本因為有 Key 而隱藏著的話）
         if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
@@ -1523,42 +1924,6 @@
         if (typeof SettingsPanel !== 'undefined') SettingsPanel.render();
         document.getElementById('clearDataModal').classList.add('hidden');
         alert('已清除這台裝置上的 API Key、已讀記錄、暫存內容、已保存的摘要與尚未發送的卡片草稿。若要繼續使用，請重新輸入 API Key。');
-      },
-      updateKeySavedIndicator() {
-        let hasKey = false;
-        try { hasKey = !!localStorage.getItem('whisper_api_key'); }
-        catch (e) { /* 忽略 */ }
-        document.getElementById('keyStatusDot').classList.toggle('empty', !hasKey);
-        document.getElementById('keyStatusText').textContent = hasKey
-          ? '這台裝置已記住一把 Key'
-          : '尚未設定 Key';
-      },
-      updateGeminiKeySavedIndicator() {
-        let hasKey = false;
-        try { hasKey = !!localStorage.getItem('gemini_api_key'); }
-        catch (e) { /* 忽略 */ }
-        document.getElementById('geminiKeyStatusDot').classList.toggle('empty', !hasKey);
-        document.getElementById('geminiKeyStatusText').textContent = hasKey
-          ? '這台裝置已記住一把 Key'
-          : '尚未設定 Key';
-      },
-
-      // ★ 新增：個別清除單一把 Key，不影響其他任何資料（卡片、摘要、
-      // 另一把 Key 都保留），供設定頁「忘記這把 Key」按鈕使用
-      forgetGroqKey() {
-        if (!confirm('確定要忘記這把 Groq API Key 嗎？之後需要重新輸入才能繼續錄音轉文字。')) return;
-        try { localStorage.removeItem('whisper_api_key'); } catch (e) { /* 忽略 */ }
-        document.getElementById('apiKeyInput').value = '';
-        this.updateKeySavedIndicator();
-        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
-      },
-
-      forgetGeminiKey() {
-        if (!confirm('確定要忘記這把 Gemini API Key 嗎？之後需要重新輸入才能使用 AI 摘要功能。')) return;
-        try { localStorage.removeItem('gemini_api_key'); } catch (e) { /* 忽略 */ }
-        document.getElementById('geminiApiKeyInput').value = '';
-        this.updateGeminiKeySavedIndicator();
-        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
       }
     };
 
@@ -1718,28 +2083,22 @@
       }
     };
 
-    // 讀取/儲存 API Key
-    document.getElementById('apiKeyInput').value = localStorage.getItem('whisper_api_key') || '';
-    function saveApiKey(val) {
-      localStorage.setItem('whisper_api_key', val.trim());
-      ClearLocalData.updateKeySavedIndicator();
-      updateKeyMissingHints();
-    }
-    ClearLocalData.updateKeySavedIndicator();
-
-    document.getElementById('geminiApiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
-    function saveGeminiApiKey(val) {
-      localStorage.setItem('gemini_api_key', val.trim());
-      ClearLocalData.updateGeminiKeySavedIndicator();
-      updateKeyMissingHints();
-    }
-    ClearLocalData.updateGeminiKeySavedIndicator();
+    // ★ 修正：多把 Key 池的初始渲染，取代原本單一輸入框的
+    // 讀取/儲存邏輯（saveApiKey／saveGeminiApiKey 已移除，改由
+    // KeyPoolPanel 統一管理）
+    KeyPoolPanel.render('groq');
+    KeyPoolPanel.render('gemini');
 
     // ★ 新增：API Key 缺漏提示條。原本 API Key 卡片常駐在主畫面最
     // 上方，使用者一定會看到；現在移到獨立的「設定」分頁後，使用者
     // 切到「錄音」或「摘要」分頁時可能根本不知道要去哪裡設定 Key，
     // 所以在這兩個分頁各放一條精簡提示，只在對應 Key 尚未設定時
     // 顯示，點擊直接帶去設定分頁，不需要使用者自己摸索路徑。
+    //
+    // ★ 這裡繼續讀舊版 whisper_api_key／gemini_api_key 這兩個欄位
+    // 就足夠了，因為 KeyPoolManager 每次「目前使用中的 key」有變動
+    // 時都會同步鏡射寫回這兩個欄位（見 KeyPoolManager._syncLegacyMirror），
+    // 不需要另外改成呼叫 KeyPoolManager。
     function updateKeyMissingHints() {
       let hasGroqKey = false, hasGeminiKey = false;
       try {
