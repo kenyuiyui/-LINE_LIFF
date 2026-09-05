@@ -3,7 +3,7 @@
 > 說話就能變成一張一張的文字卡片，掛在 LINE 裡的個人語音筆記小工具。
 > Turn what you say into text cards — a personal voice-notes tool built as a LINE LIFF app.
 
-🔗 **立即使用 / Try it now：** [https://kenyuiyui.github.io/-LINE_LIFF/](https://kenyuiyui.github.io/voice-to-text-line-bot-LIFF/)
+🔗 **立即使用 / Try it now：** [https://kenyuiyui.github.io/voice-to-text-line-bot-LIFF/](https://kenyuiyui.github.io/voice-to-text-line-bot-LIFF/)
 （需先加官方帳號好友 / Requires adding the official account as a friend first）
 
 ---
