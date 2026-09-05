@@ -1,37 +1,3 @@
-<!--
-  MIT License
-
-  Copyright (c) 2026 kenyuiyui
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-  SOFTWARE.
-
-  Full license text: see /LICENSE in the project root.
--->
-<!--
-  程式碼註解準則：
-  - 只解釋「為什麼」，不重複描述程式碼本身已經表達的「做了什麼」
-  - 不寫開發過程的背景故事（不需要「原本是...後來改成...」）
-  - 一般決策一到兩行即可；只有真正容易被誤改的技術限制（例如
-    外部套件的檔名跟慣例不同、初始化時序問題）才值得多寫幾行
-  - 不使用「新增／修正」之類的變更標記，註解是給未來維護者看的
-    程式說明，不是給這次修改紀錄用的
--->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -56,7 +22,18 @@
     base-uri 'self';
     form-action 'none';
   ">
-  <title>語音卡片筆記 — LIFF 專用版</title>
+  <title>語音卡片筆記-語音轉文字Linebot</title>
+  <meta name="description" content="語音卡片筆記：透過 LINE 官方帳號即可使用的語音轉文字筆記工具。支援錄音、共享 Google Sheet 筆記、AI 摘要（中英日韓混雜語音辨識），不用另外安裝 App，加好友就能用。">
+
+  <!-- Open Graph：讓 LINE /社群分享連結時顯示正確標題與描述。
+       不加 canonical／結構化資料：頁面有 LIFF 登入閘門
+       （見 AccessGate），爬蟲進不去 mainApp 內容，加了沒有意義。 -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="語音卡片筆記">
+  <meta property="og:locale" content="zh_TW">
+  <meta property="og:title" content="語音卡片筆記-語音轉文字Linebot">
+  <meta property="og:description" content="用 LINE 就能錄音、記筆記、AI 摘要，一鍵完成，不用安裝其他 App。">
+  <meta property="og:url" content="https://kenyuiyui.github.io/voice-to-text-line-bot-LIFF/">
   <style>
     :root {
       --line-green: #06c755;
