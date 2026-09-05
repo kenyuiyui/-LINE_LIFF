@@ -31,7 +31,9 @@
   <!--
     ★ CSP（Content-Security-Policy）
     白名單只放這份頁面實際會用到的網域：
-    - cdn.jsdelivr.net：載入 opencc-js（簡轉繁）
+    - cdn.jsdelivr.net：載入 opencc-js（簡轉繁）、markmap（AI 摘要
+      心智圖渲染，見會議摘要模組），兩者共用同一個網域，CSP 不需要
+      額外開放新網域
     - static.line-scdn.net：載入 LIFF SDK
     - api.groq.com：Whisper 轉寫 API（透過 connect-src，因為是 fetch() 呼叫，不是載入 script）
     - generativelanguage.googleapis.com：Gemini 會議摘要 API（同樣是 fetch() 呼叫）
@@ -230,6 +232,70 @@
     }
     .summary-output.empty { color: var(--ink-faint); font-size: 12px; line-height: 1.6; }
     .summary-output.loading { color: var(--ink-soft); }
+    /* ★ 新增：摘要改用 innerHTML 分行渲染（見 _buildSummaryHtml），
+       取代原本單純的 white-space: pre-wrap 文字節點，才能在每行後面
+       插入可點擊的來源標籤。.summary-line 各自維持文字換行的視覺
+       效果，等同於原本 pre-wrap 的呈現。 */
+    .summary-line { white-space: pre-wrap; word-break: break-word; }
+    .summary-source-tag {
+      display: inline-block; margin-left: 4px; padding: 1px 7px; font-size: 10.5px;
+      font-weight: 600; color: var(--line-green-dark); background: var(--line-green-tint);
+      border-radius: 999px; cursor: pointer; white-space: nowrap; vertical-align: middle;
+    }
+    .summary-source-tag:hover { filter: brightness(0.95); }
+
+    /* ★ 新增：待辦事項清單／簡易心智圖共用的區塊外觀，比照
+       .summary-panel 的卡片風格，維持視覺一致 */
+    .summary-section {
+      margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);
+    }
+    .summary-section.hidden { display: none; }
+    .summary-section-title {
+      font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .action-items-list { display: flex; flex-direction: column; gap: 6px; }
+    .action-item-row {
+      font-size: 12.5px; color: var(--ink); background: var(--card-bg);
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+    }
+    .action-item-task { flex: 1; min-width: 100px; font-weight: 600; }
+    .action-item-owner, .action-item-deadline {
+      font-size: 11px; color: var(--ink-soft); white-space: nowrap;
+    }
+
+    .mindmap-view-toggle { display: flex; gap: 4px; }
+    .mindmap-toggle-btn {
+      padding: 3px 10px; font-size: 11px; font-weight: 600; border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--ink-soft); border-radius: 999px; cursor: pointer;
+    }
+    .mindmap-toggle-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .mindmap-svg {
+      width: 100%; height: 260px; background: var(--card-bg);
+      border: 1px solid var(--border); border-radius: 10px;
+    }
+    .mindmap-fallback-text {
+      width: 100%; max-height: 260px; overflow-y: auto; margin: 0; padding: 10px;
+      font-size: 12px; line-height: 1.6; color: var(--ink); background: var(--card-bg);
+      border: 1px solid var(--border); border-radius: 10px; white-space: pre-wrap; word-break: break-word;
+    }
+    .mindmap-edit-textarea {
+      width: 100%; min-height: 160px; padding: 10px; font-size: 12.5px; line-height: 1.6;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      color: var(--ink); background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 10px; resize: vertical; box-sizing: border-box;
+    }
+    .mindmap-edit-hint { font-size: 11px; color: var(--ink-faint); margin: 6px 0 8px; line-height: 1.5; }
+    .btn-mindmap-rerender {
+      width: 100%; padding: 9px; font-size: 12.5px; font-weight: 700; border: none;
+      border-radius: 8px; background: var(--line-green); color: #fff; cursor: pointer;
+    }
+
+    /* ★ 新增：點擊來源標籤時，短暫高亮勾選池中對應的項目（見
+       SummaryModule.jumpToSource），提供明確的視覺回饋 */
+    .pool-item-highlight { background: var(--line-green-tint) !important; transition: background 0.3s; }
     .edit-mode-bar { display: flex; gap: 6px; margin-bottom: 10px; }
     .edit-mode-bar button {
       flex: 1; padding: 8px 4px; font-size: 11.5px; font-weight: 600;
@@ -658,6 +724,34 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"
           integrity="sha384-9JmxkgxoKE5gP14V/eBemUAwCKh8QSb5IFEJje/JNxxh8cn9hKsIs/q5Ho+mfVau"
+          crossorigin="anonymous"></script>
+  <!--
+    ★ 新增：markmap（d3 + markmap-lib + markmap-view）——AI 摘要的
+    「簡易心智圖」功能用，見會議摘要模組 SummaryModule._renderMindmap。
+    版本鎖定 d3@7.9.0、markmap-lib@0.18.12、markmap-view@0.18.10
+    （查證當下的最新穩定版），避免 CDN 上游未來改版造成不可預期的
+    行為變動。SRI（integrity）雜湊值透過 jsDelivr 官方資料 API
+    （https://data.jsdelivr.com/v1/packages/npm/{package}@{version}）
+    查得的 hash 欄位（base64 編碼的 SHA-256）換算而來，並非自行下載
+    檔案計算，惟仍屬官方提供的正確雜湊來源。
+
+    ★ 注意：三個套件實際的瀏覽器建構檔檔名不完全一致，已依 jsDelivr
+    檔案清單核實路徑，並非單純套用「.min.js」命名慣例：
+    - d3：dist/d3.min.js（有獨立 min 版）
+    - markmap-lib：dist/browser/index.iife.js（★ 沒有 .min.js，
+      該版本的瀏覽器建構檔本身就叫 index.iife.js，套件的 default
+      進入點也指向這個檔案）
+    - markmap-view：dist/browser/index.js（★ 同樣沒有獨立 .min.js，
+      清單中該目錄下只有這一個檔案）
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
+          integrity="sha256-8glLv2FBs1lyLE/kVOtsSw8OQswQzHr5IfwVj864ZTk="
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"
+          integrity="sha256-7f4yGj/kbpwPCvg3AUWu4YCXXyQ/IkLw+BgaxCc+COE="
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.10/dist/browser/index.js"
+          integrity="sha256-ESWcb69+MMnx0DK25aF3WmF3TAQU61ZRoPtKjtObNVs="
           crossorigin="anonymous"></script>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -1142,6 +1236,39 @@
           <div class="summary-output empty" id="summaryOutputBox">
             尚未生成摘要。勾選好要納入的資料後，點上方按鈕即可生成重點摘要。
           </div>
+
+          <!-- ★ 新增：待辦事項清單。沒有待辦事項時整塊隱藏（見
+               SummaryModule._renderActionItems）。 -->
+          <div class="summary-section hidden" id="summaryActionItemsSection">
+            <div class="summary-section-title">✅ 待辦事項</div>
+            <div class="action-items-list" id="summaryActionItemsList"></div>
+          </div>
+
+          <!-- ★ 新增：簡易心智圖。「檢視」用 markmap 渲染 SVG（唯讀，
+               不可拖曳節點——這是刻意的設計取捨，見專案討論記錄：
+               心智圖的核心價值在結構關係而非像素座標，拖曳互動的
+               開發與維護成本不成比例）；「編輯」是一個縮排大綱純
+               文字框，改文字內容或縮排層級，按重新渲染即可更新
+               檢視畫面，藉此間接達成「調整心智圖結構」的效果。 -->
+          <div class="summary-section hidden" id="summaryMindmapSection">
+            <div class="summary-section-title">
+              🧠 簡易心智圖
+              <div class="mindmap-view-toggle">
+                <button class="mindmap-toggle-btn active" id="mindmapViewBtnView" onclick="SummaryModule.switchMindmapView('view')">檢視</button>
+                <button class="mindmap-toggle-btn" id="mindmapViewBtnEdit" onclick="SummaryModule.switchMindmapView('edit')">編輯</button>
+              </div>
+            </div>
+            <div id="mindmapViewWrap">
+              <svg id="mindmapSvg" class="mindmap-svg"></svg>
+            </div>
+            <div id="mindmapEditWrap" class="hidden">
+              <textarea id="mindmapEditTextarea" class="mindmap-edit-textarea" spellcheck="false"
+                        placeholder="# 整體主題&#10;- 子主題&#10;  - 細節"></textarea>
+              <div class="mindmap-edit-hint">第一行用「# 」開頭表示整體主題（根節點），其餘用縮排清單「- 」表示子項目層級（每層 2 個空白）。改完文字後按下方按鈕重新渲染。</div>
+              <button class="btn-mindmap-rerender" onclick="SummaryModule.applyMindmapEdit()">🔄 套用並重新渲染</button>
+            </div>
+          </div>
+
           <div class="summary-actions-row hidden" id="summaryActionsRow">
             <span class="summary-saved-hint">💾 已保存在本機</span>
             <div class="summary-actions-inline">
@@ -2756,9 +2883,9 @@
         this._setLoadingUI(true);
 
         try {
-          const summaryText = await this._callGemini(items, apiKey);
-          this._renderSummary(summaryText);
-          this._persist(summaryText);
+          const summaryData = await this._callGemini(items, apiKey);
+          this._renderSummary(summaryData);
+          this._persist(summaryData);
         } catch (err) {
           console.error('生成 AI 摘要失敗：', err);
           this._renderError('生成摘要失敗：' + err.message);
@@ -2789,17 +2916,25 @@
           ? '\n\n這份逐字稿是由多個段落合併而成（可能來自不同人分別整理、或同一場會議的不同時段），每個段落前面用【標籤】標示來源，已按照指定順序排列。請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要逐段分別摘要或特別區分是誰整理的。'
           : '';
 
+        // ★ 新增：結構化輸出——摘要之外，額外要求 Gemini 產生「待辦
+        // 事項清單」「可回溯的來源引用」「簡易心智圖大綱」。改用
+        // responseSchema 強制 JSON 輸出，前端再依欄位分區塊渲染。
+        // 舊版純文字摘要不受影響：解析失敗時會 fallback 成純摘要模式
+        // （見 _callGemini 下方的容錯處理與 _normalizeSummaryData）。
         const payload = {
           systemInstruction: {
             parts: [{
-              text: '<role>\n你是一個會議記錄整理助手。請針對使用者在下方 meeting_log 標籤內提供的會議逐字稿進行分析與整理，並輸出清楚的重點摘要。\n<role>\n' +
+              text: '<role>\n' +
+                    '你是一個會議記錄整理助手。請針對使用者在下方 <meeting_log> 標籤內提供的會議逐字稿進行分析與整理。\n' +
+                    '</role>\n\n' +
                     '<demand>\n' +
-                    '1. 先用 1-2 句話整體總結這場會議的主題\n' +
-                    '2. 接著用條列式列出討論到的重點，每點盡量簡潔\n' +
-                    '3. 如果逐字稿中有提到待辦事項、下一步行動或需要追蹤的事情，額外列一個「待辦事項」區塊\n' +
-                    '4. 直接輸出整理結果，不需要額外的開場白或結語\n'+
+                    '1. summary：先用 1-2 句話整體總結這場會議的主題，接著用條列式列出討論到的重點，每點盡量簡潔。直接輸出整理結果，不需要額外的開場白或結語。\n' +
+                    '2. actionItems：抽取逐字稿中明確提及的待辦事項、下一步行動或需要追蹤的事情。每一項包含 task（待辦內容）、owner（負責人）、deadline（期限）。owner 與 deadline 若逐字稿沒有明確指出，一律填 null，絕對不可以自行臆測或推論負責人與期限。如果逐字稿完全沒有提到任何待辦事項，回傳空陣列 []。\n' +
+                    '3. mindmapOutline：用 Markdown 格式整理這場討論的主題與子主題成階層式心智圖大綱。第一行必須是 "# " 開頭的整體主題（作為心智圖的根節點），接下來每一層子項目都用清單並以縮排表示層級（每層用兩個半形空白縮排，"- " 開頭）。最多三層、最多 25 個節點，避免內容過於冗長。範例格式：\n# 整體主題\n- 子主題1\n  - 細節A\n  - 細節B\n- 子主題2\n  - 細節C\n' +
+                    '4. sourceRefs：列出 summary 中每一個重點對應到逐字稿的哪一個【標籤】段落（若原始逐字稿沒有分段標籤，此欄位回傳空陣列 []）。每一項包含 point（摘要中的那一點文字，簡短即可）與 label（對應的段落標籤名稱）。\n' +
+                    '5. 只根據 <meeting_log> 內的實際內容作答，不可自行補充或推論未提及的資訊。\n' +
                     sourceNote +
-                    '\n<demand>\n'
+                    '\n</demand>\n'
             }]
           },
           contents: [{
@@ -2807,7 +2942,41 @@
             parts: [{
               text: `<meeting_log>\n${fullText}\n</meeting_log>`
             }]
-          }]
+          }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                summary: { type: 'STRING' },
+                actionItems: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      task: { type: 'STRING' },
+                      owner: { type: 'STRING', nullable: true },
+                      deadline: { type: 'STRING', nullable: true }
+                    },
+                    required: ['task']
+                  }
+                },
+                mindmapOutline: { type: 'STRING' },
+                sourceRefs: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      point: { type: 'STRING' },
+                      label: { type: 'STRING' }
+                    },
+                    required: ['point', 'label']
+                  }
+                }
+              },
+              required: ['summary', 'actionItems']
+            }
+          }
         };
 
         let res;
@@ -2869,15 +3038,62 @@
           throw new Error('Gemini 回傳了空白結果，請稍後再試一次。');
         }
 
-        return text.trim();
+        // ★ 新增：預期收到結構化 JSON（summary/actionItems/mindmapOutline/
+        // sourceRefs）。若 Gemini 沒有遵守 responseSchema 吐出非 JSON
+        // 內容（極少數情況），不讓整個流程掛掉，改為 fallback 成「只有
+        // 純文字摘要」的資料結構，其餘欄位留空，UI 會自動不顯示相關
+        // 區塊，等同於退回舊版行為。
+        try {
+          const parsed = JSON.parse(text.trim());
+          return this._normalizeSummaryData(parsed);
+        } catch (parseErr) {
+          console.warn('Gemini 回傳內容不是預期的 JSON 結構，改用純文字模式顯示：', parseErr);
+          return this._normalizeSummaryData(text.trim());
+        }
       },
 
-      _renderSummary(text) {
-        const box = document.getElementById('summaryOutputBox');
-        box.classList.remove('empty', 'loading');
-        box.textContent = text;
-        this.currentSummary = text;
-        this._updateActionsRowVisibility();
+      // ★ 新增：統一資料結構的正規化入口。無論是新版 JSON、舊版純
+      // 文字字串（含 localStorage 讀回的歷史資料），一律轉成同一種
+      // 內部形狀，讓渲染／複製／分享等其他函式不用各自判斷型別。
+      _normalizeSummaryData(raw) {
+        if (typeof raw === 'string') {
+          return { summary: raw, actionItems: [], mindmapOutline: '', sourceRefs: [] };
+        }
+        if (raw && typeof raw === 'object') {
+          return {
+            summary: typeof raw.summary === 'string' ? raw.summary : '',
+            actionItems: Array.isArray(raw.actionItems) ? raw.actionItems.filter(it => it && typeof it.task === 'string') : [],
+            mindmapOutline: typeof raw.mindmapOutline === 'string' ? raw.mindmapOutline : '',
+            sourceRefs: Array.isArray(raw.sourceRefs) ? raw.sourceRefs.filter(r => r && typeof r.point === 'string' && typeof r.label === 'string') : []
+          };
+        }
+        return { summary: '', actionItems: [], mindmapOutline: '', sourceRefs: [] };
+      },
+
+      // ★ 修正：改吃結構化物件 { summary, actionItems, mindmapOutline,
+      // sourceRefs }（由 _callGemini → _normalizeSummaryData 統一產生），
+      // 分區塊渲染摘要文字、待辦事項清單、心智圖大綱。
+      _renderSummary(data) {
+        this.currentSummary = data;
+        this._renderCurrentUI();
+      },
+
+      // ★ 新增：組出純文字版本，供複製／分享／傳送到聊天室等既有
+      // 功能使用，維持這些下游功能完全不需要改動、行為跟舊版一致。
+      // 待辦事項若存在，會附加在摘要文字後面一併輸出。
+      getPlainText() {
+        const data = this.currentSummary;
+        if (!data) return '';
+        let text = data.summary || '';
+        if (Array.isArray(data.actionItems) && data.actionItems.length > 0) {
+          const lines = data.actionItems.map(it => {
+            const owner = it.owner ? `　負責人：${it.owner}` : '';
+            const deadline = it.deadline ? `　期限：${it.deadline}` : '';
+            return `・${it.task}${owner}${deadline}`;
+          });
+          text += '\n\n【待辦事項】\n' + lines.join('\n');
+        }
+        return text;
       },
 
       _renderError(text) {
@@ -2902,33 +3118,235 @@
         }
       },
 
-      _persist(text) {
+      // ★ 修正：改存 JSON 字串（結構化物件），存入前一律經過
+      // _normalizeSummaryData 確保形狀一致。
+      _persist(data) {
         try {
-          localStorage.setItem(SUMMARY_STORAGE_KEY, text);
+          localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(data));
         } catch (e) {
           console.warn('摘要自動儲存失敗（可能是儲存空間已滿或隱私模式）：', e);
         }
       },
 
+      // ★ 修正：相容舊版——舊版存的是純文字字串（非 JSON），JSON.parse
+      // 會直接丟例外，此時退回「當作純文字摘要」處理，不會讓使用者
+      // 原本保存的摘要憑空消失。
       restore() {
         let raw = null;
         try { raw = localStorage.getItem(SUMMARY_STORAGE_KEY); }
         catch (e) { return; }
-        if (raw) this.currentSummary = raw;
+        if (raw) {
+          try {
+            this.currentSummary = this._normalizeSummaryData(JSON.parse(raw));
+          } catch (e) {
+            this.currentSummary = this._normalizeSummaryData(raw);
+          }
+        }
         this._renderCurrentUI();
       },
 
+      // ★ 修正：分區塊渲染——摘要文字、待辦事項清單、心智圖大綱（含
+      // 編輯框）。找不到對應資料的區塊會整塊隱藏，不佔版面。
       _renderCurrentUI() {
         const box = document.getElementById('summaryOutputBox');
         box.classList.remove('loading');
-        if (this.currentSummary) {
+
+        const data = this.currentSummary;
+
+        if (data && data.summary) {
           box.classList.remove('empty');
-          box.textContent = this.currentSummary;
+          box.innerHTML = this._buildSummaryHtml(data);
         } else {
           box.classList.add('empty');
           box.textContent = '尚未生成摘要。勾選好要納入的資料後，點上方按鈕即可生成重點摘要。';
         }
+
+        this._renderActionItems(data);
+        this._renderMindmap(data);
         this._updateActionsRowVisibility();
+      },
+
+      // ★ 新增：把摘要文字轉成 HTML，若有 sourceRefs（來源引用），
+      // 逐點附上一個可點擊的來源標籤，點擊會捲動並高亮到「勾選池」
+      // 清單中對應標籤的項目，方便使用者核對這句話是不是真的出自
+      // 那個來源，而不需要照單全收 AI 的整理結果。
+      _buildSummaryHtml(data) {
+        const summaryText = CardSandbox.escapeHtml(data.summary || '');
+        const refMap = {};
+        if (Array.isArray(data.sourceRefs)) {
+          data.sourceRefs.forEach(r => { refMap[r.point] = r.label; });
+        }
+
+        // 逐行處理：條列項目若能在 sourceRefs 中找到對應的 point
+        // （容錯：用「包含」比對，因為 Gemini 複述的字句可能跟摘要
+        // 內文不會逐字一致），就附加來源標籤；找不到就原樣輸出。
+        const lines = summaryText.split('\n');
+        const rendered = lines.map(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return '';
+          const matchedPoint = Object.keys(refMap).find(point => {
+            const escapedPoint = CardSandbox.escapeHtml(point);
+            return trimmed.includes(escapedPoint) || escapedPoint.includes(trimmed);
+          });
+          if (matchedPoint) {
+            const label = CardSandbox.escapeHtml(refMap[matchedPoint]);
+            return `<div class="summary-line">${line} <span class="summary-source-tag" onclick="SummaryModule.jumpToSource('${label.replace(/'/g, "\\'")}')" title="點擊查看來源段落">📍${label}</span></div>`;
+          }
+          return `<div class="summary-line">${line}</div>`;
+        });
+
+        return rendered.join('');
+      },
+
+      // ★ 新增：點擊來源標籤時，捲動到勾選池清單中對應標籤的項目並
+      // 短暫高亮，讓使用者能核對這句摘要出自哪個來源段落。因為勾選
+      // 池的顯示標籤跟原始 label 是同一份資料（見 renderPool），可以
+      // 直接用文字比對找到對應的 DOM 節點。
+      jumpToSource(label) {
+        const listEl = document.getElementById('summaryPoolList');
+        if (!listEl) return;
+        const items = listEl.querySelectorAll('.summary-pool-item');
+        for (const item of items) {
+          const labelEl = item.querySelector('.pool-label');
+          if (labelEl && labelEl.textContent.includes(label)) {
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            item.classList.add('pool-item-highlight');
+            setTimeout(() => item.classList.remove('pool-item-highlight'), 1500);
+            return;
+          }
+        }
+      },
+
+      // ★ 新增：渲染待辦事項清單。沒有待辦事項（陣列為空或不存在）
+      // 時整塊隱藏，不佔版面、不顯示空清單造成誤解。
+      _renderActionItems(data) {
+        const section = document.getElementById('summaryActionItemsSection');
+        const list = document.getElementById('summaryActionItemsList');
+        if (!section || !list) return;
+
+        const items = (data && Array.isArray(data.actionItems)) ? data.actionItems : [];
+        if (items.length === 0) {
+          section.classList.add('hidden');
+          list.innerHTML = '';
+          return;
+        }
+
+        section.classList.remove('hidden');
+        list.innerHTML = items.map(it => {
+          const task = CardSandbox.escapeHtml(it.task || '');
+          const owner = it.owner ? `<span class="action-item-owner">👤 ${CardSandbox.escapeHtml(it.owner)}</span>` : '';
+          const deadline = it.deadline ? `<span class="action-item-deadline">⏰ ${CardSandbox.escapeHtml(it.deadline)}</span>` : '';
+          return `<div class="action-item-row"><span class="action-item-task">☐ ${task}</span>${owner}${deadline}</div>`;
+        }).join('');
+      },
+
+      // ★ 新增：心智圖渲染。mindmapOutline 為空（例如舊版純文字摘要，
+      // 或 Gemini 這次沒有產生大綱）時整塊隱藏。使用 markmap-lib 的
+      // Transformer 把縮排大綱文字轉成節點資料，交給 markmap-view 的
+      // Markmap 畫成 SVG——這兩個套件都是唯讀渲染引擎，本身不提供
+      // 節點拖曳能力，因此心智圖只能整張重新渲染，無法個別移動
+      // 節點位置（這是刻意的設計取捨，非技術限制下的妥協）。
+      _renderMindmap(data) {
+        const section = document.getElementById('summaryMindmapSection');
+        if (!section) return;
+
+        const outline = (data && typeof data.mindmapOutline === 'string') ? data.mindmapOutline.trim() : '';
+        if (!outline) {
+          section.classList.add('hidden');
+          return;
+        }
+
+        section.classList.remove('hidden');
+        this._mindmapOutline = outline;
+
+        const editTextarea = document.getElementById('mindmapEditTextarea');
+        if (editTextarea) editTextarea.value = outline;
+
+        this._doRenderMindmapSvg(outline);
+      },
+
+      // ★ 新增：實際呼叫 markmap 套件畫圖的地方，跟「資料從哪裡來」
+      // 分開，因為初次生成（來自 Gemini）與使用者編輯後重新渲染
+      // 都需要呼叫同一段邏輯。缺少 window.markmap（例如 CDN 載入
+      // 失敗、離線）時降級顯示純文字大綱，不讓整個摘要頁面掛掉。
+      _doRenderMindmapSvg(outlineText) {
+        const svgEl = document.getElementById('mindmapSvg');
+        if (!svgEl) return;
+
+        if (!window.markmap || !window.markmap.Transformer || !window.markmap.Markmap) {
+          console.warn('markmap 套件尚未載入成功，改用純文字大綱顯示。');
+          const wrap = document.getElementById('mindmapViewWrap');
+          if (wrap) {
+            wrap.innerHTML = `<pre class="mindmap-fallback-text">${CardSandbox.escapeHtml(outlineText)}</pre>`;
+          }
+          return;
+        }
+
+        try {
+          // 每次重新渲染前清空舊的 SVG 內容，避免多次渲染疊加殘留節點
+          while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+          const transformer = new window.markmap.Transformer();
+          const { root } = transformer.transform(outlineText);
+
+          if (this._mindmapInstance && typeof this._mindmapInstance.destroy === 'function') {
+            this._mindmapInstance.destroy();
+          }
+          this._mindmapInstance = window.markmap.Markmap.create(svgEl, {
+            // 唯讀檢視：不需要工具列、不允許拖曳節點，維持畫面單純
+            zoom: true,
+            pan: true
+          }, root);
+        } catch (err) {
+          console.error('心智圖渲染失敗，改用純文字大綱顯示：', err);
+          const wrap = document.getElementById('mindmapViewWrap');
+          if (wrap) {
+            wrap.innerHTML = `<pre class="mindmap-fallback-text">${CardSandbox.escapeHtml(outlineText)}</pre>`;
+          }
+        }
+      },
+
+      // ★ 新增：切換「檢視」／「編輯」兩個分頁。編輯分頁是純文字框，
+      // 修改縮排大綱文字（新增/刪除/調整層級），不提供圖塊拖曳移動。
+      switchMindmapView(mode) {
+        const viewWrap = document.getElementById('mindmapViewWrap');
+        const editWrap = document.getElementById('mindmapEditWrap');
+        const viewBtn = document.getElementById('mindmapViewBtnView');
+        const editBtn = document.getElementById('mindmapViewBtnEdit');
+        if (!viewWrap || !editWrap) return;
+
+        const isEdit = mode === 'edit';
+        viewWrap.classList.toggle('hidden', isEdit);
+        editWrap.classList.toggle('hidden', !isEdit);
+        viewBtn.classList.toggle('active', !isEdit);
+        editBtn.classList.toggle('active', isEdit);
+      },
+
+      // ★ 新增：套用使用者手動編輯過的縮排大綱文字。這裡刻意只更新
+      // 「顯示用」的心智圖與畫面上的 currentSummary.mindmapOutline，
+      // 並一併存回 localStorage，讓重新整理頁面後編輯結果不會遺失。
+      // 不會重新呼叫 Gemini——手動編輯純粹是本機端的呈現調整。
+      applyMindmapEdit() {
+        const editTextarea = document.getElementById('mindmapEditTextarea');
+        if (!editTextarea) return;
+
+        const newOutline = editTextarea.value;
+
+        // ★ 基本格式防呆：完全空白內容不處理，避免畫出一張空白心智圖
+        // 造成使用者誤以為功能故障
+        if (!newOutline.trim()) {
+          alert('心智圖內容不能是空的，請至少保留一個節點。');
+          return;
+        }
+
+        this._mindmapOutline = newOutline;
+        if (this.currentSummary) {
+          this.currentSummary.mindmapOutline = newOutline;
+          this._persist(this.currentSummary);
+        }
+
+        this._doRenderMindmapSvg(newOutline);
+        this.switchMindmapView('view');
       },
 
       _updateActionsRowVisibility() {
@@ -2941,8 +3359,9 @@
         if (!this.currentSummary) return;
         // ★ 修正：改用 copyTextRobust()，跟其他複製功能統一標準，
         // 即使這裡沒有前置 prompt() 造成的時序問題，仍一併強化以防
-        // 其他瀏覽器環境下的邊角情況
-        copyTextRobust(this.currentSummary).then(success => {
+        // 其他瀏覽器環境下的邊角情況。內容改用 getPlainText()，把
+        // 待辦事項一併帶出（見該方法說明）。
+        copyTextRobust(this.getPlainText()).then(success => {
           if (success) {
             alert('已複製摘要到剪貼簿。');
           } else {
@@ -2954,10 +3373,11 @@
       // ★ 新增：把已生成的摘要複製成可貼進共用 Sheet 的格式，標記
       // type 為 'summary'，讓其他人讀取這份共用表格時能清楚分辨這筆
       // 是摘要而非原始逐字稿。直接複用 CopyToSheetFormat 的共用邏輯
-      // （詢問主題、組 JSON、寫入剪貼簿），不需要另外寫一份。
+      // （詢問主題、組 JSON、寫入剪貼簿），不需要另外寫一份。改用
+      // getPlainText() 確保存進共用表格的仍是單純文字內容。
       copyToSheet() {
         if (!this.currentSummary) return;
-        CopyToSheetFormat.copyContent(this.currentSummary, 'summary');
+        CopyToSheetFormat.copyContent(this.getPlainText(), 'summary');
       },
 
       remove() {
@@ -2985,20 +3405,24 @@
         document.getElementById('summaryShareMenuModal').classList.add('hidden');
       },
 
+      // ★ 修正：分享內容一律改用 getPlainText()，把摘要物件正確轉為
+      // 純文字（含待辦事項），維持傳送到聊天室的行為與舊版一致。
       shareViaLineFriend() {
         this.closeShareMenu();
         if (!this.currentSummary) return;
-        ChatPreview.show(this.currentSummary, 'LINE 好友選單', () => doSend(this.currentSummary));
+        const text = this.getPlainText();
+        ChatPreview.show(text, 'LINE 好友選單', () => doSend(text));
       },
 
       shareViaWebShare() {
         this.closeShareMenu();
         if (!this.currentSummary) return;
+        const text = this.getPlainText();
         if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
-          ChatPreview.show(this.currentSummary, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(this.currentSummary));
+          ChatPreview.show(text, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(text));
           return;
         }
-        ChatPreview.show(this.currentSummary, '手機系統分享', () => doWebShare(this.currentSummary));
+        ChatPreview.show(text, '手機系統分享', () => doWebShare(text));
       }
     };
 
