@@ -23,6 +23,15 @@
 
   Full license text: see /LICENSE in the project root.
 -->
+<!--
+  程式碼註解準則：
+  - 只解釋「為什麼」，不重複描述程式碼本身已經表達的「做了什麼」
+  - 不寫開發過程的背景故事（不需要「原本是...後來改成...」）
+  - 一般決策一到兩行即可；只有真正容易被誤改的技術限制（例如
+    外部套件的檔名跟慣例不同、初始化時序問題）才值得多寫幾行
+  - 不使用「新增／修正」之類的變更標記，註解是給未來維護者看的
+    程式說明，不是給這次修改紀錄用的
+-->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -324,6 +333,7 @@
       font-size: 11px; color: var(--ink-soft); white-space: nowrap;
     }
 
+    .mindmap-title-toggle { cursor: pointer; user-select: none; }
     .mindmap-view-toggle { display: flex; gap: 4px; }
     .mindmap-view-toggle.hidden { display: none; }
     .mindmap-toggle-btn {
@@ -331,15 +341,22 @@
       background: var(--card-bg); color: var(--ink-soft); border-radius: 999px; cursor: pointer;
     }
     .mindmap-toggle-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-    /* ★ 新增：心智圖「待生成」狀態的提示區塊，比照 .summary-panel
-       淡色卡片風格，跟已生成後的 SVG／編輯框視覺區隔開來 */
     .mindmap-generate-wrap.hidden { display: none; }
     .mindmap-generate-hint {
       font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 8px;
     }
     .mindmap-svg {
       width: 100%; height: 260px; background: var(--card-bg);
-      border: 1px solid var(--border); border-radius: 10px;
+      border: 1px solid var(--border); border-radius: 10px 10px 0 0; touch-action: none;
+    }
+    .mindmap-view-toolbar {
+      display: flex; flex-wrap: wrap; gap: 4px; padding: 6px;
+      border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; background: var(--bg);
+    }
+    .mindmap-view-toolbar button {
+      flex: 1; min-width: 70px; padding: 6px 4px; font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--card-bg); color: var(--ink-soft);
+      border-radius: 8px; cursor: pointer;
     }
     .mindmap-fallback-text {
       width: 100%; max-height: 260px; overflow-y: auto; margin: 0; padding: 10px;
@@ -712,6 +729,7 @@
     }
     .type-tag.raw { background: #eef3ff; color: #4a72d6; }
     .type-tag.summary { background: var(--line-green-tint); color: var(--line-green-dark); }
+    .type-tag.mindmap { background: #f3ecfd; color: #7b3fd6; }
     /* ★ 新增：勾選順序標號，顯示在項目最前面，只有已勾選的項目才會
        顯示數字（未勾選則是空的圓圈佔位，維持排版一致不跳動） */
     .selection-order-badge {
@@ -792,39 +810,17 @@
           crossorigin="anonymous"></script>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <!--
-    ★ 修正：markmap（d3 + markmap-lib + markmap-view）——AI 摘要的
-    「簡易心智圖」功能用，見會議摘要模組 SummaryModule._renderMindmap。
-    版本鎖定 d3@7.9.0、markmap-lib@0.18.12、markmap-view@0.18.10
-    （查證當下的最新穩定版），避免 CDN 上游未來改版造成不可預期的
-    行為變動。SRI（integrity）雜湊值透過 jsDelivr 官方資料 API
-    （https://data.jsdelivr.com/v1/packages/npm/{package}@{version}）
-    查得的 hash 欄位（base64 編碼的 SHA-256）換算而來，並非自行下載
-    檔案計算，惟仍屬官方提供的正確雜湊來源。
+    markmap（d3 + markmap-lib + markmap-view）：AI 摘要心智圖用
+    （SummaryModule._renderMindmap）。版本鎖定，避免 CDN 上游改版
+    造成行為變動。
 
-    ★ 注意：三個套件實際的瀏覽器建構檔檔名不完全一致，已依 jsDelivr
-    檔案清單核實路徑，並非單純套用「.min.js」命名慣例：
-    - d3：dist/d3.min.js（有獨立 min 版）
-    - markmap-lib：dist/browser/index.iife.js（★ 沒有 .min.js，
-      該版本的瀏覽器建構檔本身就叫 index.iife.js，套件的 default
-      進入點也指向這個檔案）
-    - markmap-view：dist/browser/index.js（★ 同樣沒有獨立 .min.js，
-      清單中該目錄下只有這一個檔案）
+    檔名跟 .min.js 慣例不同，需注意：
+    - d3：dist/d3.min.js
+    - markmap-lib：dist/browser/index.iife.js（無 .min.js）
+    - markmap-view：dist/browser/index.js（無 .min.js）
 
-    ★ 修正（手機版卡在「正在確認身分」問題）：這三個 script 原本
-    緊接在 opencc-js 之後、LIFF SDK 之前，且沒有 defer／async，會
-    同步阻塞頁面解析——瀏覽器必須等這三個檔案完整下載執行完，才會
-    繼續往下解析到 LIFF SDK 與後面呼叫 AccessGate.run() 的程式碼。
-    在手機行動網路（尤其 LINE 內嵌 WebView，網路環境往往比桌機
-    寬頻更差）下，這段延遲會直接卡住 LIFF 初始化，導致「正在確認
-    身分」的載入畫面一直轉圈；桌面版寬頻環境下延遲不明顯所以沒有
-    察覺。心智圖是「使用者按下產生心智圖按鈕」才用得到的非核心
-    功能，不需要在頁面一開始就載入完成，因此：
-    1. 搬到 LIFF SDK 之後，確保 LIFF 初始化不會被這些資源排在前面
-       拖慢。
-    2. 加上 defer，讓瀏覽器可以背景並行下載、不阻塞 HTML 解析與
-       DOMContentLoaded；三個 defer script 之間仍會依照文件順序
-       依序執行（HTML 規範保證），不會有 d3 還沒備妥、markmap-lib
-       就先執行導致找不到全域變數的問題。
+    加 defer 並排在 LIFF SDK 之後：心智圖是非核心功能，同步載入
+    會阻塞 LIFF 初始化，手機行動網路下會導致「確認身分」卡住。
   -->
   <script defer src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
           integrity="sha256-8glLv2FBs1lyLE/kVOtsSw8OQswQzHr5IfwVj864ZTk="
@@ -1177,19 +1173,9 @@
       <span class="toast-icon">💾</span>
       <span class="toast-text" id="storageToastText"></span>
     </div>
-    <header>
-      <h1>語音卡片筆記 <span style="font-weight:400;color:var(--ink-soft)">LIFF 相容版</span></h1>
-      <div class="sub">MediaRecorder 前端錄音 ➔ Whisper API 雲端極速辨識</div>
-    </header>
 
-    <!-- ★ 新增：主導覽 Tab 列，取代原本「API Key 卡片常駐畫面最上方
-         + 即時錄音／錄音內容編輯 兩頁籤」的結構。原本的問題是 API Key
-         輸入區塊（含申請教學的展開區）不管使用者在做什麼都佔用畫面
-         最上方一大塊空間，在窄螢幕手機上特別浪費；現在 API Key 移到
-         獨立的「設定」分頁，主畫面只在真正需要時（例如尚未設定 Key
-         就要錄音）才用提示告知使用者去設定分頁填寫，不再常駐佔版面。
-         5 個分頁：🎙️錄音／🗂️筆記／📖共享／📝摘要／⚙️設定，同一時間
-         只顯示一個分頁的內容，畫面更聚焦、單頁功能更清晰。 -->
+    <!-- 主導覽 Tab 列：🎙️錄音／🗂️筆記／📖共享／📝摘要／⚙️設定，
+         同一時間只顯示一個分頁內容 -->
     <div class="main-tabs">
       <button id="navTabRecord" class="active" onclick="MainNav.switchTo('record')">
         <span class="tab-icon">🎙️</span><span class="tab-label">錄音</span>
@@ -1336,39 +1322,41 @@
             <div class="action-items-list" id="summaryActionItemsList"></div>
           </div>
 
-          <!-- ★ 修正：簡易心智圖。改為按需生成——摘要生成完成後不會
-               自動連帶生成心智圖，畫面先顯示「產生心智圖」按鈕，使用
-               者點擊後才呼叫 Gemini，依據「已經生成好的摘要文字」
-               （而非重新讀一次逐字稿）整理成心智圖大綱，確保心智圖
-               內容跟畫面上的摘要一致。「檢視」用 markmap 渲染 SVG
-               （唯讀，不可拖曳節點——這是刻意的設計取捨，見專案討論
-               記錄：心智圖的核心價值在結構關係而非像素座標，拖曳
-               互動的開發與維護成本不成比例）；「編輯」是一個縮排
-               大綱純文字框，改文字內容或縮排層級，按重新渲染即可
-               更新檢視畫面，藉此間接達成「調整心智圖結構」的效果。 -->
+          <!-- 心智圖按需生成：根據已生成的摘要文字整理，非重讀逐字稿。
+               檢視為 markmap 唯讀渲染（不支援拖曳節點）；編輯是縮排
+               大綱文字框，改完重新渲染即可調整結構。 -->
           <div class="summary-section hidden" id="summaryMindmapSection">
             <div class="summary-section-title">
-              🧠 簡易心智圖
+              <span class="mindmap-title-toggle" onclick="SummaryModule.toggleMindmapCollapse()">
+                <span id="mindmapCollapseIcon">🧠 簡易心智圖 ▾</span>
+              </span>
               <div class="mindmap-view-toggle hidden" id="mindmapViewToggleRow">
                 <button class="mindmap-toggle-btn active" id="mindmapViewBtnView" onclick="SummaryModule.switchMindmapView('view')">檢視</button>
                 <button class="mindmap-toggle-btn" id="mindmapViewBtnEdit" onclick="SummaryModule.switchMindmapView('edit')">編輯</button>
               </div>
             </div>
 
-            <!-- ★ 新增：待生成狀態——尚未呼叫過 Gemini 整理心智圖時顯示 -->
-            <div id="mindmapGenerateWrap" class="mindmap-generate-wrap">
-              <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次 Gemini。</div>
-              <button class="btn-mindmap-rerender" id="mindmapGenerateBtn" onclick="SummaryModule.generateMindmap()">🧠 產生心智圖</button>
-            </div>
+            <div id="mindmapCollapseBody">
+              <div id="mindmapGenerateWrap" class="mindmap-generate-wrap">
+                <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次 Gemini。</div>
+                <button class="btn-mindmap-rerender" id="mindmapGenerateBtn" onclick="SummaryModule.generateMindmap()">🧠 產生心智圖</button>
+              </div>
 
-            <div id="mindmapViewWrap" class="hidden">
-              <svg id="mindmapSvg" class="mindmap-svg"></svg>
-            </div>
-            <div id="mindmapEditWrap" class="hidden">
-              <textarea id="mindmapEditTextarea" class="mindmap-edit-textarea" spellcheck="false"
-                        placeholder="# 整體主題&#10;- 子主題&#10;  - 細節"></textarea>
-              <div class="mindmap-edit-hint">第一行用「# 」開頭表示整體主題（根節點），其餘用縮排清單「- 」表示子項目層級（每層 2 個空白）。改完文字後按下方按鈕重新渲染。</div>
-              <button class="btn-mindmap-rerender" onclick="SummaryModule.applyMindmapEdit()">🔄 套用並重新渲染</button>
+              <div id="mindmapViewWrap" class="hidden">
+                <svg id="mindmapSvg" class="mindmap-svg"></svg>
+                <div class="mindmap-view-toolbar">
+                  <button onclick="SummaryModule.resetMindmapView()" title="回到中心">🎯 置中</button>
+                  <button onclick="SummaryModule.downloadMindmapImage()" title="下載成 PNG 圖片">⬇️ 下載圖片</button>
+                  <button onclick="SummaryModule.shareMindmapImage()" title="分享圖片">🔗 分享圖片</button>
+                  <button onclick="SummaryModule.copyMindmapToSheet()" title="存成文字大綱到共用 Sheet">📤 存 Sheet</button>
+                </div>
+              </div>
+              <div id="mindmapEditWrap" class="hidden">
+                <textarea id="mindmapEditTextarea" class="mindmap-edit-textarea" spellcheck="false"
+                          placeholder="# 整體主題&#10;- 子主題&#10;  - 細節"></textarea>
+                <div class="mindmap-edit-hint">第一行「# 」表示根節點，其餘用縮排清單「- 」表示子項目層級。改完文字後按下方按鈕重新渲染。</div>
+                <button class="btn-mindmap-rerender" onclick="SummaryModule.applyMindmapEdit()">🔄 套用並重新渲染</button>
+              </div>
             </div>
           </div>
 
@@ -1571,40 +1559,23 @@
     };
     IntroModal.initOnLoad();
 
-    // ---------- ★ 新增：多把 API Key 管理（KeyPoolManager）----------
+    // 多把 API Key 管理（KeyPoolManager）。每種服務可存多把 key、
+    // 各自命名，失效時可切換，不用重新輸入。
     //
-    // 背景：原本每種服務（Groq／Gemini）只能存一把 key，額度用完或
-    // key 失效（在官網被刪除）時，使用者得手動刪掉重新輸入，很麻煩。
-    // 改為「key 池」：每種服務可以預先存好多把 key、各自命名（例如
-    // 「第一把」「備用」），失效時能直接切換到下一把，不用重新輸入。
-    //
-    // 這一版只做「儲存 + 命名 + 手動切換」的資料層與管理 UI，還不做
-    // 「自動偵測失效並依設定切換」的部分（那部分需要動到摘要／轉錄
-    // 呼叫的 catch 邏輯，範圍更大，之後再做）。
-    //
-    // 相容設計：保留舊版 whisper_api_key／gemini_api_key 這兩個
-    // localStorage 欄位不動，讓 KeyPoolManager 在「目前使用中的 key
-    // 有變動」時同步鏡射寫回這兩個欄位。這樣現有 12 處直接讀
-    // localStorage.getItem('whisper_api_key' / 'gemini_api_key') 的
-    // 呼叫點完全不用改，天然就會拿到「目前使用中」那把的值——之後
-    // 接自動偵測時，才需要把這些呼叫點換成呼叫 KeyPoolManager 本身。
+    // 相容設計：同步鏡射寫回 whisper_api_key／gemini_api_key 這兩個
+    // 舊版 localStorage 欄位，讓既有直接讀這兩個 key 的呼叫點不用改。
     const KeyPoolManager = {
       LIMITS: { groq: 12, gemini: 5 },
       LEGACY_KEY_NAME: { groq: 'whisper_api_key', gemini: 'gemini_api_key' },
       POOL_STORAGE_KEY: { groq: 'groq_key_pool', gemini: 'gemini_key_pool' },
 
-      // 記憶體快取，避免每次操作都重新 parse localStorage
       _pools: { groq: null, gemini: null },
 
-      // 產生一個不需要密碼學強度、只求「這次會話內不重複」的簡短 id，
-      // 用於 DOM 綁定與內部比對，不涉及任何安全性用途
       _genId() {
         return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       },
 
-      // ★ 核心：取得某個服務目前的 key 池結構。第一次呼叫時會嘗試
-      // 從 localStorage 讀取；若完全不存在，才觸發舊版資料遷移
-      // （_migrateLegacy），確保現有使用者的 key 不會憑空消失。
+      // 取得某服務的 key 池，不存在時觸發舊版資料遷移
       _load(type) {
         if (this._pools[type]) return this._pools[type];
 
@@ -1619,15 +1590,12 @@
         if (!pool || !Array.isArray(pool.keys)) {
           pool = this._migrateLegacy(type);
           this._pools[type] = pool;
-          // ★ 修正：遷移發生時立刻持久化成新版格式，避免每次重新
-          // 整理頁面都重跑一次遷移判斷（雖然結果相同，但屬於不必要
-          // 的重複行為）。這裡直接呼叫 _persist 而非等待外部操作
-          // 觸發，因為遷移本身就是一次需要落地保存的資料異動。
+          // 遷移完立刻持久化，避免每次載入都重跑一次判斷
           this._persist(type);
           return pool;
         }
 
-        // 基本形狀防呆：避免任何損毀資料讓後續操作直接壞掉
+        // 形狀防呆：避免損毀資料讓後續操作壞掉
         if (!pool.keys) pool.keys = [];
         if (!pool.switchMode) pool.switchMode = 'manual';
         if (pool.activeId && !pool.keys.some(k => k.id === pool.activeId)) {
@@ -1638,9 +1606,7 @@
         return pool;
       },
 
-      // ★ 新增：把舊版單一 key（whisper_api_key／gemini_api_key）
-      // 包裝成新版 pool 結構的第一把，並保留原欄位不刪除（維持雙寫
-      // 相容，見檔案頂端說明）。舊欄位沒有值時，回傳一個空池。
+      // 把舊版單一 key 包裝成新版 pool 結構的第一把，保留原欄位不刪
       _migrateLegacy(type) {
         let legacyValue = '';
         try { legacyValue = (localStorage.getItem(this.LEGACY_KEY_NAME[type]) || '').trim(); }
@@ -1753,24 +1719,13 @@
         this._persist(type);
       },
 
-      // ★ 新增：由各處 API 呼叫失敗時回報使用。errorType 只接受
-      // 'invalid'（key 已被刪除／格式錯誤等不可能靠等待恢復的失敗）
-      // 或 'quota_exceeded'（額度用完，過一段時間或換方案可能恢復）。
-      // 兩者的差異值得保留在資料裡：quota_exceeded 的 key 之後可能
-      // 自己恢復正常，不代表這把 key 要被判死刑；invalid 則幾乎可以
-      // 確定要換掉，這個區分之後如果要做「額度重置後自動恢復可用」
-      // 之類的功能會用得到。
-      //
-      // 回傳一個描述接下來發生了什麼的物件，供呼叫端組裝提醒文字：
-      // { switched: boolean, newActiveLabel, failedLabel, mode }
-      // switched 為 true 代表已經自動換到別把；為 false 代表維持
-      // 原狀（手動模式，或自動模式但找不到其他可用的 key）。
+      // 由各處 API 呼叫失敗時回報。errorType 為 'invalid'（key 失效）
+      // 或 'quota_exceeded'（額度用完，可能自行恢復）。回傳
+      // { switched, newActiveLabel, failedLabel, mode } 供呼叫端組出提醒文字。
       reportFailure(type, errorType) {
         const pool = this._load(type);
         const failedKey = pool.keys.find(k => k.id === pool.activeId);
         if (!failedKey) {
-          // 目前根本沒有使用中的 key（例如使用者從沒設定過），沒有
-          // 對象可以標記失效，直接返回，避免後續操作對 undefined 動作
           return { switched: false, newActiveLabel: null, failedLabel: null, mode: pool.switchMode };
         }
 
@@ -1779,10 +1734,6 @@
         const mode = pool.switchMode;
 
         if (mode === 'auto') {
-          // 找下一把「狀態正常」的 key，依照清單原本的順序找起，
-          // 跳過剛標記失效的這把跟其他已知失效的 key。找不到就維持
-          // 原狀（activeId 不變），讓呼叫端得知「自動切換也救不了」，
-          // 需要提示使用者去設定頁處理（例如全部都失效了）。
           const nextKey = pool.keys.find(k => k.id !== failedKey.id && k.status === 'ok');
           if (nextKey) {
             pool.activeId = nextKey.id;
@@ -1793,17 +1744,13 @@
           return { switched: false, newActiveLabel: null, failedLabel, mode };
         }
 
-        // 手動模式：只標記狀態，不動 activeId，讓使用者自己決定
         this._persist(type);
         return { switched: false, newActiveLabel: null, failedLabel, mode };
       }
     };
 
-    // ---------- ★ 新增：多把 API Key 管理 UI（KeyPoolPanel）----------
-    // 負責把 KeyPoolManager 的資料畫成畫面，以及處理使用者在設定頁
-    // 上的互動（新增、命名、切換使用中、刪除、切換模式）。與
-    // KeyPoolManager 分層：Manager 只管資料，Panel 只管畫面與互動，
-    // 兩者不混在一起，方便之後各自獨立修改。
+    // 多把 API Key 管理 UI（KeyPoolPanel）：把 KeyPoolManager 的
+    // 資料畫成畫面，處理新增／命名／切換／刪除等互動
     const KeyPoolPanel = {
       LIST_EL_ID: { groq: 'groqKeyPoolList', gemini: 'geminiKeyPoolList' },
       COUNT_HINT_EL_ID: { groq: 'groqKeyPoolCountHint', gemini: 'geminiKeyPoolCountHint' },
@@ -1931,38 +1878,20 @@
         this._renderSwitchModeButtons(type);
       },
 
-      // ★ 新增：防止同一把 key 在短時間內因為連續失敗（例如錄音中
-      // 每隔幾秒自動送一次背景轉寫，key 失效時會連續好幾段都失敗）
-      // 而彈出一長串重複的 alert，打斷使用者操作。記錄「最近一次
-      // 針對某個 key id 跳過提醒」的時間戳記，同一把 key 在冷卻時間
-      // 內的後續失敗只更新狀態資料與畫面，不再重複跳提醒。
+      // 冷卻機制：同一把 key 短時間內連續失敗（例如背景轉寫連續
+      // 幾段都失敗）時不重複彈窗，只更新狀態與畫面
       _lastNotifiedAt: {},
       NOTIFY_COOLDOWN_MS: 60000,
 
-      // ★ 新增：統一的失效提醒入口，供各處 API 呼叫失敗後呼叫。
-      // 內部呼叫 KeyPoolManager.reportFailure 更新資料，並依照回傳
-      // 結果組出對應的提醒文字，同時刷新設定頁清單（若使用者剛好
-      // 在設定頁，能立刻看到最新的狀態標籤與使用中標記，不需要手動
-      // 重新整理）。
-      //
-      // serviceLabel 是給提醒文字用的服務顯示名稱（例如 'Groq'、
-      // 'Gemini'），errorType 是 'invalid' 或 'quota_exceeded'。
+      // 統一失效提醒入口。serviceLabel 用於提醒文字（'Groq'／'Gemini'）
       notifyFailure(type, errorType, serviceLabel) {
-        // 取得目前使用中的 key id，用於冷卻判斷（在呼叫
-        // reportFailure、activeId 可能因自動切換而改變之前先記錄）
         const activeIdBeforeReport = KeyPoolManager.getActiveId(type);
 
         const result = KeyPoolManager.reportFailure(type, errorType);
         this.render(type);
 
-        if (!result.failedLabel) {
-            // 沒有使用中的 key 可以標記失效（理論上不該走到這裡，
-            // 因為呼叫端本來就是先取得 key 才發出請求；防呆保留）
-          return;
-        }
+        if (!result.failedLabel) return;
 
-        // ★ 冷卻判斷：同一把 key（同一個 activeIdBeforeReport）在冷卻
-        // 時間內已經提醒過，這次只更新資料與畫面，不重複彈窗
         const cooldownKey = `${type}:${activeIdBeforeReport}`;
         const now = Date.now();
         const lastAt = this._lastNotifiedAt[cooldownKey] || 0;
@@ -3035,12 +2964,9 @@
             label: typeof parsed.label === 'string' ? parsed.label.trim() : '',
             content: parsed.content.trim(),
             timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp.trim() : '',
-            // ★ 新增：type 欄位區分這筆資料是原始逐字稿（'raw'）還是
-            // 別人已經生成好的摘要（'summary'）。沒有這個欄位的舊資料
-            // （理論上已被上個版本淘汰，但仍做防呆）預設視為 'raw'，
-            // 只有明確標記為 'summary' 才會顯示摘要標籤，避免任何
-            // 意外把逐字稿誤判成摘要
-            type: parsed.type === 'summary' ? 'summary' : 'raw'
+            // type 區分逐字稿（'raw'）／摘要（'summary'）／心智圖大綱
+            // （'mindmap'），沒有這個欄位的舊資料預設視為 'raw'
+            type: (parsed.type === 'summary' || parsed.type === 'mindmap') ? parsed.type : 'raw'
           });
         });
 
@@ -3079,11 +3005,11 @@
           const label = r.label || `（未命名資料 ${idx + 1}）`;
           const charCount = r.content.length;
 
-          // ★ 新增：type 標籤（逐字稿／摘要），用顏色區分，讓使用者
-          // 一眼看出這筆是原始逐字稿還是別人已經生成好的摘要
           const typeTag = r.type === 'summary'
             ? '<span class="type-tag summary">📝 摘要</span>'
-            : '<span class="type-tag raw">🎤 逐字稿</span>';
+            : r.type === 'mindmap'
+              ? '<span class="type-tag mindmap">🧠 心智圖</span>'
+              : '<span class="type-tag raw">🎤 逐字稿</span>';
 
           // ★ 修正：勾選狀態與順序改由 SelectionPool 統一管理，這裡
           // 不再自己維護 selectedIndexes；checkbox 是否勾選、順序標號
@@ -3254,7 +3180,7 @@
       // 主題／組 JSON／寫入剪貼簿的流程，只有 content 與 type 不同
       copyContent(content, type) {
         if (!content || !content.trim()) {
-          alert(type === 'summary' ? '目前沒有已生成的摘要可以複製。' : '目前沒有任何內容可以複製，請先錄音或編輯出至少一張卡片。');
+          alert(type === 'summary' ? '目前沒有已生成的摘要可以複製。' : (type === 'mindmap' ? '目前沒有已生成的心智圖可以複製。' : '目前沒有任何內容可以複製，請先錄音或編輯出至少一張卡片。'));
           return;
         }
 
@@ -3265,7 +3191,7 @@
         // 使用者按了取消，回傳空字串代表按確定但沒輸入任何文字——
         // 這兩種情況都視為「沒有提供有效標籤」，退回自動帶入日期時間，
         // 確保不會出現標籤是空字串的資料被貼進共用表格
-        const typeLabel = type === 'summary' ? '摘要' : '逐字稿';
+        const typeLabel = type === 'summary' ? '摘要' : (type === 'mindmap' ? '心智圖' : '逐字稿');
         const userInput = prompt(`請輸入這筆${typeLabel}的主題名稱（留空則自動使用目前日期時間）：`, '');
         const label = (userInput && userInput.trim()) ? userInput.trim() : defaultLabel;
 
@@ -3371,15 +3297,9 @@
           return;
         }
 
-        // ★ 新增：偵測勾選池裡是否已經包含摘要類型的資料（type ===
-        // 'summary'，代表這筆是別人或自己先前已經生成好、存回 Sheet
-        // 的摘要）。這種情況下提醒使用者一下，避免不小心把「摘要的
-        // 摘要」再摘要一次而不自知——但不強制阻擋，因為某些情境下
-        // （例如彙整多場會議各自的摘要成一份總覽）刻意這樣做是合理的，
-        // 交由使用者自己判斷，只給提示不強制介入。
-        const hasSummaryType = items.some(item => item.type === 'summary');
+        const hasSummaryType = items.some(item => item.type === 'summary' || item.type === 'mindmap');
         if (hasSummaryType) {
-          const proceed = confirm('目前勾選的資料中，有一筆或多筆本身已經是「摘要」類型（而不是原始逐字稿）。\n\n若你是想把多份摘要彙整成一份總覽，可以繼續；若不是，建議先確認是否選錯了資料。\n\n按「確定」繼續生成，按「取消」返回調整勾選。');
+          const proceed = confirm('目前勾選的資料中，有一筆或多筆本身是「摘要」或「心智圖大綱」（而不是原始逐字稿）。\n\n若不是刻意要彙整這些內容，建議先確認是否選錯了資料。\n\n按「確定」繼續生成，按「取消」返回調整勾選。');
           if (!proceed) return;
         }
 
@@ -3426,21 +3346,12 @@
           ? '\n\n這份逐字稿是由多個段落合併而成（可能來自不同人分別整理、或同一場會議的不同時段），每個段落前面用【標籤】標示來源，已按照指定順序排列。請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要逐段分別摘要或特別區分是誰整理的。'
           : '';
 
-        // ★ 修正：結構化輸出——摘要之外，額外要求 Gemini 產生「待辦
-        // 事項清單」「可回溯的來源引用」。改用 responseSchema 強制
-        // JSON 輸出，前端再依欄位分區塊渲染。舊版純文字摘要不受
-        // 影響：解析失敗時會 fallback 成純摘要模式（見 _callGemini
-        // 下方的容錯處理與 _normalizeSummaryData）。
+        // 結構化輸出：待辦事項、來源引用，用 responseSchema 強制
+        // JSON，解析失敗時 fallback 成純摘要模式。
         //
-        // ★ 心智圖大綱（mindmapOutline）刻意不在這裡一起生成——
-        // 拆成獨立的 _callGeminiMindmap()，理由：
-        // 1. 心智圖應該「根據已生成的摘要」整理結構，而不是跟摘要
-        //    平行地各自重新理解逐字稿；用摘要當輸入能確保心智圖
-        //    內容跟摘要一致，不會出現兩邊各自解讀逐字稿而對不上的
-        //    情況。
-        // 2. 拆開後兩次呼叫互不拖累：心智圖生成失敗不會連累已經
-        //    產生好的摘要跟著 fallback；使用者若不點開心智圖分頁，
-        //    也不需要多等這段生成時間、多耗這段 token。
+        // 心智圖大綱不在這裡生成，改用獨立的 _callGeminiMindmap()：
+        // 心智圖要根據已生成的摘要整理，而非平行重新理解逐字稿；
+        // 且拆開後心智圖生成失敗不會拖累已產生好的摘要。
         const payload = {
           systemInstruction: {
             parts: [{
@@ -3448,7 +3359,7 @@
                     '你是一個會議記錄整理助手。請針對使用者在下方 <meeting_log> 標籤內提供的會議逐字稿進行分析與整理。\n' +
                     '</role>\n\n' +
                     '<demand>\n' +
-                    '1. summary：先用 1-2 句話整體總結這場會議的主題，接著用條列式列出討論到的重點，每點盡量簡潔。直接輸出整理結果，不需要額外的開場白或結語。\n' +
+                    '1. summary：第一行是 1-2 句話整體總結會議主題，換行後每個重點各自獨立一行，每行開頭用「・」，重點之間必須用換行字元分開，不可以把多個重點寫在同一行或同一段落裡。範例格式：這場會議討論了A與B兩個議題。（換行）・重點一的內容（換行）・重點二的內容。直接輸出整理結果，不需要額外的開場白或結語。\n' +
                     '2. actionItems：抽取逐字稿中明確提及的待辦事項、下一步行動或需要追蹤的事情。每一項包含 task（待辦內容）、owner（負責人）、deadline（期限）。owner 與 deadline 若逐字稿沒有明確指出，一律填 null，絕對不可以自行臆測或推論負責人與期限。如果逐字稿完全沒有提到任何待辦事項，回傳空陣列 []。\n' +
                     '3. sourceRefs：列出 summary 中每一個重點對應到逐字稿的哪一個【標籤】段落（若原始逐字稿沒有分段標籤，此欄位回傳空陣列 []）。每一項包含 point（摘要中的那一點文字，簡短即可）與 label（對應的段落標籤名稱）。\n' +
                     '4. 只根據 <meeting_log> 內的實際內容作答，不可自行補充或推論未提及的資訊。\n' +
@@ -3520,11 +3431,7 @@
 
         if (!res.ok) {
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
-          // ★ 新增：Key 失效／額度用完時，回報給 KeyPoolManager 更新
-          // 狀態並視設定的切換模式決定要不要自動換下一把、跳出提醒。
-          // Gemini 的「key 無效」不一定走標準的 401，常見情況是
-          // HTTP 400 搭配訊息內容含「API key not valid」，因此判斷
-          // 規則需要同時看狀態碼與訊息內容，不能只看狀態碼。
+          // Gemini 的「key 無效」常見於 400 + 特定訊息內容，不只是 401
           const isInvalidKey = (res.status === 400 && /API key not valid/i.test(apiMessage))
             || res.status === 401 || res.status === 403;
           const isQuotaExceeded = res.status === 429;
@@ -3661,9 +3568,7 @@
 
         if (!res.ok) {
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
-          // ★ 新增：跟 _callGemini 共用同一套判斷規則（見該方法內的
-          // 說明），Gemini 的「key 無效」常見於 400 + 特定訊息內容，
-          // 不只是標準的 401。
+          // 跟 _callGemini 用同一套判斷規則
           const isInvalidKey = (res.status === 400 && /API key not valid/i.test(apiMessage))
             || res.status === 401 || res.status === 403;
           const isQuotaExceeded = res.status === 429;
@@ -3807,7 +3712,7 @@
       // 清單中對應標籤的項目，方便使用者核對這句話是不是真的出自
       // 那個來源，而不需要照單全收 AI 的整理結果。
       _buildSummaryHtml(data) {
-        const summaryText = CardSandbox.escapeHtml(data.summary || '');
+        const summaryText = CardSandbox.escapeHtml(this._normalizeSummaryLineBreaks(data.summary || ''));
         const refMap = {};
         if (Array.isArray(data.sourceRefs)) {
           data.sourceRefs.forEach(r => { refMap[r.point] = r.label; });
@@ -3832,6 +3737,14 @@
         });
 
         return rendered.join('');
+      },
+
+      // 保險機制：Gemini 偶爾不照 prompt 換行，在編號或條列符號前補上換行
+      _normalizeSummaryLineBreaks(text) {
+        if (!text) return text;
+        return text
+          .replace(/([^\n])(\d+\.\s)/g, '$1\n$2')
+          .replace(/([^\n])([・•]\s)/g, '$1\n$2');
       },
 
       // ★ 新增：點擊來源標籤時，捲動到勾選池清單中對應標籤的項目並
@@ -3876,18 +3789,12 @@
         }).join('');
       },
 
-      // ★ 修正：心智圖區塊改為「按需生成」——不再依賴 _callGemini
-      // 一次到位帶出 mindmapOutline（那個欄位已從第一次呼叫的
-      // responseSchema 移除，見 _callGemini 上方說明）。這裡只負責
-      // 判斷目前狀態該顯示什麼：已經生成過大綱 → 直接渲染；還沒
-      // 生成過 → 顯示一個「產生心智圖」按鈕，等使用者點擊或切到
-      // 心智圖分頁時才呼叫 Gemini（見 generateMindmap）。
+      // 心智圖按需生成：mindmapOutline 有值就直接渲染，沒有則顯示
+      // 「產生心智圖」按鈕（見 generateMindmap）
       _renderMindmap(data) {
         const section = document.getElementById('summaryMindmapSection');
         if (!section) return;
 
-        // 沒有摘要文字就不顯示心智圖區塊——心智圖是根據摘要整理的，
-        // 沒有摘要就沒有東西可以整理
         if (!data || !data.summary) {
           section.classList.add('hidden');
           return;
@@ -3904,13 +3811,11 @@
           this._setMindmapGenerateUIVisible(false);
           this._doRenderMindmapSvg(outline);
         } else {
-          // 尚未生成過心智圖大綱：顯示待生成狀態，不主動打 API
           this._setMindmapGenerateUIVisible(true);
         }
       },
 
-      // ★ 新增：切換「待生成」與「已生成」兩種畫面狀態。待生成狀態
-      // 顯示提示文字＋按鈕；已生成狀態顯示 SVG／編輯切換列。
+      // 切換「待生成」（提示＋按鈕）與「已生成」（SVG／編輯切換列）
       _setMindmapGenerateUIVisible(showGenerateUI) {
         const generateWrap = document.getElementById('mindmapGenerateWrap');
         const toggleRow = document.getElementById('mindmapViewToggleRow');
@@ -3921,10 +3826,8 @@
         if (viewWrap) viewWrap.classList.toggle('hidden', showGenerateUI);
       },
 
-      // ★ 新增：使用者按下「產生心智圖」時才真正呼叫 Gemini，把目前
-      // 已經顯示在畫面上的摘要文字（this.currentSummary.summary）
-      // 送去整理成心智圖大綱。生成結果存回 currentSummary 並持久化，
-      // 之後重新整理頁面或切換分頁不需要再次呼叫 API。
+      // 把已生成的摘要文字送去整理成心智圖大綱，結果存回
+      // currentSummary 並持久化
       async generateMindmap() {
         if (!this.currentSummary || !this.currentSummary.summary) return;
         if (this._isGeneratingMindmap) return;
@@ -3955,25 +3858,29 @@
         }
       },
 
-      // ★ 新增：實際呼叫 markmap 套件畫圖的地方，跟「資料從哪裡來」
-      // 分開，因為初次生成（來自 Gemini）與使用者編輯後重新渲染
-      // 都需要呼叫同一段邏輯。缺少 window.markmap（例如 CDN 載入
-      // 失敗、離線）時降級顯示純文字大綱，不讓整個摘要頁面掛掉。
+      // 實際呼叫 markmap 畫圖，初次生成與編輯後重新渲染共用這段邏輯。
+      // window.markmap 不可用時降級為純文字大綱顯示
       _doRenderMindmapSvg(outlineText) {
-        const svgEl = document.getElementById('mindmapSvg');
+        let svgEl = document.getElementById('mindmapSvg');
         if (!svgEl) return;
 
+        // 只替換 SVG 內容，保留旁邊的工具列按鈕
+        const showFallback = () => {
+          svgEl.outerHTML = `<pre class="mindmap-fallback-text" id="mindmapSvg">${CardSandbox.escapeHtml(outlineText)}</pre>`;
+        };
+
         if (!window.markmap || !window.markmap.Transformer || !window.markmap.Markmap) {
-          console.warn('markmap 套件尚未載入成功，改用純文字大綱顯示。');
-          const wrap = document.getElementById('mindmapViewWrap');
-          if (wrap) {
-            wrap.innerHTML = `<pre class="mindmap-fallback-text">${CardSandbox.escapeHtml(outlineText)}</pre>`;
-          }
+          showFallback();
           return;
         }
 
+        // 上一次是 fallback 狀態（元素是 <pre> 不是 <svg>），需先換回 <svg>
+        if (svgEl.tagName.toLowerCase() !== 'svg') {
+          svgEl.outerHTML = '<svg id="mindmapSvg" class="mindmap-svg"></svg>';
+          svgEl = document.getElementById('mindmapSvg');
+        }
+
         try {
-          // 每次重新渲染前清空舊的 SVG 內容，避免多次渲染疊加殘留節點
           while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
 
           const transformer = new window.markmap.Transformer();
@@ -3983,21 +3890,101 @@
             this._mindmapInstance.destroy();
           }
           this._mindmapInstance = window.markmap.Markmap.create(svgEl, {
-            // 唯讀檢視：不需要工具列、不允許拖曳節點，維持畫面單純
             zoom: true,
             pan: true
           }, root);
         } catch (err) {
-          console.error('心智圖渲染失敗，改用純文字大綱顯示：', err);
-          const wrap = document.getElementById('mindmapViewWrap');
-          if (wrap) {
-            wrap.innerHTML = `<pre class="mindmap-fallback-text">${CardSandbox.escapeHtml(outlineText)}</pre>`;
-          }
+          console.error('心智圖渲染失敗：', err);
+          showFallback();
         }
       },
 
-      // ★ 新增：切換「檢視」／「編輯」兩個分頁。編輯分頁是純文字框，
-      // 修改縮排大綱文字（新增/刪除/調整層級），不提供圖塊拖曳移動。
+      // 收合／展開心智圖區塊
+      toggleMindmapCollapse() {
+        const body = document.getElementById('mindmapCollapseBody');
+        const icon = document.getElementById('mindmapCollapseIcon');
+        if (!body || !icon) return;
+        const collapsed = body.classList.toggle('hidden');
+        icon.textContent = collapsed ? '🧠 簡易心智圖 ▸' : '🧠 簡易心智圖 ▾';
+      },
+
+      // 呼叫 markmap 的 fit()，重新置中並縮放到適合畫面
+      resetMindmapView() {
+        if (this._mindmapInstance && typeof this._mindmapInstance.fit === 'function') {
+          this._mindmapInstance.fit();
+        }
+      },
+
+      // SVG 序列化畫到 canvas 輸出 PNG dataURL，兩倍解析度避免模糊
+      _mindmapSvgToPngDataUrl() {
+        return new Promise((resolve, reject) => {
+          const svgEl = document.getElementById('mindmapSvg');
+          if (!svgEl || svgEl.tagName.toLowerCase() !== 'svg') {
+            reject(new Error('目前沒有可輸出的心智圖，請先產生心智圖。'));
+            return;
+          }
+
+          const svgText = new XMLSerializer().serializeToString(svgEl);
+          const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+
+          const img = new Image();
+          img.onload = () => {
+            const scale = 2;
+            const width = svgEl.clientWidth || 700;
+            const height = svgEl.clientHeight || 400;
+            const canvas = document.createElement('canvas');
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('圖片轉換失敗。'));
+          };
+          img.src = url;
+        });
+      },
+
+      downloadMindmapImage() {
+        this._mindmapSvgToPngDataUrl().then(dataUrl => {
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = `心智圖_${CopyToSheetFormat.formatTimestamp(new Date())}.png`;
+          a.click();
+        }).catch(err => alert(err.message));
+      },
+
+      // 優先用 Web Share API 分享檔案，不支援時退回下載
+      shareMindmapImage() {
+        this._mindmapSvgToPngDataUrl().then(async dataUrl => {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], `心智圖_${CopyToSheetFormat.formatTimestamp(new Date())}.png`, { type: 'image/png' });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: '心智圖' });
+              return;
+            } catch (shareErr) {
+              // 使用者取消分享屬正常操作，不視為錯誤
+              if (shareErr.name === 'AbortError') return;
+            }
+          }
+          alert('此環境不支援直接分享圖片，已改為下載，請從相簿手動分享。');
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = file.name;
+          a.click();
+        }).catch(err => alert(err.message));
+      },
+
+      // 切換「檢視」／「編輯」，編輯是縮排文字框，不支援拖曳節點
       switchMindmapView(mode) {
         const viewWrap = document.getElementById('mindmapViewWrap');
         const editWrap = document.getElementById('mindmapEditWrap');
@@ -4012,18 +3999,13 @@
         editBtn.classList.toggle('active', isEdit);
       },
 
-      // ★ 新增：套用使用者手動編輯過的縮排大綱文字。這裡刻意只更新
-      // 「顯示用」的心智圖與畫面上的 currentSummary.mindmapOutline，
-      // 並一併存回 localStorage，讓重新整理頁面後編輯結果不會遺失。
-      // 不會重新呼叫 Gemini——手動編輯純粹是本機端的呈現調整。
+      // 套用手動編輯過的大綱文字，只更新本機顯示與儲存，不重新呼叫 Gemini
       applyMindmapEdit() {
         const editTextarea = document.getElementById('mindmapEditTextarea');
         if (!editTextarea) return;
 
         const newOutline = editTextarea.value;
 
-        // ★ 基本格式防呆：完全空白內容不處理，避免畫出一張空白心智圖
-        // 造成使用者誤以為功能故障
         if (!newOutline.trim()) {
           alert('心智圖內容不能是空的，請至少保留一個節點。');
           return;
@@ -4068,6 +4050,14 @@
       copyToSheet() {
         if (!this.currentSummary) return;
         CopyToSheetFormat.copyContent(this.getPlainText(), 'summary');
+      },
+
+      // 心智圖獨立存 Sheet，跟摘要分開成不同 type，不合併在同一筆。
+      // 存的是縮排大綱純文字（mindmapOutline），不是圖片。
+      copyMindmapToSheet() {
+        const outline = this.currentSummary && this.currentSummary.mindmapOutline;
+        if (!outline) return;
+        CopyToSheetFormat.copyContent(outline, 'mindmap');
       },
 
       remove() {
@@ -4224,9 +4214,7 @@
 
         if (!res.ok) {
           const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
-          // ★ 新增：Groq 官方標準錯誤碼——401 代表 key 無效／未授權，
-          // 429 代表額度用完，不像 Gemini 有「400 但其實是 key 問題」
-          // 的特殊情況，判斷規則相對單純。
+          // Groq：401 為 key 無效，429 為額度用完
           if (res.status === 401) {
             KeyPoolPanel.notifyFailure('groq', 'invalid', 'Groq');
           } else if (res.status === 429) {
@@ -4474,13 +4462,8 @@
           const data = await res.json();
           this._pendingCount = Math.max(0, this._pendingCount - 1);
 
-          // ★ 修正：這裡原本沒有檢查 res.ok，導致 401（key 失效）或
-          // 429（額度用完）等錯誤回應會被誤判成功——因為 Groq 的
-          // 錯誤回應本身仍是合法 JSON（內容是 {"error": {...}}），
-          // res.json() 不會拋例外，原本的 catch 完全抓不到這種失敗，
-          // data.text 是 undefined 所以也不會誤新增空白卡片，但使用者
-          // 會看不到任何錯誤提示、卡片就是憑空少了一段，很難察覺
-          // 問題出在 key 失效。現在補上明確的失敗判斷與提醒。
+          // Groq 錯誤回應仍是合法 JSON，res.json() 不會拋例外，
+          // 必須明確檢查 res.ok，否則 401/429 會被誤判成功
           if (!res.ok) {
             const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
             if (res.status === 401) {
