@@ -2206,11 +2206,21 @@
       }
     };
 
-    // ★ 修正：多把 Key 池的初始渲染，取代原本單一輸入框的
-    // 讀取/儲存邏輯（saveApiKey／saveGeminiApiKey 已移除，改由
-    // KeyPoolPanel 統一管理）
-    KeyPoolPanel.render('groq');
-    KeyPoolPanel.render('gemini');
+    // ★ 修正：原本這裡會立即呼叫 KeyPoolPanel.render(...)，但
+    // KeyPoolPanel._renderList 內部用到的 CardSandbox.escapeHtml 此
+    // 時（這個位置）還沒有被定義（CardSandbox 在後面的
+    // const CardSandbox = {...} 才建立）。若使用者的 key 池已有資料
+    // （例如舊版遷移過來的 key，或先前測試存過），會在這裡直接對
+    // CardSandbox 拋出 ReferenceError（暫時性死區），且沒有任何
+    // try/catch 包住——這會讓整個 <script> 區塊從這裡中斷執行，
+    // 後面所有程式碼（包括呼叫 AccessGate.run() 那一行）都不會被
+    // 執行到，使用者會卡在「正在確認身分」的載入畫面一直轉圈，且
+    // 因為錯誤發生在很前面，手機上不容易注意到 console 有錯誤訊息。
+    // 修正方式：把初始渲染改到 enterApp()（在 AccessGate 完成身分
+    // 驗證、確定要進入主畫面時才執行，此時 CardSandbox 早已定義
+    // 完成），語意上也更正確——key 池清單本來就屬於「進入 App 後」
+    // 才需要準備好的畫面內容，不需要在身分驗證階段就搶著跑。
+    // 呼叫改移到下方 AccessGate.enterApp() 內。
 
     // ★ 新增：API Key 缺漏提示條。原本 API Key 卡片常駐在主畫面最
     // 上方，使用者一定會看到；現在移到獨立的「設定」分頁後，使用者
@@ -4683,6 +4693,18 @@
         // 設定分頁時畫面已經是最新狀態，不會有短暫空白或需要等待
         SettingsPanel.render();
         updateKeyMissingHints();
+
+        // ★ 修正：多把 Key 池的初始渲染，改移到這裡執行（而非在
+        // <script> 開頭就立即呼叫）。原因：KeyPoolPanel._renderList
+        // 內部用到 CardSandbox.escapeHtml，若在 CardSandbox 定義完成
+        // 之前就呼叫且 key 池已有資料，會直接拋出未被捕捉的
+        // ReferenceError，讓整個 <script> 從那裡中斷、後面呼叫
+        // AccessGate.run() 的程式碼都不會執行，使用者會卡在「正在
+        // 確認身分」畫面一直轉圈（詳見上方對應位置留下的說明）。
+        // enterApp() 執行的時間點，CardSandbox 早已定義完成，且語意
+        // 上 key 池清單本來就屬於「進入 App 後」才需要準備好的畫面。
+        KeyPoolPanel.render('groq');
+        KeyPoolPanel.render('gemini');
 
         if (CardSandbox.cards.length > 0) {
           MainNav.switchTo('cards');
